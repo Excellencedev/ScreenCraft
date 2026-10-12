@@ -325,6 +325,9 @@ pub struct Animations {
     pub motion_blur: f64,
     /// Default zoom level for newly created regions.
     pub default_zoom: f64,
+    /// "center" keeps the cursor (or text caret while typing) in the middle of
+    /// the zoomed view; "edge" only pans when it nears the border.
+    pub follow: String,
 }
 
 impl Default for Animations {
@@ -334,6 +337,7 @@ impl Default for Animations {
             screen_spring: SpringConfig::default(),
             motion_blur: 1.0,
             default_zoom: 2.0,
+            follow: "center".into(),
         }
     }
 }

@@ -3127,6 +3127,7 @@ dependencies = [
 name = "screencraft"
 version = "0.1.0"
 dependencies = [
+ "core-foundation",
  "core-graphics",
  "libc",
  "objc2",

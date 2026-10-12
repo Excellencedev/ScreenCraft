@@ -22,6 +22,7 @@ async function refresh() {
   setRow("rowScreen", "sScreen", "bScreen", s.screen ? "granted" : "notDetermined", "Grant");
   setRow("rowCamera", "sCamera", "bCamera", s.camera, "Allow");
   setRow("rowMic", "sMic", "bMic", s.microphone, "Allow");
+  setRow("rowAx", "sAx", "bAx", s.accessibility ? "granted" : "denied", "Open Settings");
   $("bContinue").disabled = !s.screen || !startedGranted;
   // Screen Recording only takes effect after a restart when it was granted mid-session.
   const needsRestart = s.screen && !startedGranted;
@@ -48,6 +49,7 @@ async function media(kind, constraints, id) {
 }
 $("bCamera").onclick = () => media("camera", { video: true });
 $("bMic").onclick = () => media("microphone", { audio: true });
+$("bAx").onclick = () => invoke("open_privacy_pane", { kind: "accessibility" });
 $("bRecheck").onclick = refresh;
 $("bRestart").onclick = () => invoke("restart_app");
 $("bContinue").onclick = async () => {

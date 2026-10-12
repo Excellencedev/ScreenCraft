@@ -32,6 +32,15 @@
   .opt.live #camPreview { display: block; }
   .opt.live > svg { display: none; }
   #hudCam.on { display: block; width: 36px; height: 36px; }
+  .opt { position: relative; }
+  .opt .meter { position: absolute; left: 10px; right: 10px; bottom: 2px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.1); overflow: hidden; display: none; }
+  .opt.on .meter { display: block; }
+  .meter b { display: block; height: 100%; width: 0; border-radius: 2px; background: linear-gradient(90deg, #4ade80 0%, #4ade80 65%, #facc15 80%, #f87171 100%); transition: width .05s linear; }
+  .meter.hud { position: static; display: none; width: 34px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; margin-left: 2px; }
+  body.hud .meter.hud { display: block; }
+  .menu button .chk { display: inline-block; width: 16px; color: var(--accent-2); }
+  .chev2 { width: 12px !important; height: 12px !important; }
+  body.hud .bar, body.countdown .bar { cursor: grab; }
   .close { width: 28px; height: 28px; border-radius: 50%; background: #fff; color: #111; display: grid; place-items: center; margin-right: 6px; }
   .close svg { width: 14px; height: 14px; stroke: #111; stroke-width: 2.4; fill: none; }
   .rec {
@@ -76,21 +85,20 @@
     <button class="tool" data-mode="window"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 9h18"/></svg>Window</button>
     <button class="tool" data-mode="area"><svg viewBox="0 0 24 24"><path stroke-dasharray="3 3" d="M5 5h14v14H5z"/></svg>Area</button>
     <div class="sep"></div>
-    <button class="opt off" id="optCamera"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3z"/></svg><canvas id="camPreview" width="80" height="80"></canvas><span>No camera</span></button>
-    <button class="opt off" id="optMic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span>No microphone</span></button>
-    <button class="opt off" id="optSys"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 010 6"/></svg><span>No system audio</span></button>
+    <button class="opt off" id="optCamera"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3z"/></svg><canvas id="camPreview" width="80" height="80"></canvas><span class="t">No camera</span></button>
+    <button class="opt off" id="optMic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span class="t">No microphone</span><i class="meter" id="micMeter"><b></b></i></button>
+    <button class="opt off" id="optSys"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 010 6"/></svg><span class="t">No system audio</span><i class="meter" id="sysMeter"><b></b></i></button>
     <div class="sep"></div>
-    <button class="opt" id="optQuality" title="Capture quality"><svg viewBox="0 0 24 24"><path d="M4 18V9M10 18V5M16 18v-7M22 18H2"/></svg><span id="qualLabel">Balanced</span></button>
-    <button class="opt" id="optCompress" title="Compress a video file"><svg viewBox="0 0 24 24"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4M9 12h6"/></svg></button>
+    <button class="opt" id="optQuality" title="Capture quality"><svg viewBox="0 0 24 24"><path d="M4 18V9M10 18V5M16 18v-7M22 18H2"/></svg><span id="qualLabel">Balanced</span><svg class="chev2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
     <button class="opt" id="optFolder" title="Open projects"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
     <button class="rec" id="btnRec"><span class="dot"></span><span id="recLabel">Record</span></button>
     <div class="hudbox">
-      <div id="hudLeft" style="display:flex;align-items:center;gap:10px"><canvas id="hudCam" width="72" height="72"></canvas><div class="pulse"></div><div class="time" id="timer">0:00</div></div>
+      <div id="hudLeft" style="display:flex;align-items:center;gap:10px"><canvas id="hudCam" width="72" height="72"></canvas><div class="pulse"></div><div class="time" id="timer">0:00</div><i class="meter hud" id="hudMic" title="Microphone"><b></b></i><i class="meter hud sys" id="hudSys" title="System audio"><b></b></i></div>
       <div class="count" id="count" style="display:none"></div>
       <button class="stop" id="btnStop">Stop</button>
     </div>
   </div>
 </div>
-<script type="module" src="js/recorder.js"></script>
+<script type="module" src="js/recorder/main.js"></script>
 </body>
 </html>

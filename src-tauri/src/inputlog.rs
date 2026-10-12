@@ -9,7 +9,7 @@ use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 use objc2::runtime::NSObjectProtocol;
 use objc2_app_kit::NSCursor;
 
-use screencraft_core::input::{Button, ClickEvent, CursorKind, InputLog, MoveEvent};
+use screencraft_core::input::{Button, CaretEvent, ClickEvent, CursorKind, InputLog, KeyEvent, MoveEvent};
 use screencraft_core::project::Rect;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -21,7 +21,14 @@ extern "C" {
     fn CGEventSourceButtonState(state_id: i32, button: u32) -> bool;
 }
 
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGEventSourceKeyState(state_id: i32, key: u16) -> bool;
+}
+
 const COMBINED_SESSION: i32 = 0;
+/// Modifier-only key codes never count as typing.
+const MODIFIERS: [u16; 10] = [54, 55, 56, 57, 58, 59, 60, 61, 62, 63];
 
 fn button_down(button: u32) -> bool {
     unsafe { CGEventSourceButtonState(COMBINED_SESSION, button) }
@@ -68,10 +75,27 @@ struct Click {
     down: bool,
 }
 
+#[derive(Clone, Copy)]
+struct Key {
+    at: Instant,
+    code: u16,
+}
+
+#[derive(Clone, Copy)]
+struct Caret {
+    at: Instant,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+}
+
 #[derive(Default)]
 struct Buffers {
     samples: Vec<Sample>,
     clicks: Vec<Click>,
+    keys: Vec<Key>,
+    carets: Vec<Caret>,
 }
 
 pub struct InputTracker {
@@ -112,7 +136,16 @@ impl InputTracker {
                 .iter()
                 .map(|c| ClickEvent { t: rel(c.at), x: c.x, y: c.y, button: c.button, down: c.down })
                 .collect(),
-            keys: Vec::new(),
+            keys: buf
+                .keys
+                .iter()
+                .map(|k| KeyEvent { t: rel(k.at), key: k.code.to_string(), down: true })
+                .collect(),
+            carets: buf
+                .carets
+                .iter()
+                .map(|c| CaretEvent { t: rel(c.at), x: c.x, y: c.y, w: c.w, h: c.h })
+                .collect(),
         }
     }
 }
@@ -124,6 +157,9 @@ fn poll_loop(stop: Arc<AtomicBool>, buffers: Arc<Mutex<Buffers>>) {
     let mut left = false;
     let mut right = false;
     let mut tick = 0u32;
+    let mut down_keys = [false; 128];
+    let mut last_key_at: Option<Instant> = None;
+    let ax_ok = crate::ax::trusted();
     while !stop.load(Ordering::SeqCst) {
         let now = Instant::now();
         if let Ok(ev) = CGEvent::new(source.clone()) {
@@ -147,6 +183,31 @@ fn poll_loop(stop: Arc<AtomicBool>, buffers: Arc<Mutex<Buffers>>) {
             if r != right {
                 right = r;
                 b.clicks.push(Click { at: now, x: p.x, y: p.y, button: Button::Right, down: r });
+            }
+        }
+        // Keyboard activity (key-state polling needs no extra permission).
+        if tick % 2 == 0 {
+            let mut b = buffers.lock().unwrap();
+            for code in 0u16..128 {
+                if MODIFIERS.contains(&code) {
+                    continue;
+                }
+                let d = unsafe { CGEventSourceKeyState(COMBINED_SESSION, code) };
+                if d && !down_keys[code as usize] {
+                    b.keys.push(Key { at: now, code });
+                    last_key_at = Some(now);
+                }
+                down_keys[code as usize] = d;
+            }
+        }
+        // While typing, follow the text caret (~16 Hz).
+        if ax_ok && tick % 7 == 0 {
+            if let Some(t) = last_key_at {
+                if now.duration_since(t) < Duration::from_millis(2000) {
+                    if let Some((x, y, w, h)) = crate::ax::caret_rect() {
+                        buffers.lock().unwrap().carets.push(Caret { at: now, x, y, w, h });
+                    }
+                }
             }
         }
         tick = tick.wrapping_add(1);

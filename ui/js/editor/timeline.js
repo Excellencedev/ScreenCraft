@@ -1,0 +1,192 @@
+// Timeline rendering and interaction. Dragging touches only the dragged
+// element's style; the DOM is rebuilt only when the edit is committed.
+import { invoke } from "../tauri.js";
+import { $, S, P, dir, uid, clamp, fmt, hooks } from "./state.js";
+import { sliceLen, outDuration, outToSrc, srcToOut } from "./timemap.js";
+import { change } from "./history.js";
+import { requestSeek, pause, play, updateTransport, setTimelineWidth } from "./playback.js";
+
+const tlWidth = () => Math.max(100, $("tlInner").clientWidth);
+let rulerKey = "";
+
+function renderRuler(dur, W, pxPerMs) {
+  const key = `${Math.round(dur)}|${W}`;
+  if (key === rulerKey) return;
+  rulerKey = key;
+  const ruler = $("ruler");
+  const steps = [100, 200, 500, 1000, 2000, 5000, 10000, 15000, 30000, 60000, 120000, 300000];
+  const step = steps.find((s) => s * pxPerMs >= 80) || 300000;
+  let html = "";
+  for (let t = 0; t <= dur; t += step) {
+    const x = t * pxPerMs;
+    html += `<div class="tick" style="left:${x}px"></div><div class="lab" style="left:${x}px">${fmt(t).replace(/\.0$/, "")}</div>`;
+  }
+  ruler.innerHTML = html;
+}
+
+export function renderTimeline() {
+  if (!P()) return;
+  const dur = outDuration();
+  const W = tlWidth();
+  setTimelineWidth(W);
+  const pxPerMs = W / Math.max(1, dur);
+  renderRuler(dur, W, pxPerMs);
+
+  // clip track
+  const clip = $("trackClip");
+  const frag = document.createDocumentFragment();
+  let acc = 0;
+  for (const s of P().scene.slices) {
+    const len = sliceLen(s);
+    const el = document.createElement("div");
+    el.className = "block clip" + (S.selected?.type === "slice" && S.selected.id === s.id ? " sel" : "");
+    el.style.left = acc * pxPerMs + "px";
+    el.style.width = Math.max(4, len * pxPerMs - 2) + "px";
+    el.innerHTML = `<span>Clip</span><span class="t">${(len / 1000).toFixed(1)}s${s.timeScale !== 1 ? ` · ${s.timeScale}×` : ""}</span>`;
+    el.onpointerdown = (e) => {
+      e.stopPropagation();
+      S.selected = { type: "slice", id: s.id };
+      const rect = $("tlInner").getBoundingClientRect();
+      requestSeek((e.clientX - rect.left) / pxPerMs);
+      renderTimeline();
+      hooks.renderPanel();
+      hooks.syncControls();
+    };
+    frag.appendChild(el);
+    acc += len;
+  }
+  clip.replaceChildren(frag);
+
+  // zoom track
+  const zt = $("trackZoom");
+  const zf = document.createDocumentFragment();
+  for (const z of P().scene.zooms) {
+    const a = srcToOut(z.sourceStartMs), b = srcToOut(z.sourceEndMs);
+    if (b - a < 1) continue;
+    const el = document.createElement("div");
+    el.className = "block zoom" + (z.isDisabled ? " disabled" : "") + (S.selected?.type === "zoom" && S.selected.id === z.id ? " sel" : "");
+    el.style.left = a * pxPerMs + "px";
+    el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
+    el.innerHTML = `<span>Zoom</span><span class="t">${z.zoom.toFixed(1)}× · ${z.kind === "manual" ? "Manual" : "Auto"}</span><div class="h l"></div><div class="h r"></div>`;
+    el.onpointerdown = (e) => beginZoomDrag(e, z, el, pxPerMs);
+    zf.appendChild(el);
+  }
+  zt.replaceChildren(zf);
+  updateTransport();
+}
+
+function beginZoomDrag(e, z, el, pxPerMs) {
+  e.stopPropagation();
+  e.preventDefault();
+  el.setPointerCapture(e.pointerId);
+  S.selected = { type: "zoom", id: z.id };
+  S.tab = "zoom";
+  document.querySelectorAll("#trackZoom .block.sel, #trackClip .block.sel").forEach((b) => b.classList.remove("sel"));
+  el.classList.add("sel");
+  hooks.renderPanel();
+  hooks.syncControls();
+
+  const mode = e.target.classList.contains("l") ? "l" : e.target.classList.contains("r") ? "r" : "move";
+  const x0 = e.clientX;
+  const a0 = srcToOut(z.sourceStartMs), b0 = srcToOut(z.sourceEndMs);
+  const total = outDuration();
+  let na = a0, nb = b0, moved = false;
+
+  el.onpointermove = (ev) => {
+    if (Math.abs(ev.clientX - x0) < 3 && !moved) return;
+    moved = true;
+    const d = (ev.clientX - x0) / pxPerMs;
+    let a = a0, b = b0;
+    if (mode === "move") {
+      const w = b0 - a0;
+      a = clamp(a0 + d, 0, total - w);
+      b = a + w;
+    } else if (mode === "l") {
+      a = clamp(a0 + d, 0, b0 - 300);
+    } else {
+      b = clamp(b0 + d, a0 + 300, total);
+    }
+    na = a; nb = b;
+    el.style.left = a * pxPerMs + "px";
+    el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
+  };
+  el.onpointerup = (ev) => {
+    el.onpointermove = el.onpointerup = null;
+    try { el.releasePointerCapture(ev.pointerId); } catch {}
+    if (!moved) return;
+    const ns = outToSrc(na).src, ne = outToSrc(nb).src;
+    change("zoom-drag-" + z.id, () => { z.sourceStartMs = ns; z.sourceEndMs = ne; }, { timeline: true });
+  };
+}
+
+// ---- scrubbing on ruler / empty track space
+export function bindScrub() {
+  const inner = $("tlInner");
+  inner.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".block")) return;
+    S.selected = null;
+    document.querySelectorAll(".block.sel").forEach((b) => b.classList.remove("sel"));
+    hooks.renderPanel();
+    const wasPlaying = S.playing;
+    if (wasPlaying) pause();
+    S.scrubbing = true;
+    inner.setPointerCapture(e.pointerId);
+    const seekTo = (ev, fast) => {
+      const r = inner.getBoundingClientRect();
+      requestSeek(clamp(((ev.clientX - r.left) / r.width) * outDuration(), 0, outDuration()), fast);
+    };
+    seekTo(e, true);
+    const mv = (ev) => seekTo(ev, true);
+    const up = (ev) => {
+      inner.removeEventListener("pointermove", mv);
+      inner.removeEventListener("pointerup", up);
+      try { inner.releasePointerCapture(ev.pointerId); } catch {}
+      S.scrubbing = false;
+      seekTo(ev, false); // exact frame + full-resolution redraw
+      if (wasPlaying) play();
+    };
+    inner.addEventListener("pointermove", mv);
+    inner.addEventListener("pointerup", up);
+  });
+}
+
+// ---- edit operations
+export function splitAtPlayhead() {
+  const { src, idx } = outToSrc(S.tOut);
+  const s = P().scene.slices[idx];
+  if (src <= s.sourceStartMs + 50 || src >= s.sourceEndMs - 50) return;
+  change(null, () => {
+    const right = { ...s, id: uid(), sourceStartMs: src };
+    s.sourceEndMs = src;
+    P().scene.slices.splice(idx + 1, 0, right);
+    S.selected = { type: "slice", id: right.id };
+  }, { panel: true, timeline: true });
+}
+
+export function deleteSelected() {
+  const sel = S.selected;
+  if (!sel) return;
+  if (sel.type === "zoom") {
+    change(null, () => { P().scene.zooms = P().scene.zooms.filter((z) => z.id !== sel.id); S.selected = null; }, { panel: true, timeline: true });
+  } else if (P().scene.slices.length > 1) {
+    change(null, () => { P().scene.slices = P().scene.slices.filter((s) => s.id !== sel.id); S.selected = null; }, { panel: true, timeline: true });
+    requestSeek(Math.min(S.tOut, outDuration()));
+  }
+}
+
+export function addZoomAtPlayhead() {
+  const { src, idx } = outToSrc(S.tOut);
+  const sl = P().scene.slices[idx];
+  const end = Math.min(src + 2500, sl.sourceEndMs);
+  if (end - src < 400) return;
+  const z = {
+    id: uid(), zoom: P().config.animations.defaultZoom, kind: "follow-cursor", manualTargetPoint: { x: 0.5, y: 0.5 },
+    isDisabled: false, sourceStartMs: src, sourceEndMs: end, instant: false,
+  };
+  change(null, () => { P().scene.zooms.push(z); S.selected = { type: "zoom", id: z.id }; S.tab = "zoom"; }, { panel: true, timeline: true });
+}
+
+export async function autoZoom() {
+  const zooms = await invoke("auto_zoom", { dir, project: P(), zoom: P().config.animations.defaultZoom });
+  change(null, () => { P().scene.zooms = zooms.map((z) => ({ ...z, id: uid() })); S.selected = null; }, { panel: true, timeline: true });
+}

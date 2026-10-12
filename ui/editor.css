@@ -97,3 +97,7 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 #menu button { display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px; }
 #menu button:hover { background: #242638; }
 #menu hr { border: 0; border-top: 1px solid #2a2c3d; margin: 6px 0; }
+
+#menu .mh { padding: 6px 10px 2px; color: var(--muted); font-size: 11px; }
+#tlScroll { contain: layout paint; }
+.block { will-change: transform; }

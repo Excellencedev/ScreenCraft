@@ -17,6 +17,12 @@ audio bitrate or removal, and a live size estimate. It runs natively in Rust on
 AVFoundation's hardware encoders. The editor's export dialog also offers codec
 and quality choices.
 
+## Typing & cursor focus
+
+Zoomed views keep the cursor in the middle of the frame. While you type, the camera
+moves to the text caret (read through the Accessibility API — grant it in the
+Permissions window). Typing bursts also create zoom regions automatically.
+
 ## Architecture
 
 | Piece | Where | What it does |

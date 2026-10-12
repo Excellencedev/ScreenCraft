@@ -71,6 +71,16 @@ pub struct KeyEvent {
     pub down: bool,
 }
 
+/// Text caret rectangle (global points) sampled while typing.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CaretEvent {
+    pub t: f64,
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct InputLog {
@@ -79,6 +89,7 @@ pub struct InputLog {
     pub moves: Vec<MoveEvent>,
     pub clicks: Vec<ClickEvent>,
     pub keys: Vec<KeyEvent>,
+    pub carets: Vec<CaretEvent>,
 }
 
 impl Default for InputLog {
@@ -88,6 +99,7 @@ impl Default for InputLog {
             moves: Vec::new(),
             clicks: Vec::new(),
             keys: Vec::new(),
+            carets: Vec::new(),
         }
     }
 }
@@ -120,6 +132,25 @@ impl InputLog {
         };
         let (nx, ny) = self.normalize(x, y);
         Some((nx, ny, k))
+    }
+
+    /// True when a key was pressed within `window_ms` before `t`.
+    pub fn typing_at(&self, t: f64, window_ms: f64) -> bool {
+        let i = self.keys.partition_point(|k| k.t <= t);
+        i > 0 && t - self.keys[i - 1].t <= window_ms
+    }
+
+    /// Normalised caret centre most recently sampled before `t` (within 2.5 s).
+    pub fn caret_at(&self, t: f64) -> Option<(f64, f64)> {
+        let i = self.carets.partition_point(|c| c.t <= t);
+        if i == 0 {
+            return None;
+        }
+        let c = self.carets[i - 1];
+        if t - c.t > 2500.0 {
+            return None;
+        }
+        Some(self.normalize(c.x + c.w * 0.5, c.y + c.h * 0.5))
     }
 
     pub fn button_down_at(&self, t: f64) -> bool {

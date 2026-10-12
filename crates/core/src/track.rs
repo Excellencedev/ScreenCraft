@@ -150,9 +150,15 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
                 let centre = match z.kind {
                     ZoomKind::Manual => (z.manual_target_point.x, z.manual_target_point.y),
                     ZoomKind::FollowCursor => {
-                        let allow_x = half_w * 0.6;
-                        let allow_y = half_h * 0.6;
-                        let (px, py) = (mx.x, my.x);
+                        // typing => look at the text caret, otherwise the cursor
+                        let (px, py) = if input.typing_at(t_src, 1500.0) {
+                            input.caret_at(t_src).unwrap_or((mx.x, my.x))
+                        } else {
+                            (mx.x, my.x)
+                        };
+                        let edge = anim.follow == "edge";
+                        let allow_x = if edge { half_w * 0.6 } else { 0.0 };
+                        let allow_y = if edge { half_h * 0.6 } else { 0.0 };
                         let dx = px - focus.0;
                         let dy = py - focus.1;
                         if dx.abs() > allow_x {
@@ -278,5 +284,29 @@ mod tests {
             assert!(tr.cx[i] - half >= -1e-6 && tr.cx[i] + half <= 1.0 + 1e-6);
             assert!(tr.cy[i] - half >= -1e-6 && tr.cy[i] + half <= 1.0 + 1e-6);
         }
+    }
+
+    #[test]
+    fn typing_moves_focus_to_caret() {
+        use crate::input::{CaretEvent, KeyEvent};
+        let (p, mut log) = project();
+        // cursor parked top-right, text caret at the left side of the screen
+        log.keys.push(KeyEvent { t: 2000.0, key: "0".into(), down: true });
+        log.carets.push(CaretEvent { t: 2050.0, x: 100.0, y: 250.0, w: 2.0, h: 20.0 });
+        let tr = compute_track(&p, &log, 60.0);
+        let f = |ms: f64| (ms * 60.0 / 1000.0) as usize;
+        // before typing the camera is on the cursor (x = 0.8); while typing it moves toward the caret (x ≈ 0.1)
+        assert!(tr.cx[f(1900.0)] > 0.6);
+        assert!(tr.cx[f(3000.0)] < tr.cx[f(1900.0)], "camera should pan toward the caret");
+    }
+
+    #[test]
+    fn center_mode_keeps_cursor_centred() {
+        let (p, log) = project();
+        let tr = compute_track(&p, &log, 60.0);
+        let f = |ms: f64| (ms * 60.0 / 1000.0) as usize;
+        let i = f(3500.0);
+        // viewport half-width is 0.25; cursor sits at 0.8 so the clamped centre is 0.75
+        assert!((tr.cx[i] - 0.75).abs() < 0.02);
     }
 }

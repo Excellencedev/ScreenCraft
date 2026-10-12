@@ -5,7 +5,7 @@
 //! burst, and clicks that land too close to the end of the recording are
 //! ignored.
 
-use crate::input::{Button, ClickEvent};
+use crate::input::{Button, InputLog};
 use crate::project::{ZoomKind, ZoomRegion};
 
 #[derive(Clone, Debug)]
@@ -25,12 +25,22 @@ impl Default for AutoZoomOptions {
     }
 }
 
-pub fn generate(clicks: &[ClickEvent], duration_ms: f64, opts: &AutoZoomOptions) -> Vec<ZoomRegion> {
-    let mut downs: Vec<f64> = clicks
+/// Zoom regions from clicks and typing bursts.
+pub fn generate(log: &InputLog, duration_ms: f64, opts: &AutoZoomOptions) -> Vec<ZoomRegion> {
+    let mut downs: Vec<f64> = log
+        .clicks
         .iter()
         .filter(|c| c.down && c.button == Button::Left)
         .map(|c| c.t)
         .collect();
+    // typing: one trigger at the start of each burst of key presses
+    let mut last_key = f64::NEG_INFINITY;
+    for k in log.keys.iter().filter(|k| k.down) {
+        if k.t - last_key > 2000.0 {
+            downs.push(k.t);
+        }
+        last_key = k.t;
+    }
     downs.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
     let mut groups: Vec<(f64, f64)> = Vec::new(); // (start, end)
@@ -61,6 +71,7 @@ pub fn generate(clicks: &[ClickEvent], duration_ms: f64, opts: &AutoZoomOptions)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::input::ClickEvent;
 
     fn click(t: f64) -> ClickEvent {
         ClickEvent { t, x: 0.0, y: 0.0, button: Button::Left, down: true }
@@ -69,7 +80,8 @@ mod tests {
     #[test]
     fn matches_reference_recording() {
         // Clicks seen in a real 19.4 s session: 1.57 s, 7.60 s and one right at the end.
-        let z = generate(&[click(1568.0), click(7596.0), click(19380.0)], 19401.0, &Default::default());
+        let log = InputLog { clicks: vec![click(1568.0), click(7596.0), click(19380.0)], ..Default::default() };
+        let z = generate(&log, 19401.0, &Default::default());
         assert_eq!(z.len(), 2);
         assert!((z[0].source_start_ms - 1268.0).abs() < 1.0);
         assert!((z[1].source_start_ms - 7296.0).abs() < 1.0);
@@ -78,7 +90,8 @@ mod tests {
 
     #[test]
     fn merges_bursts() {
-        let z = generate(&[click(1000.0), click(2000.0), click(3000.0)], 20000.0, &Default::default());
+        let log = InputLog { clicks: vec![click(1000.0), click(2000.0), click(3000.0)], ..Default::default() };
+        let z = generate(&log, 20000.0, &Default::default());
         assert_eq!(z.len(), 1);
         assert_eq!(z[0].source_end_ms, 5500.0);
     }

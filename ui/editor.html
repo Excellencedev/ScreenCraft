@@ -19,6 +19,8 @@
     <div class="top-right">
       <button class="icon-btn" id="btnUndo" title="Undo (⌘Z)"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
       <button class="icon-btn" id="btnRedo" title="Redo (⇧⌘Z)"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 000 12h3"/></svg></button>
+      <button class="pill" id="btnRaw" title="Raw recording files"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5"/></svg>Raw</button>
+      <button class="pill" id="btnCompress" title="Compress the video like HandBrake"><svg viewBox="0 0 24 24"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4M9 12h6"/></svg>Compress</button>
       <button class="pill" id="btnPresets"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/></svg>Presets<svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
       <button class="primary" id="btnExport"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Export</button>
     </div>
@@ -115,6 +117,6 @@
   </div>
 </div>
 <div id="menu" hidden></div>
-<script type="module" src="js/editor.js"></script>
+<script type="module" src="js/editor/main.js"></script>
 </body>
 </html>

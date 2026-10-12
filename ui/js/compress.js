@@ -82,6 +82,8 @@ async function loadFile(path) {
     $("btnStart").disabled = false;
     $("btnReveal").hidden = true;
     if (!document.querySelector(".preset.on")) applyPreset(PRESETS[0]);
+const presetInput = new URLSearchParams(location.search).get("input");
+if (presetInput) loadFile(presetInput);
     update();
   } catch (e) {
     $("srcInfo").textContent = "Could not read that file: " + e;
@@ -149,3 +151,5 @@ await listen("tauri://drag-drop", (e) => {
 await listen("tauri://drag-enter", () => $("drag").classList.add("on"));
 await listen("tauri://drag-leave", () => $("drag").classList.remove("on"));
 applyPreset(PRESETS[0]);
+const presetInput = new URLSearchParams(location.search).get("input");
+if (presetInput) loadFile(presetInput);

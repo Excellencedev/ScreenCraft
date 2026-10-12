@@ -321,7 +321,7 @@ fn end(s: Session) -> Result<StopInfo, String> {
     {
         let (m, cv) = &*s.finished;
         let g = m.lock().unwrap();
-        let _ = cv.wait_timeout_while(g, Duration::from_secs(10), |done| !*done).unwrap();
+        let _ = cv.wait_timeout_while(g, Duration::from_secs(3), |done| !*done).unwrap();
     }
     let d = s.output.recorded_duration();
     let mut duration_ms = if d.timescale > 0 { d.value as f64 / d.timescale as f64 * 1000.0 } else { 0.0 };
