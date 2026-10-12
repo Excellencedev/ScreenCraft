@@ -160,13 +160,12 @@ function musicTick() {
       if (!el.paused) el.pause();
       continue;
     }
-    const target = a.c.inMs + a.t;
+    const target = (a.c.inMs + a.t) / 1000;
     if (el.paused) {
-      el.currentTime = target / 1000;
-      if (el.playbackRate !== 1) el.playbackRate = 1;
+      if (Math.abs(el.currentTime - target) > 0.15) el.currentTime = target;
       el.play().catch(() => {});
-    } else {
-      chase(el, target, 1);
+    } else if (Math.abs(el.currentTime - target) > 1.5) {
+      el.currentTime = target; // far out of step: one correction
     }
   }
 }
@@ -182,24 +181,62 @@ function setPlayIcon(playing) {
   $("btnPlay").title = playing ? "Pause (Space)" : "Play (Space)";
 }
 
-export function play() {
-  if (S.playing || !S.track) return;
-  S.proxy = null;
-  ensureAudio();
-  if (S.tOut >= outDuration() - 30) seekOut(0);
-  const m = outToSrc(S.tOut);
-  S.curSlice = m.idx;
-  media.screen.currentTime = m.src / 1000;
-  applySliceAudio(P().scene.slices[m.idx]);
-  syncCamera(m.src);
-  syncMic(m.src);
-  media.screen.play().catch(console.error);
-  media.camera?.play().catch(() => {});
-  media.mic?.play().catch(() => {});
-  S.playing = true;
-  musicTick();
-  setPlayIcon(true);
-  requestAnimationFrame(loop);
+/** Seek `el` to `t` seconds and resolve once it has actually landed there. */
+function settle(el, t) {
+  return new Promise((res) => {
+    if (!el) return res();
+    if (Math.abs(el.currentTime - t) < 0.03 && el.readyState >= 2) return res();
+    let g = 0;
+    const done = () => {
+      clearTimeout(g);
+      el.removeEventListener("seeked", done);
+      res();
+    };
+    g = setTimeout(done, 700);
+    el.addEventListener("seeked", done);
+    el.currentTime = Math.max(0, t);
+  });
+}
+
+let starting = false;
+
+/**
+ * Start playback. Every element is first parked on exactly the right frame/sample and
+ * only then are they all started together; while playing nothing is seeked or re-rated
+ * (seeks and rate changes mid-playback are what deadlock WebKit's AVFoundation player).
+ */
+export async function play() {
+  if (S.playing || starting || !S.track) return;
+  starting = true;
+  try {
+    S.proxy = null;
+    if (S.tOut >= outDuration() - 30) seekOut(0);
+    const m = outToSrc(S.tOut);
+    S.curSlice = m.idx;
+    applySliceAudio(P().scene.slices[m.idx]);
+    const mu = P().scene.musicClips || [];
+    const jobs = [
+      settle(media.screen, Math.max(m.src / 1000, 0.05)),
+      settle(media.camera, Math.max(0, (m.src + P().media.cameraOffsetMs) / 1000)),
+      settle(media.mic, Math.max(0, (m.src + (P().media.micOffsetMs || 0)) / 1000)),
+    ];
+    for (const c of mu) {
+      const t = S.tOut - c.offsetMs;
+      const el = media.musicEls[c.file];
+      if (el && t >= 0 && t < c.durMs - 30) jobs.push(settle(el, (c.inMs + t) / 1000));
+    }
+    await Promise.all(jobs);
+    if (S.playing) return;
+    S.playing = true;
+    media.screen.play().catch(console.error);
+    media.camera?.play().catch(() => {});
+    media.mic?.play().catch(() => {});
+    musicTick();
+    setPlayIcon(true);
+    requestAnimationFrame(loop);
+  } finally {
+    starting = false;
+  }
 }
 export function pause() {
   if (!S.playing) return;
@@ -238,8 +275,9 @@ function loop() {
   }
   const cur = sl[S.curSlice];
   S.tOut = sliceOutStart(S.curSlice) + (clamp(v.currentTime * 1000, cur.sourceStartMs, cur.sourceEndMs) - cur.sourceStartMs) / cur.timeScale;
-  if (media.camera) chase(media.camera, v.currentTime * 1000 + P().media.cameraOffsetMs);
-  if (media.mic) chase(media.mic, v.currentTime * 1000 + (P().media.micOffsetMs || 0));
+  // only a gross drift (> 1.5 s) is corrected; small drift is left alone on purpose
+  if (media.camera) chase(media.camera, v.currentTime * 1000 + P().media.cameraOffsetMs, undefined, 1500);
+  if (media.mic) chase(media.mic, v.currentTime * 1000 + (P().media.micOffsetMs || 0), undefined, 1500);
   updateTransport(false);
   musicTick();
   draw();
