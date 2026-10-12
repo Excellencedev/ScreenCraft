@@ -345,6 +345,8 @@ pub struct Animations {
     pub follow_smooth_ms: f64,
     /// Extra smoothing applied to the drawn cursor itself.
     pub cursor_smooth_ms: f64,
+    /// Camera follow time while typing: shorter, so the caret stays near the middle.
+    pub typing_smooth_ms: f64,
 }
 
 impl Default for Animations {
@@ -359,6 +361,7 @@ impl Default for Animations {
             ease_out_ms: 500.0,
             follow_smooth_ms: 450.0,
             cursor_smooth_ms: 120.0,
+            typing_smooth_ms: 160.0,
         }
     }
 }

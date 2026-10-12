@@ -157,6 +157,22 @@ impl InputLog {
         (c.t - t <= 2500.0).then(|| self.normalize(c.x + c.w * 0.5, c.y + c.h * 0.5))
     }
 
+    /// Caret position at `t`, linearly interpolated between samples so the camera
+    /// glides with it instead of stepping at the sampling rate.
+    pub fn caret_smooth(&self, t: f64) -> Option<(f64, f64)> {
+        let i = self.carets.partition_point(|c| c.t <= t);
+        if i > 0 && i < self.carets.len() {
+            let (a, b) = (self.carets[i - 1], self.carets[i]);
+            if b.t - a.t > 0.0 && b.t - a.t < 700.0 {
+                let f = (t - a.t) / (b.t - a.t);
+                let (ax, ay) = (a.x + a.w * 0.5, a.y + a.h * 0.5);
+                let (bx, by) = (b.x + b.w * 0.5, b.y + b.h * 0.5);
+                return Some(self.normalize(ax + (bx - ax) * f, ay + (by - ay) * f));
+            }
+        }
+        self.caret_near(t)
+    }
+
     /// Normalised caret centre most recently sampled before `t` (within 2.5 s).
     pub fn caret_at(&self, t: f64) -> Option<(f64, f64)> {
         let i = self.carets.partition_point(|c| c.t <= t);

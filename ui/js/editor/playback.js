@@ -109,6 +109,13 @@ function applySliceAudio(s) {
 }
 export const refreshSliceAudio = () => applySliceAudio(P().scene.slices[S.curSlice]);
 
+/** SVG elements have no `.hidden` property, so toggle the attribute directly. */
+function setPlayIcon(playing) {
+  $("icoPlay").toggleAttribute("hidden", playing);
+  $("icoPause").toggleAttribute("hidden", !playing);
+  $("btnPlay").title = playing ? "Pause (Space)" : "Play (Space)";
+}
+
 export function play() {
   if (S.playing || !S.track) return;
   if (S.tOut >= outDuration() - 30) seekOut(0);
@@ -122,8 +129,7 @@ export function play() {
   media.camera?.play().catch(() => {});
   media.mic?.play().catch(() => {});
   S.playing = true;
-  $("icoPlay").hidden = true;
-  $("icoPause").hidden = false;
+  setPlayIcon(true);
   requestAnimationFrame(loop);
 }
 export function pause() {
@@ -132,8 +138,7 @@ export function pause() {
   media.screen.pause();
   media.camera?.pause();
   media.mic?.pause();
-  $("icoPlay").hidden = false;
-  $("icoPause").hidden = true;
+  setPlayIcon(false);
   draw();
 }
 function loop() {

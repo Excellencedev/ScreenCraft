@@ -174,11 +174,9 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
 
         // --- camera focus: caret while typing, otherwise the cursor ---
         // (look ahead too, so the lead-in of a typing zoom already heads for the caret)
-        let (tx, ty) = if input.typing_at(t_src, 1500.0) || input.typing_ahead(t_src, 900.0) {
-            input.caret_near(t_src).unwrap_or((mx, my))
-        } else {
-            (mx, my)
-        };
+        let typing = input.typing_at(t_src, 1500.0) || input.typing_ahead(t_src, 900.0);
+        let caret = if typing { input.caret_smooth(t_src) } else { None };
+        let (tx, ty) = caret.unwrap_or((mx, my));
         let (tx, ty) = (tx.clamp(crop.x, crop.x + crop.width), ty.clamp(crop.y, crop.y + crop.height));
         if !initialised {
             fx = tx;
@@ -194,7 +192,8 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
             fx = smooth_damp(fx, fx + gx, &mut fvx, st, dt);
             fy = smooth_damp(fy, fy + gy, &mut fvy, st, dt);
         } else {
-            let st = anim.follow_smooth_ms / 1000.0;
+            // follow the caret tightly so it stays as close to the middle as the frame allows
+            let st = if caret.is_some() { anim.typing_smooth_ms } else { anim.follow_smooth_ms } / 1000.0;
             fx = smooth_damp(fx, tx, &mut fvx, st, dt);
             fy = smooth_damp(fy, ty, &mut fvy, st, dt);
         }
@@ -367,5 +366,28 @@ mod tests {
         let f = |ms: f64| (ms * 60.0 / 1000.0) as usize;
         // 800 ms before the first key the camera has already started moving left
         assert!(tr.cx[f(2450.0)] < tr.cx[f(1500.0)] - 0.01);
+    }
+
+    #[test]
+    fn typing_keeps_the_caret_near_the_centre() {
+        use crate::input::{CaretEvent, KeyEvent};
+        let (mut p, mut log) = project();
+        p.scene.zooms[0].source_start_ms = 500.0;
+        p.scene.zooms[0].source_end_ms = 5500.0;
+        // caret walks steadily left to right across the middle of the screen, 20 Hz samples
+        for i in 0..80 {
+            let t = 1000.0 + i as f64 * 50.0;
+            log.keys.push(KeyEvent { t, key: "0".into(), down: true });
+            let x = 300.0 + i as f64 * 5.0; // 300..695 px of a 1000 px wide capture
+            log.carets.push(CaretEvent { t, x, y: 250.0, w: 2.0, h: 20.0 });
+        }
+        let tr = compute_track(&p, &log, 60.0);
+        let f = |ms: f64| (ms * 60.0 / 1000.0).round() as usize;
+        for ms in [2000.0, 2600.0, 3200.0, 3800.0] {
+            let i = f(ms);
+            let caret_x = (300.0 + ((ms - 1000.0) / 50.0) * 5.0 + 1.0) / 1000.0;
+            let off = (tr.cx[i] - caret_x).abs();
+            assert!(off < 0.04, "caret {caret_x:.3} vs camera {:.3} at {ms} ms", tr.cx[i]);
+        }
     }
 }
