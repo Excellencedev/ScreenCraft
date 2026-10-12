@@ -83,6 +83,8 @@ fn main() {
             windows::show_compressor,
             windows::open_editor,
             windows::open_area_picker,
+            windows::show_area_frame,
+            windows::hide_area_frame,
         ])
         .setup(move |app| {
             let _ = app.global_shortcut().register(toggle);

@@ -44,6 +44,7 @@ async function refreshSources() {
 async function chooseMode(mode) {
   if (isMenuOpen()) await closeMenu();
   state.mode = mode;
+  if (mode !== "area") invoke("hide_area_frame");
   savePrefs();
   render();
   await refreshSources();
@@ -72,6 +73,7 @@ async function chooseMode(mode) {
       anchor,
     );
   } else if (mode === "area") {
+    await invoke("hide_area_frame");
     await invoke("open_area_picker", { displayId: state.displayId });
   }
 }
@@ -141,9 +143,15 @@ $("optQuality").onclick = () => toggleMenu(captureMenu);
 $("optFolder").onclick = () => toggleMenu(folderMenu);
 $("btnRec").onclick = beginRecording;
 $("btnStop").onclick = finishRecording;
-$("btnClose").onclick = () => win.hide();
+$("btnClose").onclick = () => { invoke("hide_area_frame"); win.hide(); };
 
-await listen("area-selected", (e) => { state.area = e.payload; state.mode = "area"; savePrefs(); render(); });
+await listen("area-selected", async (e) => {
+  state.area = e.payload;
+  state.mode = "area";
+  savePrefs();
+  render();
+  try { await invoke("show_area_frame", { rect: e.payload, displayId: state.displayId }); } catch (err) { showError(String(err)); }
+});
 await listen("toggle-record", () => (state.phase === "recording" ? finishRecording() : beginRecording()));
 await listen("stop-record", () => finishRecording());
 addEventListener("keydown", (e) => { if (e.key === "Escape" && isMenuOpen()) closeMenu(); });

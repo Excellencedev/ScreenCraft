@@ -155,6 +155,7 @@ export async function finishRecording() {
   }
   try {
     const dir = await invoke("stop_recording", { cameraStartedUnixMs: cameraRec ? cameraStartedMs : null });
+    await invoke("hide_area_frame");
     await invoke("open_editor", { dir });
   } catch (e) {
     showError(String(e));
