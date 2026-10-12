@@ -29,20 +29,46 @@ async function startMic() {
         echoCancellation: false,
         noiseSuppression: false,
         autoGainControl: false,
+        channelCount: { ideal: 2 },
       },
       video: false,
     }),
     new Promise((_, rej) => setTimeout(() => rej(new Error("Microphone timed out")), 8000)),
   ]);
+  // Always record two channels: a mono microphone is duplicated to left and right.
+  const raw = stream;
+  let recStream = raw;
+  let ctx = null;
+  try {
+    ctx = new AudioContext({ sampleRate: 48000 });
+    await ctx.resume();
+    const src = ctx.createMediaStreamSource(raw);
+    const dest = ctx.createMediaStreamDestination();
+    dest.channelCount = 2;
+    dest.channelCountMode = "explicit";
+    dest.channelInterpretation = "speakers";
+    src.connect(dest);
+    recStream = dest.stream;
+  } catch {
+    ctx?.close?.().catch?.(() => {});
+    ctx = null;
+    recStream = raw;
+  }
+  const handle = {
+    getTracks: () => [
+      ...raw.getTracks(),
+      { stop: () => ctx?.close?.().catch?.(() => {}) },
+    ],
+  };
   const mime = ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm"].find((m) => MediaRecorder.isTypeSupported(m)) || "";
   let rec;
   try {
-    rec = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 192000 } : {});
+    rec = new MediaRecorder(recStream, mime ? { mimeType: mime, audioBitsPerSecond: 192000 } : {});
   } catch (e) {
-    stream.getTracks().forEach((t) => t.stop());
+    handle.getTracks().forEach((t) => t.stop());
     throw e;
   }
-  return { stream, rec, ext: mime.includes("mp4") ? "m4a" : "webm" };
+  return { stream: handle, rec, ext: mime.includes("mp4") ? "m4a" : "webm" };
 }
 
 async function startCamera() {

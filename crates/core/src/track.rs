@@ -106,7 +106,10 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
         let slice = &slices[slice_idx.min(slices.len().saturating_sub(1))];
 
         // --- cursor ---
-        let (rx, ry, kind) = input.cursor_at(t_src).unwrap_or((0.5, 0.5, CursorKind::Arrow));
+        // Smoothing delays the cursor by about its smoothing time, so aim at where the
+        // mouse will be then: the eased cursor then lands on the real position.
+        let lead = if slice.disable_smooth_mouse { 0.0 } else { anim.cursor_smooth_ms };
+        let (rx, ry, kind) = input.cursor_at(t_src + lead).unwrap_or((0.5, 0.5, CursorKind::Arrow));
         let (rx, ry) = loop_position(p, input, t_src, (rx, ry));
         if !initialised || slice.disable_smooth_mouse {
             mx = rx;
@@ -176,7 +179,12 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
         // (look ahead too, so the lead-in of a typing zoom already heads for the caret)
         let typing = input.typing_at(t_src, 1500.0) || input.typing_ahead(t_src, 900.0);
         let caret = if typing { input.caret_smooth(t_src) } else { None };
-        let (tx, ty) = caret.unwrap_or((mx, my));
+        // the camera also aims slightly ahead so the cursor stays close to the middle
+        let ahead = input
+            .cursor_at(t_src + anim.follow_smooth_ms * 0.7)
+            .map(|(x, y, _)| (x, y))
+            .unwrap_or((mx, my));
+        let (tx, ty) = caret.unwrap_or(ahead);
         let (tx, ty) = (tx.clamp(crop.x, crop.x + crop.width), ty.clamp(crop.y, crop.y + crop.height));
         if !initialised {
             fx = tx;
@@ -388,6 +396,22 @@ mod tests {
             let caret_x = (300.0 + ((ms - 1000.0) / 50.0) * 5.0 + 1.0) / 1000.0;
             let off = (tr.cx[i] - caret_x).abs();
             assert!(off < 0.04, "caret {caret_x:.3} vs camera {:.3} at {ms} ms", tr.cx[i]);
+        }
+    }
+
+    #[test]
+    fn eased_cursor_does_not_lag_the_real_mouse() {
+        let (p, mut log) = project();
+        log.moves.clear();
+        for i in 0..=100 {
+            let t = i as f64 * 50.0;
+            log.moves.push(MoveEvent { t, x: 100.0 + i as f64 * 6.0, y: 500.0, cursor: CursorKind::Arrow });
+        }
+        let tr = compute_track(&p, &log, 60.0);
+        for ms in [1500.0_f64, 2500.0, 3500.0] {
+            let i = (ms * 60.0 / 1000.0).round() as usize;
+            let real = (100.0 + ms / 50.0 * 6.0) / 1000.0;
+            assert!((tr.mx[i] - real).abs() < 0.01, "cursor {:.3} vs real {real:.3} at {ms}", tr.mx[i]);
         }
     }
 }
