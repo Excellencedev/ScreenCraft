@@ -17,6 +17,29 @@ fn with_ns_window(win: &tauri::WebviewWindow, f: impl FnOnce(&objc2_app_kit::NSW
     });
 }
 
+/// Resize the recorder bar in one native call, keeping its bottom-centre fixed
+/// (AppKit's origin is bottom-left, so the bottom edge simply stays put).
+#[tauri::command]
+pub fn resize_bar(app: AppHandle, w: f64, h: f64) -> Result<(), String> {
+    let win = app.get_webview_window("recorder").ok_or("no recorder window")?;
+    let ptr = win.ns_window().map_err(|e| e.to_string())? as usize;
+    let (tx, rx) = std::sync::mpsc::channel();
+    win.run_on_main_thread(move || {
+        let nswin = unsafe { &*(ptr as *const objc2_app_kit::NSWindow) };
+        let f = nswin.frame();
+        let cx = f.origin.x + f.size.width / 2.0;
+        let frame = objc2_foundation::NSRect::new(
+            objc2_foundation::NSPoint::new(cx - w / 2.0, f.origin.y),
+            objc2_foundation::NSSize::new(w, h),
+        );
+        nswin.setFrame_display_animate(frame, true, false);
+        let _ = tx.send(());
+    })
+    .map_err(|e| e.to_string())?;
+    let _ = rx.recv_timeout(std::time::Duration::from_millis(500));
+    Ok(())
+}
+
 /// Keep the toolbar / HUD above the dimmed surround of an area recording.
 pub fn raise_above_frame(win: &tauri::WebviewWindow) {
     with_ns_window(win, |w| w.setLevel(25));

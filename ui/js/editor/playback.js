@@ -54,9 +54,9 @@ function chase(el, targetMs, base = media.screen.playbackRate) {
   if (Math.abs(err) > 600) {
     el.currentTime = Math.max(0, targetMs / 1000);
     el.playbackRate = base;
-  } else if (Math.abs(err) > 35) {
+  } else if (Math.abs(err) > 90) {
     el.playbackRate = base * (err > 0 ? 0.97 : 1.03);
-  } else if (el.playbackRate !== base) {
+  } else if (Math.abs(err) < 30 && el.playbackRate !== base) {
     el.playbackRate = base;
   }
 }
@@ -133,51 +133,24 @@ export const seekOut = (t) => requestSeek(t, false);
 // the 100% an <audio>/<video> element allows, with a limiter against clipping.
 const bus = { ctx: null, dev: null, mic: null, music: {}, limiter: null };
 function ensureAudio() {
-  if (bus.ctx) {
-    bus.ctx.resume?.().catch(() => {});
-    return;
-  }
-  try {
-    const ctx = new AudioContext();
-    const limiter = makeLimiter(ctx);
-    limiter.connect(ctx.destination);
-    bus.limiter = limiter;
-    const wire = (el, mono) => {
-      if (!el) return null;
-      try {
-        const g = ctx.createGain();
-        const src = ctx.createMediaElementSource(el);
-        if (mono) src.connect(monoMix(ctx)).connect(g);
-        else src.connect(g);
-        g.connect(limiter);
-        el.volume = 1;
-        return g;
-      } catch {
-        return null;
-      }
-    };
-    bus.dev = wire(media.screen, false);
-    bus.mic = wire(media.mic, true);
-    for (const [f, el] of Object.entries(media.musicEls)) bus.music[f] = wire(el, false);
-    bus.ctx = ctx;
-    ctx.resume?.().catch(() => {});
-  } catch {}
+  // intentionally empty: playback uses plain media elements (no WebAudio graph)
 }
 
 function setLevel(el, node, gain) {
-  if (node) node.gain.value = Math.max(0, gain);
-  else el.volume = clamp(gain, 0, 1);
+  el.volume = clamp(gain, 0, 1);
 }
 
 function applySliceAudio(s) {
   const a = P().config.audio;
   const m = s.volume * masterGain(a.volume);
   media.screen.playbackRate = clamp(s.timeScale, 0.0625, 16);
-  setLevel(media.screen, bus.dev, m * a.deviceVolume);
+  setLevel(media.screen, null, m * a.deviceVolume);
   if (media.camera) media.camera.playbackRate = media.screen.playbackRate;
   if (media.mic) {
     media.mic.playbackRate = media.screen.playbackRate;
-    setLevel(media.mic, bus.mic, m * a.micVolume * (media.micLevel || 1));
+    // the baked mic already carries its auto-level at 2x; the master slider scales that back
+    const micGain = media.micBaked ? (m / 2) * a.micVolume : m * a.micVolume * (media.micLevel || 1);
+    setLevel(media.mic, null, micGain);
   }
   applyMusicLevel();
 }
@@ -185,19 +158,7 @@ function applySliceAudio(s) {
 function applyMusicLevel() {
   const a = P().config.audio;
   const lvl = masterGain(a.volume) * (a.musicVolume ?? 0.5);
-  for (const [f, el] of Object.entries(media.musicEls)) {
-    if (!bus.music[f] && bus.ctx) {
-      // added after playback started: wire it now
-      try {
-        const g = bus.ctx.createGain();
-        bus.ctx.createMediaElementSource(el).connect(g);
-        g.connect(bus.limiter);
-        el.volume = 1;
-        bus.music[f] = g;
-      } catch {}
-    }
-    setLevel(el, bus.music[f], lvl);
-  }
+  for (const el of Object.values(media.musicEls)) el.volume = clamp(lvl, 0, 1);
 }
 
 /** Music clips sit on the output timeline, so they follow tOut rather than source time. */

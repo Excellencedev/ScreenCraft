@@ -64,3 +64,41 @@ export function monoMix(ctx) {
   g.channelInterpretation = "speakers";
   return g;
 }
+
+function wavBlob(buf) {
+  const n = buf.length, ch = 2, bytes = n * ch * 2;
+  const ab = new ArrayBuffer(44 + bytes);
+  const v = new DataView(ab);
+  const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 36 + bytes, true); w(8, "WAVE"); w(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, ch, true);
+  v.setUint32(24, buf.sampleRate, true); v.setUint32(28, buf.sampleRate * ch * 2, true);
+  v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, bytes, true);
+  const l = buf.getChannelData(0), r = buf.getChannelData(buf.numberOfChannels > 1 ? 1 : 0);
+  let o = 44;
+  for (let i = 0; i < n; i++) {
+    v.setInt16(o, Math.max(-1, Math.min(1, l[i])) * 32767, true);
+    v.setInt16(o + 2, Math.max(-1, Math.min(1, r[i])) * 32767, true);
+    o += 4;
+  }
+  return new Blob([ab], { type: "audio/wav" });
+}
+
+/**
+ * Pre-render the microphone: centred in both ears, levelled and limited, at the loudness
+ * the "100%" master position needs. Playback can then use a plain <audio> element
+ * (volume <= 1) instead of routing it through WebAudio, which stutters when the
+ * main thread is busy drawing.
+ */
+export async function bakeMic(buf) {
+  const gain = autoGain(buf) * 2;
+  const off = new OfflineAudioContext(2, buf.length, buf.sampleRate);
+  const src = off.createBufferSource();
+  src.buffer = buf;
+  const g = off.createGain();
+  g.gain.value = gain;
+  src.connect(monoMix(off)).connect(g).connect(makeLimiter(off)).connect(off.destination);
+  src.start();
+  const out = await off.startRendering();
+  return URL.createObjectURL(wavBlob(out));
+}

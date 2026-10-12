@@ -33,9 +33,10 @@ export async function openMenu(items, anchor) {
   m.style.left = left + "px";
   m.style.bottom = BAR_H + 6 + "px";
   m.style.maxHeight = h + "px";
-  m.classList.add("show");
   open = true;
+  // grow the window first, then reveal the menu inside it (no flash at the old size)
   await resizeBar(BAR_W, BAR_H + h + 14);
+  m.classList.add("show");
 }
 
 export async function closeMenu() {

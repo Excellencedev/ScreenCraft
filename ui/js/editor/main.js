@@ -16,7 +16,7 @@ import { openExport, bindExport } from "./exportDialog.js";
 import { contentRect, camAt } from "../render.js";
 import { buildScrubCache } from "./scrubcache.js";
 import { loadMusicElements, migrateMusic } from "./music.js";
-import { autoGain } from "../audiolevel.js";
+import { autoGain, bakeMic } from "../audiolevel.js";
 
 hooks.updateTitle = () => {
   const t = $("title");
@@ -25,7 +25,19 @@ hooks.updateTitle = () => {
   currentWindow().setTitle?.(P().name + (S.dirty ? " *" : "")).catch?.(() => {});
 };
 hooks.draw = draw;
-hooks.syncMusic = () => { loadMusicElements().then(syncMusic); };
+hooks.syncMusic = () => { loadMusicElements().then(syncMusic); syncBgImage(); };
+/** Keep the decoded background image in step with the project (also after undo/redo). */
+export function syncBgImage() {
+  const bg = P()?.config.styles.background;
+  if (!bg || bg.kind !== "image" || !bg.image) return;
+  if (media.bgImage && media.bgImage.dataset.src === bg.image) return;
+  const img = new Image();
+  img.dataset.src = bg.image;
+  img.onload = () => hooks.draw();
+  img.src = bg.image;
+  media.bgImage = img;
+}
+hooks.syncBgImage = syncBgImage;
 hooks.renderTimeline = renderTimeline;
 hooks.renderPanel = renderPanel;
 hooks.scheduleTrack = scheduleTrack;
@@ -196,7 +208,7 @@ function loadVideo(url) {
   });
 }
 
-/** Measure the microphone once so it can be levelled automatically. */
+/** Level + centre the microphone once, then play that baked copy (see bakeMic). */
 async function levelMic(url) {
   try {
     const bytes = await (await fetch(url)).arrayBuffer();
@@ -204,6 +216,16 @@ async function levelMic(url) {
     const buf = await ctx.decodeAudioData(bytes);
     ctx.close?.();
     media.micLevel = autoGain(buf);
+    const baked = await bakeMic(buf);
+    const a = new Audio(baked);
+    a.preload = "auto";
+    await new Promise((res) => { a.onloadeddata = res; a.onerror = res; });
+    if (media.mic) {
+      a.currentTime = media.mic.currentTime;
+      media.mic.pause();
+    }
+    media.mic = a;
+    media.micBaked = true;
     refreshSliceAudio();
   } catch (e) {
     console.warn("mic level", e);
@@ -244,8 +266,7 @@ async function boot() {
     }
     const bg = P().config.styles.background;
     if (bg.kind === "image" && bg.image) {
-      media.bgImage = new Image();
-      media.bgImage.src = bg.image;
+      syncBgImage();
     }
     migrateMusic();
     bindUI();

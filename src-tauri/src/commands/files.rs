@@ -59,3 +59,36 @@ pub fn default_export_dir() -> String {
 pub fn test_export_path() -> Option<String> {
     std::env::var("SCREENCRAFT_TEST_EXPORT_PATH").ok().filter(|p| !p.is_empty())
 }
+
+/// Read an image file as a `data:` URL (used for custom backgrounds).
+#[tauri::command]
+pub fn read_image_data_url(path: String) -> CmdResult<String> {
+    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    if bytes.len() > 40 * 1024 * 1024 {
+        return Err("That image is larger than 40 MB".into());
+    }
+    let ext = path.rsplit('.').next().unwrap_or("").to_lowercase();
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "heic" => "image/heic",
+        "bmp" => "image/bmp",
+        "tif" | "tiff" => "image/tiff",
+        _ => "application/octet-stream",
+    };
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len() * 4 / 3 + 32);
+    out.push_str("data:");
+    out.push_str(mime);
+    out.push_str(";base64,");
+    for c in bytes.chunks(3) {
+        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        out.push(T[(n >> 18 & 63) as usize] as char);
+        out.push(T[(n >> 12 & 63) as usize] as char);
+        out.push(if c.len() > 1 { T[(n >> 6 & 63) as usize] as char } else { '=' });
+        out.push(if c.len() > 2 { T[(n & 63) as usize] as char } else { '=' });
+    }
+    Ok(out)
+}

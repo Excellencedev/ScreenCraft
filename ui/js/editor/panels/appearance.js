@@ -1,4 +1,5 @@
-import { P } from "../state.js";
+import { P, hooks } from "../state.js";
+import { invoke, dialog } from "../../tauri.js";
 import { change } from "../history.js";
 import { h3, el, slider, toggle, segmented, colorField } from "../widgets.js";
 import { WALLPAPERS, drawWallpaper } from "../../wallpapers.js";
@@ -35,18 +36,21 @@ export function panelAppearance(p) {
     p.append(colorField("Color", () => bg.color, (v) => (bg.color = v)));
   } else {
     const b = el('<button class="btn-line">Choose image…</button>');
-    b.onclick = () => {
-      const i = document.createElement("input");
-      i.type = "file";
-      i.accept = "image/*";
-      i.onchange = () => {
-        const f = i.files[0];
-        if (!f) return;
-        const r = new FileReader();
-        r.onload = () => change(null, () => (bg.image = r.result), { panel: true, track: false });
-        r.readAsDataURL(f);
-      };
-      i.click();
+    b.onclick = async () => {
+      // the system file picker + a Rust read: <input type=file> doesn't open in this web view
+      const picked = await dialog.open({
+        multiple: false,
+        filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "heic", "bmp", "tiff"] }],
+      });
+      const path = Array.isArray(picked) ? picked[0] : picked;
+      if (!path) return;
+      try {
+        const url = await invoke("read_image_data_url", { path });
+        change(null, () => (bg.image = url), { panel: true, track: false });
+        hooks.syncBgImage?.();
+      } catch (err) {
+        alert("Could not open that image: " + err);
+      }
     };
     p.append(b);
   }
