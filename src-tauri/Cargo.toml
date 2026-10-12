@@ -22,6 +22,8 @@ objc2-app-kit = { version = "0.3", features = ["NSCursor", "NSEvent", "NSWorkspa
 libc = "0.2"
 core-foundation = "0.10"
 objc2-av-foundation = { version = "0.3", features = ["objc2-core-media", "objc2-core-video", "AVCaptureDevice", "AVMediaFormat"] }
-objc2-core-media = { version = "0.3.2", features = ["CMTime", "CMSampleBuffer", "CMFormatDescription"] }
+objc2-core-media = { version = "0.3.2", features = ["CMTime", "CMSampleBuffer", "CMFormatDescription", "objc2-core-video"] }
+objc2-core-video = { version = "0.3", features = ["CVPixelBuffer", "CVImageBuffer", "CVBuffer", "CVReturn"] }
+jpeg-encoder = "0.7"
 objc2-foundation = "0.3.2"
 symphonia = { version = "0.6.1", features = ["aac", "isomp4", "mp3", "wav", "pcm"] }

@@ -6,6 +6,7 @@ mod commands;
 mod compress;
 mod inputlog;
 mod levelmic;
+mod proxy;
 mod meter;
 mod state;
 mod windows;
@@ -33,6 +34,29 @@ fn main() {
                 })
                 .build(),
         )
+        .register_uri_scheme_protocol("sc", |_ctx, req| {
+            // /frame/<screen|camera>/<n>?d=<project dir>
+            let uri = req.uri().to_string();
+            let path = req.uri().path().to_string();
+            let parts: Vec<&str> = path.trim_matches('/').split('/').collect();
+            let dir = uri
+                .split("?d=")
+                .nth(1)
+                .map(|d| urlencoding_decode(d.split('&').next().unwrap_or("")))
+                .unwrap_or_default();
+            let body = if parts.len() == 3 && parts[0] == "frame" {
+                parts[2].parse::<usize>().ok().and_then(|n| proxy::frame_bytes(&dir, parts[1], n))
+            } else {
+                None
+            };
+            let b = tauri::http::Response::builder()
+                .header("Access-Control-Allow-Origin", "*")
+                .header("Cache-Control", "no-store");
+            match body {
+                Some(bytes) => b.header("Content-Type", "image/jpeg").body(bytes).unwrap(),
+                None => b.status(404).body(Vec::new()).unwrap(),
+            }
+        })
         .menu(|handle| {
             use tauri::menu::{Menu, MenuItem, MenuItemKind};
             let menu = Menu::default(handle)?;
@@ -82,6 +106,7 @@ fn main() {
             commands::projects::save_project,
             windows::cancel_quit,
             levelmic::level_mic,
+            proxy::ensure_proxy,
             windows::resize_bar,
             windows::open_menu_window,
             windows::menu_take_items,
@@ -175,4 +200,22 @@ fn main() {
                 }
             }
         });
+}
+
+fn urlencoding_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(if bytes[i] == b'+' { b' ' } else { bytes[i] });
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }

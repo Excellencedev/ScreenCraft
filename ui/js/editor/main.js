@@ -1,5 +1,5 @@
 // Editor entry point: boot + event wiring. Everything else lives in sibling modules.
-import { invoke, convertFileSrc, currentWindow } from "../tauri.js";
+import { invoke, listen, currentWindow } from "../tauri.js";
 import { $, S, P, dir, hooks, media, clamp } from "./state.js";
 import { outDuration } from "./timemap.js";
 import { change, undo, redo, updateUndo, saveNow } from "./history.js";
@@ -14,7 +14,9 @@ import { showMenu } from "./menus.js";
 import { rawMenu } from "./rawfiles.js";
 import { openExport, bindExport } from "./exportDialog.js";
 import { contentRect, camAt } from "../render.js";
-import { loadMusicElements, migrateMusic } from "./music.js";
+import { migrateMusic } from "./music.js";
+import { Strip } from "./frames.js";
+import { loadAudio } from "./audio.js";
 
 hooks.updateTitle = () => {
   const t = $("title");
@@ -23,7 +25,7 @@ hooks.updateTitle = () => {
   currentWindow().setTitle?.(P().name + (S.dirty ? " *" : "")).catch?.(() => {});
 };
 hooks.draw = draw;
-hooks.syncMusic = () => { loadMusicElements().then(syncMusic); syncBgImage(); };
+hooks.syncMusic = () => { syncMusic(); syncBgImage(); };
 /** Keep the decoded background image in step with the project (also after undo/redo). */
 export function syncBgImage() {
   const bg = P()?.config.styles.background;
@@ -194,52 +196,6 @@ function bindUI() {
   bindExport();
 }
 
-function loadVideo(url) {
-  const v = document.createElement("video");
-  v.preload = "auto";
-  v.playsInline = true;
-  v.crossOrigin = "anonymous";
-  v.src = url;
-  return new Promise((res, rej) => {
-    v.onloadeddata = () => res(v);
-    v.onerror = () => rej(new Error("Could not load " + url));
-  });
-}
-
-/**
- * The mic is levelled and centred by the native side (level_mic) in the background;
- * once the leveled copy exists it replaces the original element between plays.
- */
-let leveledUrl = null;
-function swapMic() {
-  if (!leveledUrl || S.playing) return;
-  const url = leveledUrl;
-  leveledUrl = null;
-  const a = new Audio(url);
-  a.preload = "auto";
-  a.onloadeddata = () => {
-    if (S.playing) { leveledUrl = url; return; }
-    if (media.mic) {
-      a.currentTime = media.mic.currentTime;
-      media.mic.pause();
-    }
-    media.mic = a;
-    media.micBaked = true;
-    refreshSliceAudio();
-  };
-}
-hooks.swapMic = swapMic;
-
-async function levelMic() {
-  try {
-    const name = await invoke("level_mic", { dir, file: P().media.mic });
-    leveledUrl = convertFileSrc(`${dir}/${name}`);
-    swapMic();
-  } catch (e) {
-    console.warn("mic level", e);
-  }
-}
-
 async function boot() {
   if (!dir) { $("loading").textContent = "No project specified."; return; }
   try {
@@ -247,34 +203,38 @@ async function boot() {
     S.project = loaded.project;
     $("title").textContent = P().name;
     currentWindow().setTitle?.(P().name).catch?.(() => {});
-    media.screen = await loadVideo(convertFileSrc(`${dir}/${P().media.screen}`));
-    if (P().media.camera) media.camera = await loadVideo(convertFileSrc(`${dir}/${P().media.camera}`)).catch(() => null);
-    if (media.camera) media.camera.muted = true;
-    if (P().media.mic) {
-      media.mic = await new Promise((res) => {
-        const a = new Audio();
-        a.crossOrigin = "anonymous";
-        a.src = convertFileSrc(`${dir}/${P().media.mic}`);
-        a.preload = "auto";
-        a.onloadeddata = () => res(a);
-        a.onerror = () => res(null);
-      });
+
+    // Natively decoded preview proxy (built once per project, reused afterwards).
+    $("app").inert = true;
+    $("prep").hidden = false;
+    $("loading").hidden = true;
+    const un = await listen("proxy-progress", (e) => {
+      $("prepBar").style.width = Math.round(e.payload * 100) + "%";
+    });
+    let meta;
+    try {
+      meta = await invoke("ensure_proxy", { dir, screen: P().media.screen, camera: P().media.camera || null });
+    } finally {
+      un();
     }
-    const v = media.screen;
+    $("prep").hidden = true;
+    $("app").inert = false;
+    if (!meta?.screen) throw new Error("could not prepare the preview");
+    media.strips.screen = new Strip("screen", meta.screen, dir);
+    media.strips.camera = P().media.camera && meta.camera ? new Strip("camera", meta.camera, dir) : null;
+    const arrive = () => { if (!S.playing) requestAnimationFrame(() => hooks.draw()); };
+    media.strips.screen.onArrive = arrive;
+    if (media.strips.camera) media.strips.camera.onArrive = arrive;
+
     // trust the real file over the recorded numbers
-    if (v.videoWidth) {
-      P().media.width = v.videoWidth;
-      P().media.height = v.videoHeight;
+    const realMs = (meta.screen.n / meta.screen.fps) * 1000;
+    if (realMs > 0 && Math.abs(realMs - P().media.durationMs) > 400) {
+      for (const s of P().scene.slices) s.sourceEndMs = Math.min(s.sourceEndMs || realMs, realMs);
+      P().media.durationMs = realMs;
     }
-    if (isFinite(v.duration) && v.duration > 0 && Math.abs(v.duration * 1000 - P().media.durationMs) > 250) {
-      const d = v.duration * 1000;
-      for (const s of P().scene.slices) s.sourceEndMs = Math.min(s.sourceEndMs || d, d);
-      P().media.durationMs = d;
-    }
+
     const bg = P().config.styles.background;
-    if (bg.kind === "image" && bg.image) {
-      syncBgImage();
-    }
+    if (bg.kind === "image" && bg.image) syncBgImage();
     migrateMusic();
     bindUI();
     guardClose();
@@ -282,11 +242,12 @@ async function boot() {
     syncControls();
     updateUndo();
     await computeTrack();
-    await loadMusicElements();
-    if (media.mic) levelMic();
-    $("loading").hidden = true;
     requestSeek(0);
+    loadAudio().then(() => { syncMusic(); renderTimeline(); }).catch((e) => console.warn("audio", e));
   } catch (e) {
+    $("prep").hidden = true;
+    $("app").inert = false;
+    $("loading").hidden = false;
     $("loading").textContent = "Could not open project: " + (e?.message || e);
     console.error(e);
   }

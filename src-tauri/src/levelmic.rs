@@ -15,7 +15,7 @@ use symphonia::core::formats::{FormatOptions, TrackType};
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 
-const OUT_NAME: &str = "mic-leveled.wav";
+const OUT_NAME: &str = "mic-leveled-v2.wav";
 
 /// Returns (mono samples, sample rate).
 fn decode_mono(path: &Path) -> Result<(Vec<f32>, u32), String> {
@@ -145,7 +145,7 @@ fn level(dir: &Path, rel: &str) -> Result<String, String> {
     let (mono, rate) = decode_mono(&src)?;
     let gain = auto_gain(&mono, rate);
     // x2: headroom so the 100% master position is louder than 50%; the editor scales it back
-    let leveled: Vec<f32> = mono.iter().map(|&x| soft_limit(x * gain * 2.0)).collect();
+    let leveled: Vec<f32> = mono.iter().map(|&x| soft_limit(x * gain)).collect();
     write_wav(&out, &leveled, rate)?;
     Ok(OUT_NAME.into())
 }

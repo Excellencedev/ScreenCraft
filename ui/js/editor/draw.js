@@ -1,5 +1,6 @@
 // Canvas preview drawing with adaptive resolution.
 import { $, S, P, TRACK_FPS, media } from "./state.js";
+import { outToSrc } from "./timemap.js";
 import { outputSize, contentRect, paintFrame, camAt } from "../render.js";
 
 const canvas = $("preview");
@@ -42,9 +43,21 @@ export function draw() {
   if (!S.track || !P()) return;
   const { W, H } = sizeCanvas();
   const cam = camAt(S.track, frameIndex());
-  drawSrc.screen = S.proxy ? S.proxy.screen : media.screen;
-  drawSrc.camera = S.proxy ? S.proxy.camera || media.camera : media.camera;
+  const srcMs = outToSrc(S.tOut).src;
+  const st = media.strips;
+  const dirn = S.playing ? 1 : 0;
+  if (st.screen) {
+    const i = st.screen.index(srcMs);
+    st.screen.want(i, dirn);
+    drawSrc.screen = st.screen.peek(i);
+  }
+  if (st.camera) {
+    const i = st.camera.index(srcMs + P().media.cameraOffsetMs);
+    st.camera.want(i, dirn);
+    drawSrc.camera = st.camera.peek(i);
+  }
   drawSrc.bgImage = media.bgImage;
+  if (!drawSrc.screen) return;
   const t0 = performance.now();
   paintFrame(ctx, W, H, P(), cam, S.tOut, S.track.clicks, drawSrc);
   if (S.selected?.type === "zoom") updateManualMarker(cam);

@@ -1,7 +1,8 @@
 // Background music: clips of audio files placed on the edited timeline.
 // scene.musicClips = [{ id, file, name, offsetMs, inMs, durMs, fileDurMs }]
 import { invoke, dialog, convertFileSrc } from "../tauri.js";
-import { S, P, dir, media, uid } from "./state.js";
+import { S, P, dir, uid, hooks } from "./state.js";
+import { getMusicBuffer } from "./audio.js";
 import { change } from "./history.js";
 
 export const clips = () => P().scene.musicClips || (P().scene.musicClips = []);
@@ -19,65 +20,31 @@ export function migrateMusic() {
   sc.music = null;
 }
 
-const makeEl = (file) =>
-  new Promise((res) => {
-    const a = new Audio();
-    a.crossOrigin = "anonymous";
-    a.preload = "auto";
-    a.src = convertFileSrc(`${dir}/${file}`);
-    a.onloadeddata = () => res(a);
-    a.onerror = () => res(null);
-  });
-
-/** One <audio> element per distinct file (clips of the same file share it). */
-export async function loadMusicElements() {
-  media.musicEls = media.musicEls || {};
-  const files = new Set(clips().map((c) => c.file));
-  for (const f of files) {
-    if (!media.musicEls[f]) {
-      const a = await makeEl(f);
-      if (a) media.musicEls[f] = a;
-    }
-  }
-  for (const f of Object.keys(media.musicEls)) {
-    if (!files.has(f)) {
-      media.musicEls[f].pause();
-      delete media.musicEls[f];
-    }
-  }
-}
-
 // ---- waveform peaks (computed once per file)
 const peakCache = new Map();
 const BINS = 3000;
 export function getPeaks(file) {
   if (!peakCache.has(file)) {
     peakCache.set(file, (async () => {
-      try {
-        const bytes = await (await fetch(convertFileSrc(`${dir}/${file}`))).arrayBuffer();
-        const ctx = new AudioContext();
-        const buf = await ctx.decodeAudioData(bytes);
-        ctx.close?.();
-        const n = buf.length, per = Math.max(1, Math.floor(n / BINS));
-        const out = new Float32Array(Math.ceil(n / per));
-        for (let c = 0; c < buf.numberOfChannels; c++) {
-          const d = buf.getChannelData(c);
-          for (let i = 0; i < out.length; i++) {
-            let m = 0;
-            for (let k = i * per, e = Math.min(n, k + per); k < e; k++) {
-              const v = d[k] < 0 ? -d[k] : d[k];
-              if (v > m) m = v;
-            }
-            if (m > out[i]) out[i] = m;
+      const buf = await getMusicBuffer(file);
+      if (!buf) return null;
+      const n = buf.length, per = Math.max(1, Math.floor(n / BINS));
+      const out = new Float32Array(Math.ceil(n / per));
+      for (let c = 0; c < buf.numberOfChannels; c++) {
+        const d = buf.getChannelData(c);
+        for (let i = 0; i < out.length; i++) {
+          let m = 0;
+          for (let k = i * per, e = Math.min(n, k + per); k < e; k++) {
+            const v = d[k] < 0 ? -d[k] : d[k];
+            if (v > m) m = v;
           }
+          if (m > out[i]) out[i] = m;
         }
-        let peak = 0;
-        for (const v of out) if (v > peak) peak = v;
-        if (peak > 0) for (let i = 0; i < out.length; i++) out[i] /= peak;
-        return { peaks: out, durMs: (n / buf.sampleRate) * 1000 };
-      } catch {
-        return null;
       }
+      let peak = 0;
+      for (const v of out) if (v > peak) peak = v;
+      if (peak > 0) for (let i = 0; i < out.length; i++) out[i] /= peak;
+      return { peaks: out, durMs: (n / buf.sampleRate) * 1000 };
     })());
   }
   return peakCache.get(file);
@@ -136,7 +103,7 @@ export async function addMusic() {
     S.selected = { type: "music", id: clip.id };
     S.tab = "audio";
   }, { panel: true, timeline: true, track: false });
-  await loadMusicElements();
+  hooks.syncMusic?.();
 }
 
 export function removeMusicClip(id) {
@@ -144,5 +111,5 @@ export function removeMusicClip(id) {
     P().scene.musicClips = clips().filter((c) => c.id !== id);
     if (S.selected?.type === "music") S.selected = null;
   }, { panel: true, timeline: true, track: false });
-  loadMusicElements();
+  hooks.syncMusic?.();
 }
