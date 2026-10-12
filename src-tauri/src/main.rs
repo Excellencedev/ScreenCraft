@@ -148,6 +148,7 @@ struct StartArgs {
     microphone: bool,
     microphone_id: Option<String>,
     fps: Option<u32>,
+    quality: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -170,6 +171,7 @@ fn start_recording(state: State<AppState>, args: StartArgs) -> CmdResult<StartRe
         microphone: args.microphone,
         microphone_id: args.microphone_id,
         fps: args.fps.unwrap_or(60),
+        quality: args.quality,
         output_dir: dir.clone(),
     })?;
     *state.recording_dir.lock().unwrap() = Some(dir.clone());
@@ -505,7 +507,7 @@ fn show_recorder_window(app: &AppHandle) -> tauri::Result<()> {
         return Ok(());
     }
     let (sw, sh) = main_display_size();
-    let (w, h) = (920.0, 76.0);
+    let (w, h) = (1000.0, 76.0);
     WebviewWindowBuilder::new(app, "recorder", WebviewUrl::App("recorder.html".into()))
         .title("ScreenCraft")
         .inner_size(w, h)
@@ -515,6 +517,7 @@ fn show_recorder_window(app: &AppHandle) -> tauri::Result<()> {
         .shadow(false)
         .resizable(false)
         .always_on_top(true)
+        .accept_first_mouse(true)
         .visible_on_all_workspaces(true)
         .build()?;
     Ok(())
@@ -538,6 +541,7 @@ fn open_editor(app: AppHandle, dir: String) -> CmdResult<()> {
     let q = dir.replace('%', "%25").replace(' ', "%20").replace('&', "%26").replace('#', "%23");
     WebviewWindowBuilder::new(&app, label, WebviewUrl::App(format!("editor.html?dir={q}").into()))
         .title("ScreenCraft")
+        .accept_first_mouse(true)
         .inner_size(1240.0, 780.0)
         .min_inner_size(960.0, 640.0)
         .center()

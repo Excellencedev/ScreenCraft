@@ -140,6 +140,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
   venc.configure(vcfg);
 
   const total = track.count;
+  const src = { screen, camera, bgImage, cache: {} };
   const srcRatio = (i) => Math.max(0, Math.min(total - 1, i));
   for (let i = 0; i < total; i++) {
     if (shouldCancel?.()) { venc.close(); throw new Error("cancelled"); }
@@ -148,7 +149,6 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     const tOut = (i * 1000) / fps;
     await seek(screen, track.tSrc[t] / 1000);
     if (camera) await seek(camera, Math.max(0, (track.tSrc[t] + project.media.cameraOffsetMs) / 1000));
-    const src = { screen, camera, bgImage };
     const cam = camAt(track, i);
     const prev = camAt(track, srcRatio(i - 1)), next = camAt(track, srcRatio(i + 1));
     const motion = Math.abs(next.zoom - prev.zoom) * 4 + Math.abs(next.cx - prev.cx) * 12 + Math.abs(next.cy - prev.cy) * 12;
@@ -223,13 +223,14 @@ export async function exportGif({ project, dir, path, resolution, onProgress, sh
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const gifCache = {};
   const gif = GIFEncoder();
   const delay = Math.round(1000 / fps);
   for (let i = 0; i < track.count; i++) {
     if (shouldCancel?.()) throw new Error("cancelled");
     await seek(screen, track.tSrc[i] / 1000);
     if (camera) await seek(camera, Math.max(0, (track.tSrc[i] + project.media.cameraOffsetMs) / 1000));
-    paintFrame(ctx, W, H, project, camAt(track, i), (i * 1000) / fps, track.clicks, { screen, camera, bgImage });
+    paintFrame(ctx, W, H, project, camAt(track, i), (i * 1000) / fps, track.clicks, { screen, camera, bgImage, cache: gifCache });
     const { data } = ctx.getImageData(0, 0, W, H);
     const palette = quantize(data, 256, { format: "rgb565" });
     const index = applyPalette(data, palette, "rgb565");

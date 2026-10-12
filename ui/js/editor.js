@@ -24,7 +24,10 @@ const S = {
   curSlice: 0,
 };
 let screenV, cameraV, bgImage = null;
-const ctx = $("preview").getContext("2d");
+const ctx = $("preview").getContext("2d", { alpha: false });
+const drawSrc = { screen: null, camera: null, bgImage: null, cache: {} };
+let dyn = 1; // adaptive preview scale while playing
+let drawMs = 8;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -142,7 +145,8 @@ function frameIndex() {
   return Math.round((S.tOut * TRACK_FPS) / 1000);
 }
 function sizeCanvas() {
-  const { W, H } = outputSize(P(), S.previewRes);
+  const res = Math.round(S.previewRes * (S.playing ? dyn : 1));
+  const { W, H } = outputSize(P(), res);
   const c = $("preview");
   if (c.width !== W || c.height !== H) {
     c.width = W;
@@ -154,13 +158,26 @@ function draw() {
   if (!S.track || !P()) return;
   const { W, H } = sizeCanvas();
   const cam = camAt(S.track, frameIndex());
-  paintFrame(ctx, W, H, P(), cam, S.tOut, S.track.clicks, { screen: screenV, camera: cameraV, bgImage });
-  updateManualMarker(cam);
+  drawSrc.screen = screenV;
+  drawSrc.camera = cameraV;
+  drawSrc.bgImage = bgImage;
+  const t0 = performance.now();
+  paintFrame(ctx, W, H, P(), cam, S.tOut, S.track.clicks, drawSrc);
+  if (S.selected?.type === "zoom") updateManualMarker(cam);
+  else if (markerShown) { $("manualMarker").hidden = true; markerShown = false; }
+  // adapt preview resolution to keep playback smooth
+  if (S.playing) {
+    drawMs = drawMs * 0.85 + (performance.now() - t0) * 0.15;
+    if (drawMs > 20 && dyn > 0.5) { dyn = Math.max(0.5, dyn - 0.25); drawMs = 10; }
+    else if (drawMs < 6 && dyn < 1) { dyn = Math.min(1, dyn + 0.25); drawMs = 10; }
+  }
 }
+let markerShown = false;
 function updateManualMarker(cam) {
   const m = $("manualMarker");
   const z = S.selected?.type === "zoom" && P().scene.zooms.find((x) => x.id === S.selected.id);
-  if (!z || z.kind !== "manual") { m.hidden = true; return; }
+  if (!z || z.kind !== "manual") { m.hidden = true; markerShown = false; return; }
+  markerShown = true;
   const c = $("preview");
   const r = contentRect(P(), c.width, c.height);
   const crop = P().config.crop;
@@ -221,6 +238,7 @@ function pause() {
   cameraV?.pause();
   $("icoPlay").hidden = false;
   $("icoPause").hidden = true;
+  draw();
 }
 function loop() {
   if (!S.playing) return;
@@ -247,14 +265,20 @@ function loop() {
   const cur = sl[S.curSlice];
   S.tOut = srcToOut(clamp(screenV.currentTime * 1000, cur.sourceStartMs, cur.sourceEndMs));
   if (cameraV && Math.abs(cameraV.currentTime * 1000 - (screenV.currentTime * 1000 + P().media.cameraOffsetMs)) > 250) syncCamera(screenV.currentTime * 1000);
-  updateTransport();
+  updateTransport(false);
   draw();
   requestAnimationFrame(loop);
 }
-function updateTransport() {
+let lastTransport = 0;
+let tlW = 0;
+function updateTransport(force = true) {
+  const now = performance.now();
+  if (!force && now - lastTransport < 66) return;
+  lastTransport = now;
   $("tCur").textContent = fmt(S.tOut);
   const dur = outDuration();
-  $("playhead").style.left = (dur ? (S.tOut / dur) * tlWidth() : 0) + "px";
+  if (!tlW) tlW = tlWidth();
+  $("playhead").style.transform = `translateX(${dur ? (S.tOut / dur) * tlW : 0}px)`;
 }
 
 // ------------------------------------------------------------------ timeline
@@ -263,6 +287,7 @@ function renderTimeline() {
   if (!P()) return;
   const dur = outDuration();
   const W = tlWidth();
+  tlW = W;
   const pxPerMs = W / Math.max(1, dur);
   // ruler
   const ruler = $("ruler");

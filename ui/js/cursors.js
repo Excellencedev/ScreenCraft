@@ -13,7 +13,7 @@ function poly(ctx, pts, s) {
 const styles = {
   macos: { fill: "#111", stroke: "#fff" },
   light: { fill: "#fff", stroke: "#111" },
-  accent: { fill: "#5b4cf5", stroke: "#fff" },
+  accent: { fill: "#3b82c4", stroke: "#fff" },
 };
 
 /**

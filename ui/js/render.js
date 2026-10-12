@@ -41,26 +41,26 @@ function camScale(p, zoom) {
 }
 
 /**
- * Paint one output frame.
- * `cam` = { zoom, cx, cy, mx, my, kind, cscale, calpha, crot }.
- * `ctx` may be any 2D context sized W×H.
+ * Background + drop shadow only change when the style or output size does, so
+ * they are rendered once into an offscreen layer and blitted every frame.
  */
-export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
-  const s = H / 1080;
+function staticLayer(p, W, H, src) {
   const st = p.config.styles;
-  ctx.clearRect(0, 0, W, H);
-
-  // background
+  const bg = st.background;
+  const key = JSON.stringify([W, H, contentAspect(p), st.paddingRatio, st.cornerRadius, st.shadow, { ...bg, image: bg.image ? bg.image.length : 0 }]);
+  const cache = (src.cache ??= {});
+  if (cache.key === key && cache.canvas) return cache.canvas;
+  const c = cache.canvas && cache.canvas.width === W && cache.canvas.height === H ? cache.canvas : document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d");
+  const s = H / 1080;
   ctx.save();
-  if (st.background.blur > 0 && "filter" in ctx) ctx.filter = `blur(${st.background.blur * s}px)`;
-  drawBackground(ctx, W, H, st.background, src.bgImage);
+  if (bg.blur > 0 && "filter" in ctx) ctx.filter = `blur(${bg.blur * s}px)`;
+  drawBackground(ctx, W, H, bg, src.bgImage);
   ctx.restore();
-
-  const r = contentRect(p, W, H);
-  const radius = st.cornerRadius * s;
-
-  // shadow
   if (st.shadow.intensity > 0) {
+    const r = contentRect(p, W, H);
     ctx.save();
     const ang = (st.shadow.angle * Math.PI) / 180;
     const d = st.shadow.distance * s;
@@ -69,10 +69,28 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
     ctx.shadowOffsetX = st.shadow.directional ? Math.cos(ang) * d * 0.5 : 0;
     ctx.shadowOffsetY = st.shadow.directional ? Math.sin(ang) * d * 0.5 : d * 0.3;
     ctx.fillStyle = "#000";
-    rr(ctx, r.x, r.y, r.w, r.h, radius);
+    rr(ctx, r.x, r.y, r.w, r.h, st.cornerRadius * s);
     ctx.fill();
     ctx.restore();
   }
+  cache.key = key;
+  cache.canvas = c;
+  return c;
+}
+
+/**
+ * Paint one output frame.
+ * `cam` = { zoom, cx, cy, mx, my, kind, cscale, calpha, crot }.
+ * `ctx` may be any 2D context sized W×H.
+ */
+export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
+  const s = H / 1080;
+  const st = p.config.styles;
+  // background + shadow (cached layer)
+  ctx.drawImage(staticLayer(p, W, H, src), 0, 0);
+
+  const r = contentRect(p, W, H);
+  const radius = st.cornerRadius * s;
 
   // screen
   const crop = p.config.crop;

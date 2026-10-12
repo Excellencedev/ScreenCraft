@@ -42,6 +42,9 @@ pub struct StartOpts {
     pub microphone_id: Option<String>,
     #[serde(default = "default_fps")]
     pub fps: u32,
+    /// "native" | "balanced" | "light"
+    #[serde(default)]
+    pub quality: Option<String>,
     pub output_dir: PathBuf,
 }
 
@@ -217,7 +220,14 @@ fn begin(opts: StartOpts) -> Result<Session, String> {
         }
     };
 
-    let scale = filter.point_pixel_scale().max(1.0) as f64;
+    let native = filter.point_pixel_scale().max(1.0) as f64;
+    // Capture size profiles: huge Retina captures are what make recording and
+    // editing feel slow, so "balanced" caps the long side at 2560 px.
+    let scale = match opts.quality.as_deref() {
+        Some("light") => 1.0,
+        Some("native") => native,
+        _ => native.min((2560.0 / bounds.width.max(bounds.height)).max(1.0)),
+    };
     let (width, height) = (even(bounds.width * scale), even(bounds.height * scale));
 
     let mut config = SCStreamConfiguration::new()

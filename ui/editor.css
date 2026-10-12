@@ -11,7 +11,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px; background: #151620; border: 1px solid #1f2130; color: #d7d9e8; }
 .pill:hover { background: #1c1d2a; }
 .pill.small { padding: 5px 10px; font-size: 12px; }
-.pill.on { background: rgba(91,76,245,.25); border-color: var(--accent); }
+.pill.on { background: rgba(59,130,196,.25); border-color: var(--accent); }
 .pill .chev { width: 14px; height: 14px; }
 .primary { display: inline-flex; align-items: center; gap: 6px; background: var(--accent); color: #fff; padding: 8px 14px; border-radius: 10px; font-weight: 600; }
 .primary:hover { background: var(--accent-2); }
@@ -75,12 +75,12 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 .block { position: absolute; top: 0; bottom: 0; border-radius: 9px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; cursor: grab; border: 2px solid transparent; }
 .block.clip { background: linear-gradient(#d49a33, #b97f1f); color: #2b1c00; }
 .block.clip .t { color: rgba(43,28,0,.65); font-size: 11px; }
-.block.zoom { background: linear-gradient(#5b4cf5, #4538d8); color: #fff; }
+.block.zoom { background: linear-gradient(#3b82c4, #2f6aa8); color: #fff; }
 .block.zoom.disabled { opacity: .35; }
 .block.sel { border-color: #fff; }
 .block .h { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
 .block .h.l { left: 0; } .block .h.r { right: 0; }
-#playhead { position: absolute; top: 0; bottom: 0; width: 0; pointer-events: none; }
+#playhead { position: absolute; left: 0; top: 0; bottom: 0; width: 0; pointer-events: none; will-change: transform; }
 #playhead .head { position: absolute; left: -6px; top: 8px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent-2); }
 #playhead::after { content: ""; position: absolute; left: -1px; top: 20px; bottom: 0; width: 2px; background: var(--accent-2); }
 
