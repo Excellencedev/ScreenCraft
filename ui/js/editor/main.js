@@ -3,10 +3,10 @@ import { invoke, convertFileSrc, currentWindow } from "../tauri.js";
 import { $, S, P, dir, hooks, media, clamp } from "./state.js";
 import { outDuration } from "./timemap.js";
 import { change, undo, redo, updateUndo } from "./history.js";
-import { draw, frameIndex } from "./draw.js";
+import { draw, frameIndex, displayedRect } from "./draw.js";
 import { play, pause, requestSeek, scheduleTrack, computeTrack, refreshSliceAudio } from "./playback.js";
 import {
-  renderTimeline, bindScrub, splitAtPlayhead, deleteSelected, addZoomAtPlayhead, autoZoom,
+  renderTimeline, bindScrub, splitAtPlayhead, deleteSelected, addZoomAtPlayhead, autoZoom, duplicateSelected,
 } from "./timeline.js";
 import { renderPanel } from "./panels/index.js";
 import { presetsMenu } from "./presets.js";
@@ -38,6 +38,8 @@ function bindUI() {
   $("btnSplit").onclick = splitAtPlayhead;
   $("btnDelete").onclick = deleteSelected;
   $("btnAddZoom").onclick = addZoomAtPlayhead;
+  $("btnZoomHere").onclick = addZoomAtPlayhead;
+  $("btnDuplicate").onclick = duplicateSelected;
   $("btnAutoZoom").onclick = autoZoom;
   $("btnFolder").onclick = () => invoke("reveal_in_finder", { path: dir });
   $("btnCrop").onclick = () => { S.tab = "crop"; renderPanel(); };
@@ -62,7 +64,7 @@ function bindUI() {
       S.playing ? pause() : play();
       return;
     }
-    const c = $("preview"), rect = c.getBoundingClientRect();
+    const c = $("preview"), rect = displayedRect();
     const px = ((e.clientX - rect.left) / rect.width) * c.width, py = ((e.clientY - rect.top) / rect.height) * c.height;
     const r = contentRect(P(), c.width, c.height);
     const cam = camAt(S.track, frameIndex());
@@ -78,6 +80,7 @@ function bindUI() {
     if (e.code === "Space") { e.preventDefault(); S.playing ? pause() : play(); }
     else if (e.key === "s" && !mod) splitAtPlayhead();
     else if (e.key === "z" && !mod) addZoomAtPlayhead();
+    else if (e.key === "d" && !mod) duplicateSelected();
     else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); deleteSelected(); }
     else if (e.key === "ArrowLeft") { pause(); requestSeek(S.tOut - (e.shiftKey ? 1000 : 1000 / 30)); }
     else if (e.key === "ArrowRight") { pause(); requestSeek(S.tOut + (e.shiftKey ? 1000 : 1000 / 30)); }

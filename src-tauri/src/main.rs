@@ -9,7 +9,7 @@ mod meter;
 mod state;
 mod windows;
 
-use commands::permissions::screen_granted;
+use commands::permissions::all_required_granted;
 use state::{load_settings, AppState};
 use std::fs;
 use std::sync::Mutex;
@@ -71,6 +71,7 @@ fn main() {
             commands::compress::estimate_bitrate,
             commands::permissions::permission_status,
             commands::permissions::request_screen_access,
+            commands::permissions::request_input_monitoring,
             commands::permissions::open_privacy_pane,
             commands::permissions::restart_app,
             commands::devices::list_audio_inputs,
@@ -113,7 +114,7 @@ fn main() {
                 .build(app)?;
             let state = app.state::<AppState>();
             fs::create_dir_all(state.projects_root()).ok();
-            if screen_granted() {
+            if all_required_granted() {
                 windows::show_recorder_window(app.handle())?;
             } else {
                 windows::show_permissions_window(app.handle())?;

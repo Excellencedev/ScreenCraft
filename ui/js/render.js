@@ -36,7 +36,8 @@ function rr(ctx, x, y, w, h, r) {
 
 function camScale(p, zoom) {
   const maxZ = Math.max(1.0001, ...p.scene.zooms.filter((z) => !z.isDisabled).map((z) => z.zoom));
-  const f = Math.min(1, Math.max(0, (zoom - 1) / (maxZ - 1)));
+  const t = Math.min(1, Math.max(0, (zoom - 1) / (maxZ - 1)));
+  const f = t * t * (3 - 2 * t); // smooth, follows the eased zoom so the bubble shrinks gradually
   return 1 + (p.config.camera.zoomedScale - 1) * f;
 }
 

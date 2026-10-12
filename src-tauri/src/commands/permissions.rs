@@ -5,6 +5,8 @@ use tauri::AppHandle;
 extern "C" {
     fn CGPreflightScreenCaptureAccess() -> bool;
     fn CGRequestScreenCaptureAccess() -> bool;
+    fn CGPreflightListenEventAccess() -> bool;
+    fn CGRequestListenEventAccess() -> bool;
 }
 
 fn av_status(media: &str) -> String {
@@ -24,21 +26,51 @@ pub fn screen_granted() -> bool {
     unsafe { CGPreflightScreenCaptureAccess() }
 }
 
+pub fn input_monitoring_granted() -> bool {
+    unsafe { CGPreflightListenEventAccess() }
+}
+
+/// Everything required before the recorder is usable.
+pub fn all_required_granted() -> bool {
+    screen_granted() && crate::ax::trusted() && input_monitoring_granted()
+}
+
 #[derive(Serialize)]
 pub struct PermissionStatus {
     screen: bool,
     camera: String,
     microphone: String,
     accessibility: bool,
+    input_monitoring: bool,
+    /// Granted *and* actually usable in this process (otherwise a restart is needed).
+    screen_ready: bool,
+    input_ready: bool,
+}
+
+fn tap_ready() -> bool {
+    use core_graphics::event::{CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType, CallbackResult};
+    CGEventTap::new(
+        CGEventTapLocation::Session,
+        CGEventTapPlacement::HeadInsertEventTap,
+        CGEventTapOptions::ListenOnly,
+        vec![CGEventType::KeyDown],
+        |_, _, _| CallbackResult::Keep,
+    )
+    .is_ok()
 }
 
 #[tauri::command]
 pub fn permission_status() -> PermissionStatus {
+    let screen = screen_granted();
+    let input = input_monitoring_granted();
     PermissionStatus {
-        screen: screen_granted(),
+        screen_ready: screen && screencapturekit::prelude::SCShareableContent::get().is_ok(),
+        input_ready: input && tap_ready(),
+        screen,
         camera: av_status("vide"),
         microphone: av_status("soun"),
         accessibility: crate::ax::trusted(),
+        input_monitoring: input,
     }
 }
 
@@ -50,11 +82,17 @@ pub fn request_screen_access() -> bool {
 }
 
 #[tauri::command]
+pub fn request_input_monitoring() -> bool {
+    unsafe { CGRequestListenEventAccess() }
+}
+
+#[tauri::command]
 pub fn open_privacy_pane(kind: String) {
     let pane = match kind.as_str() {
         "camera" => "Privacy_Camera",
         "microphone" => "Privacy_Microphone",
         "accessibility" => "Privacy_Accessibility",
+        "input" => "Privacy_ListenEvent",
         _ => "Privacy_ScreenCapture",
     };
     let _ = std::process::Command::new("open")

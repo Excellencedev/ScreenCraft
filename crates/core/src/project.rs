@@ -114,6 +114,9 @@ pub struct ZoomRegion {
     pub source_start_ms: f64,
     pub source_end_ms: f64,
     pub instant: bool,
+    /// Per-region ease durations; `None` uses the project default.
+    pub ease_in_ms: Option<f64>,
+    pub ease_out_ms: Option<f64>,
 }
 
 impl Default for ZoomRegion {
@@ -127,6 +130,8 @@ impl Default for ZoomRegion {
             source_start_ms: 0.0,
             source_end_ms: 0.0,
             instant: false,
+            ease_in_ms: None,
+            ease_out_ms: None,
         }
     }
 }
@@ -211,7 +216,7 @@ impl Default for CameraConfig {
             position: Point { x: 1.0, y: 1.0 },
             padding_ratio: 0.5,
             corner_radius_ratio: 0.5,
-            zoomed_scale: 0.8,
+            zoomed_scale: 0.7,
             shadow: true,
             border: false,
         }
@@ -328,6 +333,13 @@ pub struct Animations {
     /// "center" keeps the cursor (or text caret while typing) in the middle of
     /// the zoomed view; "edge" only pans when it nears the border.
     pub follow: String,
+    /// Default zoom ease-in / ease-out duration.
+    pub ease_in_ms: f64,
+    pub ease_out_ms: f64,
+    /// How softly the camera glides after the cursor / caret.
+    pub follow_smooth_ms: f64,
+    /// Extra smoothing applied to the drawn cursor itself.
+    pub cursor_smooth_ms: f64,
 }
 
 impl Default for Animations {
@@ -338,6 +350,10 @@ impl Default for Animations {
             motion_blur: 1.0,
             default_zoom: 2.0,
             follow: "center".into(),
+            ease_in_ms: 300.0,
+            ease_out_ms: 300.0,
+            follow_smooth_ms: 450.0,
+            cursor_smooth_ms: 120.0,
         }
     }
 }

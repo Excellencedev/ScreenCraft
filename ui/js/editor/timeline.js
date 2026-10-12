@@ -2,7 +2,7 @@
 // element's style; the DOM is rebuilt only when the edit is committed.
 import { invoke } from "../tauri.js";
 import { $, S, P, dir, uid, clamp, fmt, hooks } from "./state.js";
-import { sliceLen, outDuration, outToSrc, srcToOut } from "./timemap.js";
+import { sliceLen, outDuration, outToSrc, spansOut } from "./timemap.js";
 import { change } from "./history.js";
 import { requestSeek, pause, play, updateTransport, setTimelineWidth } from "./playback.js";
 
@@ -42,40 +42,104 @@ export function renderTimeline() {
     el.className = "block clip" + (S.selected?.type === "slice" && S.selected.id === s.id ? " sel" : "");
     el.style.left = acc * pxPerMs + "px";
     el.style.width = Math.max(4, len * pxPerMs - 2) + "px";
-    el.innerHTML = `<span>Clip</span><span class="t">${(len / 1000).toFixed(1)}s${s.timeScale !== 1 ? ` · ${s.timeScale}×` : ""}</span>`;
-    el.onpointerdown = (e) => {
-      e.stopPropagation();
-      S.selected = { type: "slice", id: s.id };
-      const rect = $("tlInner").getBoundingClientRect();
-      requestSeek((e.clientX - rect.left) / pxPerMs);
-      renderTimeline();
-      hooks.renderPanel();
-      hooks.syncControls();
-    };
+    el.dataset.id = s.id;
+    el.innerHTML = `<div class="h l"></div><span>Clip</span><span class="t">${(len / 1000).toFixed(1)}s${s.timeScale !== 1 ? ` · ${s.timeScale}×` : ""}</span><div class="h r"></div>`;
+    el.onpointerdown = (e) => beginClipDrag(e, s, el, pxPerMs);
     frag.appendChild(el);
     acc += len;
   }
   clip.replaceChildren(frag);
 
-  // zoom track
+  // zoom track: one block per stretch of the timeline that shows the region
   const zt = $("trackZoom");
   const zf = document.createDocumentFragment();
   for (const z of P().scene.zooms) {
-    const a = srcToOut(z.sourceStartMs), b = srcToOut(z.sourceEndMs);
-    if (b - a < 1) continue;
-    const el = document.createElement("div");
-    el.className = "block zoom" + (z.isDisabled ? " disabled" : "") + (S.selected?.type === "zoom" && S.selected.id === z.id ? " sel" : "");
-    el.style.left = a * pxPerMs + "px";
-    el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
-    el.innerHTML = `<span>Zoom</span><span class="t">${z.zoom.toFixed(1)}× · ${z.kind === "manual" ? "Manual" : "Auto"}</span><div class="h l"></div><div class="h r"></div>`;
-    el.onpointerdown = (e) => beginZoomDrag(e, z, el, pxPerMs);
-    zf.appendChild(el);
+    for (const [a, b] of spansOut(z.sourceStartMs, z.sourceEndMs)) {
+      if (b - a < 1) continue;
+      const el = document.createElement("div");
+      el.className = "block zoom" + (z.isDisabled ? " disabled" : "") + (S.selected?.type === "zoom" && S.selected.id === z.id ? " sel" : "");
+      el.style.left = a * pxPerMs + "px";
+      el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
+      el.innerHTML = `<div class="h l"></div><span>Zoom</span><span class="t">${z.zoom.toFixed(1)}× · ${z.kind === "manual" ? "Manual" : "Auto"}</span><div class="h r"></div>`;
+      el.onpointerdown = (e) => beginZoomDrag(e, z, el, pxPerMs, a, b);
+      zf.appendChild(el);
+    }
   }
   zt.replaceChildren(zf);
   updateTransport();
 }
 
-function beginZoomDrag(e, z, el, pxPerMs) {
+/** Clip block: edge handles trim, dragging the body re-orders, a click selects + seeks. */
+function beginClipDrag(e, s, el, pxPerMs) {
+  e.stopPropagation();
+  e.preventDefault();
+  el.setPointerCapture(e.pointerId);
+  S.selected = { type: "slice", id: s.id };
+  document.querySelectorAll("#trackZoom .block.sel, #trackClip .block.sel").forEach((b) => b.classList.remove("sel"));
+  el.classList.add("sel");
+  hooks.renderPanel();
+  hooks.syncControls();
+
+  const mode = e.target.classList.contains("l") ? "l" : e.target.classList.contains("r") ? "r" : "move";
+  const x0 = e.clientX;
+  const rect = $("tlInner").getBoundingClientRect();
+  const left0 = parseFloat(el.style.left), width0 = parseFloat(el.style.width);
+  const total = P().media.durationMs;
+  const start0 = s.sourceStartMs, end0 = s.sourceEndMs;
+  let moved = false;
+  let ns = start0, ne = end0, drop = -1;
+
+  el.onpointermove = (ev) => {
+    const dx = ev.clientX - x0;
+    if (!moved && Math.abs(dx) < 4) return;
+    moved = true;
+    if (mode === "move") {
+      el.classList.add("dragging");
+      el.style.transform = `translateX(${dx}px)`;
+      // drop slot = number of other blocks whose centre is left of the pointer
+      const px = ev.clientX - rect.left;
+      let idx = 0;
+      for (const b of $("trackClip").children) {
+        if (b === el) continue;
+        const c = parseFloat(b.style.left) + parseFloat(b.style.width) / 2;
+        if (c < px) idx++;
+      }
+      drop = idx;
+    } else if (mode === "l") {
+      const dSrc = (dx / pxPerMs) * s.timeScale;
+      ns = clamp(start0 + dSrc, 0, end0 - 200);
+      const w = (end0 - ns) / s.timeScale * pxPerMs;
+      el.style.left = left0 + width0 - w + "px";
+      el.style.width = Math.max(8, w) + "px";
+    } else {
+      const dSrc = (dx / pxPerMs) * s.timeScale;
+      ne = clamp(end0 + dSrc, start0 + 200, total);
+      el.style.width = Math.max(8, ((ne - start0) / s.timeScale) * pxPerMs) + "px";
+    }
+  };
+  el.onpointerup = (ev) => {
+    el.onpointermove = el.onpointerup = null;
+    try { el.releasePointerCapture(ev.pointerId); } catch {}
+    el.classList.remove("dragging");
+    el.style.transform = "";
+    if (!moved) {
+      requestSeek((ev.clientX - rect.left) / pxPerMs);
+      return;
+    }
+    if (mode === "move") {
+      const from = P().scene.slices.findIndex((x) => x.id === s.id);
+      if (drop < 0 || drop === from) return renderTimeline();
+      change(null, () => {
+        const [it] = P().scene.slices.splice(from, 1);
+        P().scene.slices.splice(drop, 0, it);
+      }, { timeline: true });
+    } else {
+      change(null, () => { s.sourceStartMs = ns; s.sourceEndMs = ne; }, { timeline: true });
+    }
+  };
+}
+
+function beginZoomDrag(e, z, el, pxPerMs, a0, b0) {
   e.stopPropagation();
   e.preventDefault();
   el.setPointerCapture(e.pointerId);
@@ -88,7 +152,6 @@ function beginZoomDrag(e, z, el, pxPerMs) {
 
   const mode = e.target.classList.contains("l") ? "l" : e.target.classList.contains("r") ? "r" : "move";
   const x0 = e.clientX;
-  const a0 = srcToOut(z.sourceStartMs), b0 = srcToOut(z.sourceEndMs);
   const total = outDuration();
   let na = a0, nb = b0, moved = false;
 
@@ -160,6 +223,18 @@ export function splitAtPlayhead() {
     s.sourceEndMs = src;
     P().scene.slices.splice(idx + 1, 0, right);
     S.selected = { type: "slice", id: right.id };
+  }, { panel: true, timeline: true });
+}
+
+export function duplicateSelected() {
+  const sel = S.selected;
+  if (!sel || sel.type !== "slice") return;
+  const idx = P().scene.slices.findIndex((x) => x.id === sel.id);
+  if (idx < 0) return;
+  change(null, () => {
+    const copy = { ...P().scene.slices[idx], id: uid() };
+    P().scene.slices.splice(idx + 1, 0, copy);
+    S.selected = { type: "slice", id: copy.id };
   }, { panel: true, timeline: true });
 }
 

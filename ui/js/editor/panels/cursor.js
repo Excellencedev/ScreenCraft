@@ -34,7 +34,8 @@ export function panelCursor(p) {
   p.append(h3("Camera motion"));
   p.append(segmented("Follow", [["center", "Keep centered"], ["edge", "Only near edges"]], () => a.follow, (v) => (a.follow = v), { track: true }));
   p.append(el('<div class="hint muted">Zoomed views keep the cursor in the middle of the screen. While you type, the camera moves to the text caret (grant Accessibility in Permissions).</div>'));
-  p.append(slider("Cursor smoothing", 40, 400, 5, () => a.mouseSpring.stiffness, (v) => (a.mouseSpring.stiffness = v), { track: true, key: "mouse-stiff" }));
-  p.append(slider("Camera stiffness", 40, 400, 5, () => a.screenSpring.stiffness, (v) => (a.screenSpring.stiffness = v), { track: true, key: "screen-stiff" }));
-  p.append(slider("Camera damping", 4, 40, 0.5, () => a.screenSpring.damping, (v) => (a.screenSpring.damping = v), { track: true, key: "screen-damp" }));
+  p.append(slider("Camera smoothness", 0.1, 1.2, 0.05, () => a.followSmoothMs / 1000, (v) => (a.followSmoothMs = v * 1000), { track: true, key: "follow-smooth", fmt: (v) => v.toFixed(2) + " s" }));
+  p.append(slider("Cursor smoothing", 0, 0.5, 0.01, () => a.cursorSmoothMs / 1000, (v) => (a.cursorSmoothMs = v * 1000), { track: true, key: "cursor-smooth", fmt: (v) => v.toFixed(2) + " s" }));
+  p.append(slider("Zoom ease in", 0, 1.5, 0.05, () => a.easeInMs / 1000, (v) => (a.easeInMs = v * 1000), { track: true, key: "ease-in-all", fmt: (v) => v.toFixed(2) + " s" }));
+  p.append(slider("Zoom ease out", 0, 1.5, 0.05, () => a.easeOutMs / 1000, (v) => (a.easeOutMs = v * 1000), { track: true, key: "ease-out-all", fmt: (v) => v.toFixed(2) + " s" }));
 }

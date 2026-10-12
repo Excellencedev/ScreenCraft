@@ -21,11 +21,6 @@ extern "C" {
     fn CGEventSourceButtonState(state_id: i32, button: u32) -> bool;
 }
 
-#[link(name = "CoreGraphics", kind = "framework")]
-extern "C" {
-    fn CGEventSourceKeyState(state_id: i32, key: u16) -> bool;
-}
-
 const COMBINED_SESSION: i32 = 0;
 /// Modifier-only key codes never count as typing.
 const MODIFIERS: [u16; 10] = [54, 55, 56, 57, 58, 59, 60, 61, 62, 63];
@@ -102,6 +97,41 @@ pub struct InputTracker {
     stop: Arc<AtomicBool>,
     buffers: Arc<Mutex<Buffers>>,
     thread: Option<JoinHandle<()>>,
+    key_thread: Option<JoinHandle<()>>,
+}
+
+/// Keyboard activity through a listen-only event tap (needs Input Monitoring).
+fn key_tap_loop(stop: Arc<AtomicBool>, buffers: Arc<Mutex<Buffers>>) {
+    use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop};
+    use core_graphics::event::{
+        CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType, CallbackResult, EventField,
+    };
+    let b = buffers.clone();
+    let res = CGEventTap::with_enabled(
+        CGEventTapLocation::Session,
+        CGEventTapPlacement::HeadInsertEventTap,
+        CGEventTapOptions::ListenOnly,
+        vec![CGEventType::KeyDown],
+        move |_, _, ev| {
+            if ev.get_integer_value_field(EventField::KEYBOARD_EVENT_AUTOREPEAT) == 0 {
+                let code = ev.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE) as u16;
+                if !MODIFIERS.contains(&code) {
+                    b.lock().unwrap().keys.push(Key { at: Instant::now(), code });
+                }
+            }
+            CallbackResult::Keep
+        },
+        || {
+            while !stop.load(Ordering::SeqCst) {
+                unsafe {
+                    CFRunLoop::run_in_mode(kCFRunLoopDefaultMode, Duration::from_millis(100), false);
+                }
+            }
+        },
+    );
+    if res.is_err() {
+        eprintln!("[screencraft] keyboard tap unavailable (Input Monitoring not granted)");
+    }
 }
 
 impl InputTracker {
@@ -113,13 +143,21 @@ impl InputTracker {
             .name("screencraft-input".into())
             .spawn(move || poll_loop(s, b))
             .ok();
-        Self { stop, buffers, thread }
+        let (s2, b2) = (stop.clone(), buffers.clone());
+        let key_thread = thread::Builder::new()
+            .name("screencraft-keys".into())
+            .spawn(move || key_tap_loop(s2, b2))
+            .ok();
+        Self { stop, buffers, thread, key_thread }
     }
 
     /// Stop polling and convert the log to times relative to `zero`.
     pub fn finish(mut self, zero: Instant, bounds: Rect) -> InputLog {
         self.stop.store(true, Ordering::SeqCst);
         if let Some(t) = self.thread.take() {
+            let _ = t.join();
+        }
+        if let Some(t) = self.key_thread.take() {
             let _ = t.join();
         }
         let buf = std::mem::take(&mut *self.buffers.lock().unwrap());
@@ -157,8 +195,7 @@ fn poll_loop(stop: Arc<AtomicBool>, buffers: Arc<Mutex<Buffers>>) {
     let mut left = false;
     let mut right = false;
     let mut tick = 0u32;
-    let mut down_keys = [false; 128];
-    let mut last_key_at: Option<Instant> = None;
+    let mut finder = crate::ax::CaretFinder::default();
     let ax_ok = crate::ax::trusted();
     while !stop.load(Ordering::SeqCst) {
         let now = Instant::now();
@@ -185,28 +222,18 @@ fn poll_loop(stop: Arc<AtomicBool>, buffers: Arc<Mutex<Buffers>>) {
                 b.clicks.push(Click { at: now, x: p.x, y: p.y, button: Button::Right, down: r });
             }
         }
-        // Keyboard activity (key-state polling needs no extra permission).
-        if tick % 2 == 0 {
-            let mut b = buffers.lock().unwrap();
-            for code in 0u16..128 {
-                if MODIFIERS.contains(&code) {
-                    continue;
-                }
-                let d = unsafe { CGEventSourceKeyState(COMBINED_SESSION, code) };
-                if d && !down_keys[code as usize] {
-                    b.keys.push(Key { at: now, code });
-                    last_key_at = Some(now);
-                }
-                down_keys[code as usize] = d;
-            }
-        }
         // While typing, follow the text caret (~16 Hz).
         if ax_ok && tick % 7 == 0 {
-            if let Some(t) = last_key_at {
-                if now.duration_since(t) < Duration::from_millis(2000) {
-                    if let Some((x, y, w, h)) = crate::ax::caret_rect() {
-                        buffers.lock().unwrap().carets.push(Caret { at: now, x, y, w, h });
-                    }
+            let typing = buffers
+                .lock()
+                .unwrap()
+                .keys
+                .last()
+                .map(|k| now.duration_since(k.at) < Duration::from_millis(2000))
+                .unwrap_or(false);
+            if typing {
+                if let Some((x, y, w, h)) = finder.caret() {
+                    buffers.lock().unwrap().carets.push(Caret { at: now, x, y, w, h });
                 }
             }
         }

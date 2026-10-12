@@ -1,7 +1,7 @@
 // Playback, seeking and render-track computation.
 import { invoke } from "../tauri.js";
 import { $, S, P, dir, TRACK_FPS, media, clamp, fmt, hooks } from "./state.js";
-import { outDuration, outToSrc, srcToOut } from "./timemap.js";
+import { outDuration, outToSrc, sliceOutStart } from "./timemap.js";
 import { draw } from "./draw.js";
 
 // ---- transport UI (throttled)
@@ -144,7 +144,7 @@ function loop() {
     v.currentTime = s.sourceStartMs / 1000;
   }
   const cur = sl[S.curSlice];
-  S.tOut = srcToOut(clamp(v.currentTime * 1000, cur.sourceStartMs, cur.sourceEndMs));
+  S.tOut = sliceOutStart(S.curSlice) + (clamp(v.currentTime * 1000, cur.sourceStartMs, cur.sourceEndMs) - cur.sourceStartMs) / cur.timeScale;
   if (media.camera && Math.abs(media.camera.currentTime * 1000 - (v.currentTime * 1000 + P().media.cameraOffsetMs)) > 250) syncCamera(v.currentTime * 1000);
   updateTransport(false);
   draw();

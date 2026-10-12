@@ -1,6 +1,6 @@
 //! Window creation helpers and window-related commands.
 
-use crate::commands::permissions::screen_granted;
+use crate::commands::permissions::all_required_granted;
 use screencapturekit::prelude::*;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -45,7 +45,7 @@ pub fn show_permissions_window(app: &AppHandle) -> tauri::Result<()> {
     }
     WebviewWindowBuilder::new(app, "permissions", WebviewUrl::App("permissions.html".into()))
         .title("ScreenCraft permissions")
-        .inner_size(580.0, 660.0)
+        .inner_size(600.0, 760.0)
         .resizable(false)
         .accept_first_mouse(true)
         .center()
@@ -143,7 +143,7 @@ pub fn on_window_destroyed(app: &AppHandle, label: &str) {
     if !tracked(label) {
         return;
     }
-    if label == "permissions" && !screen_granted() {
+    if label == "permissions" && !all_required_granted() {
         return;
     }
     let others = app.webview_windows().keys().any(|k| tracked(k) && k != label);

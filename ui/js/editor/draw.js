@@ -10,6 +10,21 @@ let dyn = 1; // adaptive scale while playing
 let drawMs = 8;
 let markerShown = false;
 
+/** On-screen rectangle actually covered by the (letterboxed) canvas picture. */
+export function displayedRect() {
+  const r = canvas.getBoundingClientRect();
+  const ca = canvas.width / canvas.height, ra = r.width / r.height;
+  let { width: w, height: h, left: x, top: y } = r;
+  if (ra > ca) {
+    w = r.height * ca;
+    x += (r.width - w) / 2;
+  } else {
+    h = r.width / ca;
+    y += (r.height - h) / 2;
+  }
+  return { left: x, top: y, width: w, height: h };
+}
+
 export const frameIndex = () => Math.round((S.tOut * TRACK_FPS) / 1000);
 
 function sizeCanvas() {
@@ -58,7 +73,7 @@ function updateManualMarker(cam) {
   const vwN = crop.width / cam.zoom, vhN = crop.height / cam.zoom;
   const nx = (z.manualTargetPoint.x - (cam.cx - vwN / 2)) / vwN;
   const ny = (z.manualTargetPoint.y - (cam.cy - vhN / 2)) / vhN;
-  const rect = canvas.getBoundingClientRect(), wrap = $("canvasWrap").getBoundingClientRect();
+  const rect = displayedRect(), wrap = $("canvasWrap").getBoundingClientRect();
   m.hidden = false;
   m.style.left = rect.left - wrap.left + ((r.x + nx * r.w) / canvas.width) * rect.width + "px";
   m.style.top = rect.top - wrap.top + ((r.y + ny * r.h) / canvas.height) * rect.height + "px";

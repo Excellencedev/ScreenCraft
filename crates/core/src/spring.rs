@@ -54,6 +54,25 @@ impl Spring {
     }
 }
 
+/// Critically damped smoothing toward `target` (Unity-style SmoothDamp).
+/// `smooth_time` is roughly the time in seconds to reach the target.
+pub fn smooth_damp(current: f64, target: f64, velocity: &mut f64, smooth_time: f64, dt: f64) -> f64 {
+    let st = smooth_time.max(1e-3);
+    let omega = 2.0 / st;
+    let x = omega * dt;
+    let e = 1.0 / (1.0 + x + 0.48 * x * x + 0.235 * x * x * x);
+    let change = current - target;
+    let temp = (*velocity + omega * change) * dt;
+    *velocity = (*velocity - omega * temp) * e;
+    target + (change + temp) * e
+}
+
+/// Smootherstep easing, 0..1 -> 0..1 with zero velocity at both ends.
+pub fn ease(t: f64) -> f64 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -69,6 +88,27 @@ mod tests {
         }
         assert!(max <= 1.0 + 1e-9, "overshot: {max}");
         assert!((s.x - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn smooth_damp_converges_without_overshoot() {
+        let (mut x, mut v) = (0.0, 0.0);
+        let mut max = 0.0f64;
+        for _ in 0..240 {
+            x = smooth_damp(x, 1.0, &mut v, 0.4, 1.0 / 60.0);
+            max = max.max(x);
+        }
+        assert!(max <= 1.001 && (x - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn ease_is_monotonic_and_bounded() {
+        let mut prev = 0.0;
+        for i in 0..=100 {
+            let e = ease(i as f64 / 100.0);
+            assert!(e >= prev - 1e-12 && (0.0..=1.0).contains(&e));
+            prev = e;
+        }
     }
 
     #[test]

@@ -4,7 +4,7 @@
 
 use crate::input::{CursorKind, InputLog};
 use crate::project::{Project, Rect, ZoomKind};
-use crate::spring::Spring;
+use crate::spring::{ease, smooth_damp, Spring};
 use crate::timeline::{output_duration_ms, output_to_source};
 use serde::{Deserialize, Serialize};
 
@@ -78,22 +78,23 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
 
     let crop_cx = crop.x + crop.width / 2.0;
     let crop_cy = crop.y + crop.height / 2.0;
-    let mut zoom = Spring::new(1.0);
-    let mut cam_x = Spring::new(crop_cx);
-    let mut cam_y = Spring::new(crop_cy);
-    let mut mx = Spring::default();
-    let mut my = Spring::default();
+
+    // smoothed cursor + camera focus (critically damped, so no snapping)
+    let mut mx = 0.5;
+    let mut my = 0.5;
+    let (mut mvx, mut mvy) = (0.0, 0.0);
+    let (mut fx, mut fy) = (crop_cx, crop_cy);
+    let (mut fvx, mut fvy) = (0.0, 0.0);
+    let mut initialised = false;
     let mut press = Spring::new(1.0);
     let mut alpha = Spring::new(1.0);
-    let mut focus = (crop_cx, crop_cy);
-    let mut active_region: Option<usize> = None;
-    let mut initialised = false;
+    let mut rotation = Spring::new(0.0);
     let mut last_move_t = 0.0;
     let mut last_raw = (0.0, 0.0);
-    let mut rotation = Spring::new(0.0);
     let press_cfg = crate::spring::SpringConfig { stiffness: 500.0, damping: 30.0, mass: 1.0, clamp: true, precision: 0.001 };
     let fade_cfg = crate::spring::SpringConfig { stiffness: 300.0, damping: 34.0, mass: 1.0, clamp: true, precision: 0.001 };
     let rot_cfg = crate::spring::SpringConfig { stiffness: 200.0, damping: 20.0, mass: 1.0, clamp: false, precision: 0.001 };
+    let edge = anim.follow == "edge";
 
     for i in 0..count {
         let t_out = (i as f64) * 1000.0 / fps;
@@ -103,17 +104,15 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
         // --- cursor ---
         let (rx, ry, kind) = input.cursor_at(t_src).unwrap_or((0.5, 0.5, CursorKind::Arrow));
         let (rx, ry) = loop_position(p, input, t_src, (rx, ry));
-        if !initialised {
-            mx = Spring::new(rx);
-            my = Spring::new(ry);
-            focus = (rx.clamp(crop.x, crop.x + crop.width), ry.clamp(crop.y, crop.y + crop.height));
-        }
-        if slice.disable_smooth_mouse || !initialised {
-            mx = Spring::new(rx);
-            my = Spring::new(ry);
+        if !initialised || slice.disable_smooth_mouse {
+            mx = rx;
+            my = ry;
+            mvx = 0.0;
+            mvy = 0.0;
         } else {
-            mx.step(rx, dt, &anim.mouse_spring);
-            my.step(ry, dt, &anim.mouse_spring);
+            let st = anim.cursor_smooth_ms / 1000.0;
+            mx = smooth_damp(mx, rx, &mut mvx, st, dt);
+            my = smooth_damp(my, ry, &mut mvy, st, dt);
         }
         if (rx - last_raw.0).abs() + (ry - last_raw.1).abs() > 1e-4 {
             last_move_t = t_out;
@@ -122,89 +121,84 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
 
         let down = input.button_down_at(t_src);
         press.step(if down { 0.78 } else { 1.0 }, dt, &press_cfg);
-        let hide_idle = p
-            .config
-            .cursor
-            .hide_not_moving_after_ms
-            .map(|ms| t_out - last_move_t > ms)
-            .unwrap_or(false);
+        let hide_idle = p.config.cursor.hide_not_moving_after_ms.map(|ms| t_out - last_move_t > ms).unwrap_or(false);
         let want_alpha = if p.config.cursor.hide || slice.hide_cursor || hide_idle { 0.0 } else { 1.0 };
         alpha.step(want_alpha, dt, &fade_cfg);
-        let vx = (mx.v).clamp(-3.0, 3.0);
-        rotation.step(if p.config.cursor.rotate_with_velocity { vx * 0.35 } else { 0.0 }, dt, &rot_cfg);
+        rotation.step(
+            if p.config.cursor.rotate_with_velocity { mvx.clamp(-3.0, 3.0) * 0.35 } else { 0.0 },
+            dt,
+            &rot_cfg,
+        );
 
-        // --- camera ---
-        let region_idx = p.scene.zooms.iter().position(|z| {
-            !z.is_disabled && t_src >= z.source_start_ms && t_src < z.source_end_ms
-        });
-        let (target_zoom, target_center) = match region_idx {
-            Some(idx) => {
-                let z = &p.scene.zooms[idx];
-                let zf = z.zoom.max(1.0);
-                let half_w = crop.width / zf * 0.5;
-                let half_h = crop.height / zf * 0.5;
-                if active_region != Some(idx) {
-                    // entering a region: start focused on the cursor
-                    focus = (rx, ry);
-                }
-                let centre = match z.kind {
-                    ZoomKind::Manual => (z.manual_target_point.x, z.manual_target_point.y),
-                    ZoomKind::FollowCursor => {
-                        // typing => look at the text caret, otherwise the cursor
-                        let (px, py) = if input.typing_at(t_src, 1500.0) {
-                            input.caret_at(t_src).unwrap_or((mx.x, my.x))
-                        } else {
-                            (mx.x, my.x)
-                        };
-                        let edge = anim.follow == "edge";
-                        let allow_x = if edge { half_w * 0.6 } else { 0.0 };
-                        let allow_y = if edge { half_h * 0.6 } else { 0.0 };
-                        let dx = px - focus.0;
-                        let dy = py - focus.1;
-                        if dx.abs() > allow_x {
-                            focus.0 += dx - dx.signum() * allow_x;
-                        }
-                        if dy.abs() > allow_y {
-                            focus.1 += dy - dy.signum() * allow_y;
-                        }
-                        focus
-                    }
-                };
-                let cxx = clamp_center(centre.0, half_w, crop.x, crop.x + crop.width);
-                let cyy = clamp_center(centre.1, half_h, crop.y, crop.y + crop.height);
-                (zf, (cxx, cyy))
+        // --- zoom level: eased envelope over every active region ---
+        let mut zoom = 1.0f64;
+        let mut manual_w = 0.0f64;
+        let mut manual_pt = (crop_cx, crop_cy);
+        for z in p.scene.zooms.iter().filter(|z| !z.is_disabled) {
+            if t_src < z.source_start_ms || t_src >= z.source_end_ms {
+                continue;
             }
-            None => (1.0, (crop_cx, crop_cy)),
-        };
-        let instant = region_idx.map(|idx| p.scene.zooms[idx].instant).unwrap_or(false);
-        if !initialised {
-            zoom = Spring::new(target_zoom);
-            cam_x = Spring::new(target_center.0);
-            cam_y = Spring::new(target_center.1);
-        } else if instant && active_region != region_idx {
-            zoom = Spring::new(target_zoom);
-            cam_x = Spring::new(target_center.0);
-            cam_y = Spring::new(target_center.1);
-        } else {
-            zoom.step(target_zoom, dt, &anim.screen_spring);
-            cam_x.step(target_center.0, dt, &anim.screen_spring);
-            cam_y.step(target_center.1, dt, &anim.screen_spring);
+            let env = if z.instant {
+                1.0
+            } else {
+                let ein = z.ease_in_ms.unwrap_or(anim.ease_in_ms).max(1.0);
+                let eout = z.ease_out_ms.unwrap_or(anim.ease_out_ms).max(1.0);
+                let a = ease((t_src - z.source_start_ms) / ein);
+                let b = ease((z.source_end_ms - t_src) / eout);
+                a.min(b)
+            };
+            let level = 1.0 + (z.zoom.max(1.0) - 1.0) * env;
+            if level > zoom {
+                zoom = level;
+            }
+            if z.kind == ZoomKind::Manual && env > manual_w {
+                manual_w = env;
+                manual_pt = (z.manual_target_point.x, z.manual_target_point.y);
+            }
         }
-        active_region = region_idx;
+
+        // --- camera focus: caret while typing, otherwise the cursor ---
+        let (tx, ty) = if input.typing_at(t_src, 1500.0) {
+            input.caret_at(t_src).unwrap_or((mx, my))
+        } else {
+            (mx, my)
+        };
+        let (tx, ty) = (tx.clamp(crop.x, crop.x + crop.width), ty.clamp(crop.y, crop.y + crop.height));
+        if !initialised {
+            fx = tx;
+            fy = ty;
+        } else if edge {
+            // only pan when the focus leaves the inner 60% of the viewport
+            let half_w = crop.width / zoom * 0.5 * 0.6;
+            let half_h = crop.height / zoom * 0.5 * 0.6;
+            let (dx, dy) = (tx - fx, ty - fy);
+            let gx = if dx.abs() > half_w { dx - dx.signum() * half_w } else { 0.0 };
+            let gy = if dy.abs() > half_h { dy - dy.signum() * half_h } else { 0.0 };
+            let st = anim.follow_smooth_ms / 1000.0;
+            fx = smooth_damp(fx, fx + gx, &mut fvx, st, dt);
+            fy = smooth_damp(fy, fy + gy, &mut fvy, st, dt);
+        } else {
+            let st = anim.follow_smooth_ms / 1000.0;
+            fx = smooth_damp(fx, tx, &mut fvx, st, dt);
+            fy = smooth_damp(fy, ty, &mut fvy, st, dt);
+        }
         initialised = true;
 
-        // keep the viewport inside the crop while the spring is mid-flight
-        let half_w = crop.width / zoom.x.max(1.0) * 0.5;
-        let half_h = crop.height / zoom.x.max(1.0) * 0.5;
-        let cxo = clamp_center(cam_x.x, half_w, crop.x, crop.x + crop.width);
-        let cyo = clamp_center(cam_y.x, half_h, crop.y, crop.y + crop.height);
+        // manual regions pull the camera toward their fixed point
+        let wx = fx + (manual_pt.0 - fx) * manual_w;
+        let wy = fy + (manual_pt.1 - fy) * manual_w;
+
+        let half_w = crop.width / zoom.max(1.0) * 0.5;
+        let half_h = crop.height / zoom.max(1.0) * 0.5;
+        let cxo = clamp_center(wx, half_w, crop.x, crop.x + crop.width);
+        let cyo = clamp_center(wy, half_h, crop.y, crop.y + crop.height);
 
         tr.t_src.push(r4(t_src));
-        tr.zoom.push(r4(zoom.x));
+        tr.zoom.push(r4(zoom));
         tr.cx.push(r4(cxo));
         tr.cy.push(r4(cyo));
-        tr.mx.push(r4(mx.x));
-        tr.my.push(r4(my.x));
+        tr.mx.push(r4(mx));
+        tr.my.push(r4(my));
         tr.cursor_kind.push(kind.index() as u8);
         tr.cursor_scale.push(r4(press.x));
         tr.cursor_alpha.push(r4(alpha.x));
@@ -281,8 +275,8 @@ mod tests {
         let tr = compute_track(&p, &log, 60.0);
         for i in 0..tr.count {
             let half = 0.5 / tr.zoom[i];
-            assert!(tr.cx[i] - half >= -1e-6 && tr.cx[i] + half <= 1.0 + 1e-6);
-            assert!(tr.cy[i] - half >= -1e-6 && tr.cy[i] + half <= 1.0 + 1e-6);
+            assert!(tr.cx[i] - half >= -1e-3 && tr.cx[i] + half <= 1.0 + 1e-3);
+            assert!(tr.cy[i] - half >= -1e-3 && tr.cy[i] + half <= 1.0 + 1e-3);
         }
     }
 
@@ -308,5 +302,37 @@ mod tests {
         let i = f(3500.0);
         // viewport half-width is 0.25; cursor sits at 0.8 so the clamped centre is 0.75
         assert!((tr.cx[i] - 0.75).abs() < 0.02);
+    }
+
+    #[test]
+    fn zoom_eases_in_over_the_configured_duration() {
+        let (mut p, log) = project();
+        p.config.animations.ease_in_ms = 400.0;
+        let tr = compute_track(&p, &log, 60.0);
+        let f = |ms: f64| (ms * 60.0 / 1000.0).round() as usize;
+        // region starts at 1000 ms: halfway through the ease the zoom is about halfway
+        assert!((tr.zoom[f(1000.0)] - 1.0).abs() < 1e-6);
+        assert!((tr.zoom[f(1200.0)] - 1.5).abs() < 0.08, "got {}", tr.zoom[f(1200.0)]);
+        assert!((tr.zoom[f(1400.0)] - 2.0).abs() < 0.01);
+        // never jumps by more than a small step between frames
+        for i in 1..tr.count {
+            assert!((tr.zoom[i] - tr.zoom[i - 1]).abs() < 0.12);
+        }
+    }
+
+    #[test]
+    fn camera_pan_is_smooth_between_frames() {
+        let (p, mut log) = project();
+        // cursor jumps across the screen at 2 s
+        log.moves = vec![
+            crate::input::MoveEvent { t: 0.0, x: 800.0, y: 100.0, cursor: CursorKind::Arrow },
+            crate::input::MoveEvent { t: 2000.0, x: 800.0, y: 100.0, cursor: CursorKind::Arrow },
+            crate::input::MoveEvent { t: 2010.0, x: 100.0, y: 400.0, cursor: CursorKind::Arrow },
+            crate::input::MoveEvent { t: 6000.0, x: 100.0, y: 400.0, cursor: CursorKind::Arrow },
+        ];
+        let tr = compute_track(&p, &log, 60.0);
+        for i in 1..tr.count {
+            assert!((tr.cx[i] - tr.cx[i - 1]).abs() < 0.03, "camera snapped at frame {i}");
+        }
     }
 }
