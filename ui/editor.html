@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>ScreenCraft</title>
+<link rel="stylesheet" href="theme.css" />
+<link rel="stylesheet" href="editor.css" />
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <div class="traffic-space"></div>
+    <div class="top-left">
+      <button class="icon-btn" id="btnFolder" title="Show in Finder">
+        <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+      </button>
+    </div>
+    <div class="title" id="title">Untitled</div>
+    <div class="top-right">
+      <button class="icon-btn" id="btnUndo" title="Undo (⌘Z)"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
+      <button class="icon-btn" id="btnRedo" title="Redo (⇧⌘Z)"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 000 12h3"/></svg></button>
+      <button class="pill" id="btnPresets"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/></svg>Presets<svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="primary" id="btnExport"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Export</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section id="stage">
+      <div id="stageBar">
+        <label class="sel">Aspect
+          <select id="selAspect">
+            <option value="auto">Auto</option><option value="16:9">16:9 Wide</option><option value="9:16">9:16 Vertical</option>
+            <option value="1:1">1:1 Square</option><option value="4:3">4:3</option><option value="3:4">3:4</option>
+            <option value="4:5">4:5</option><option value="21:9">21:9 Cinema</option>
+          </select>
+        </label>
+        <button class="pill" id="btnCrop">Crop</button>
+        <span class="spacer"></span>
+        <label class="sel">Preview
+          <select id="selPreview"><option value="540">Fast</option><option value="720" selected>Balanced</option><option value="1080">Full</option></select>
+        </label>
+      </div>
+      <div id="canvasWrap">
+        <canvas id="preview"></canvas>
+        <div id="manualMarker" hidden></div>
+        <div id="loading">Loading…</div>
+      </div>
+      <div id="transport">
+        <span id="tCur" class="tm">0:00.0</span>
+        <button class="icon-btn" id="btnStart" title="Back to start"><svg viewBox="0 0 24 24"><path d="M6 5v14M18 6l-9 6 9 6z"/></svg></button>
+        <button class="play" id="btnPlay" title="Play / Pause (Space)">
+          <svg id="icoPlay" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>
+          <svg id="icoPause" viewBox="0 0 24 24" hidden><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>
+        </button>
+        <button class="icon-btn" id="btnEnd" title="Go to end"><svg viewBox="0 0 24 24"><path d="M18 5v14M6 6l9 6-9 6z"/></svg></button>
+        <span id="tDur" class="tm">0:00.0</span>
+      </div>
+    </section>
+
+    <aside id="side">
+      <nav id="rail"></nav>
+      <div id="panel"></div>
+    </aside>
+  </main>
+
+  <section id="timeline">
+    <div id="tlTools">
+      <button class="icon-btn" id="btnSplit" title="Split clip at playhead (S)"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.5 8l11 9M8.5 16l11-9"/></svg></button>
+      <button class="icon-btn" id="btnDelete" title="Delete selected (⌫)"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+      <button class="pill small" id="btnAddZoom" title="Add zoom at playhead (Z)">+ Zoom</button>
+      <button class="pill small" id="btnAutoZoom" title="Regenerate zooms from clicks">Auto zooms</button>
+      <span class="spacer"></span>
+      <label class="sel">Speed
+        <select id="selSpeed">
+          <option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="0.75">0.75×</option>
+          <option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+          <option value="2">2×</option><option value="3">3×</option><option value="4">4×</option><option value="8">8×</option>
+        </select>
+      </label>
+    </div>
+    <div id="tlScroll">
+      <div id="tlInner">
+        <div id="ruler"></div>
+        <div id="trackClip" class="track"></div>
+        <div id="trackZoom" class="track"></div>
+        <div id="playhead"><div class="head"></div></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="modal" hidden>
+  <div class="dialog">
+    <h2>Export</h2>
+    <div class="row"><span>Format</span>
+      <div class="seg" id="expFormat"><button data-v="mp4" class="on">MP4</button><button data-v="gif">GIF</button></div></div>
+    <div class="row"><span>Resolution</span>
+      <div class="seg" id="expRes"><button data-v="720">720p</button><button data-v="1080" class="on">1080p</button><button data-v="1440">1440p</button><button data-v="2160">4K</button></div></div>
+    <div class="row"><span>Frame rate</span>
+      <div class="seg" id="expFps"><button data-v="30">30</button><button data-v="60" class="on">60</button></div></div>
+    <div class="row"><span>Motion blur</span>
+      <div class="seg" id="expBlur"><button data-v="0">Off</button><button data-v="1" class="on">On</button></div></div>
+    <div id="expProgress" hidden>
+      <div class="bar"><div id="expBar"></div></div>
+      <div id="expText" class="muted">Preparing…</div>
+    </div>
+    <div class="actions">
+      <button class="pill" id="expCancel">Cancel</button>
+      <button class="primary" id="expGo">Export</button>
+    </div>
+  </div>
+</div>
+<div id="menu" hidden></div>
+<script type="module" src="js/editor.js"></script>
+</body>
+</html>

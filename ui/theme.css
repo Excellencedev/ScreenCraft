@@ -1,0 +1,22 @@
+:root {
+  --bg: #07080c;
+  --panel: #12131a;
+  --panel-2: #191a23;
+  --line: #262836;
+  --text: #e9eaf2;
+  --muted: #8b8ea3;
+  --accent: #5b4cf5;
+  --accent-2: #7d71ff;
+  --danger: #ff4d5e;
+  --clip: #c98f2b;
+  --radius: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: transparent; color: var(--text); font-size: 13px; -webkit-font-smoothing: antialiased; user-select: none; -webkit-user-select: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:disabled { opacity: .4; cursor: default; }
+input, select { font: inherit; color: inherit; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #2c2e3d; border-radius: 4px; }
