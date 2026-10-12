@@ -44,11 +44,14 @@ async function setBar(w, h, extraUp = 0) {
 }
 
 // ---------------------------------------------------------------- UI
+let errTimer = null;
 function showError(msg) {
   const e = $("err");
-  e.textContent = msg;
-  e.style.display = msg ? "block" : "none";
-  if (msg) setTimeout(() => (e.style.display = "none"), 8000);
+  e.textContent = msg ? msg + "  (click to dismiss)" : "";
+  e.style.display = msg ? "flex" : "none";
+  e.onclick = () => (e.style.display = "none");
+  clearTimeout(errTimer);
+  if (msg) errTimer = setTimeout(() => (e.style.display = "none"), 9000);
 }
 
 function render() {
@@ -164,11 +167,28 @@ let cameraStartedMs = null;
 let timerHandle = null;
 let writeChain = Promise.resolve();
 
+const withTimeout = (p, ms, what) =>
+  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what + " timed out")), ms))]);
+
+async function openCameraStream() {
+  const base = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+  const attempts = [];
+  if (state.cameraId) attempts.push({ ...base, deviceId: { ideal: state.cameraId } });
+  attempts.push(base, true);
+  let last;
+  for (const video of attempts) {
+    try {
+      return await withTimeout(navigator.mediaDevices.getUserMedia({ video, audio: false }), 8000, "Camera");
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
+}
+
 async function startCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { deviceId: state.cameraId ? { exact: state.cameraId } : undefined, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-    audio: false,
-  });
+  if (!window.MediaRecorder) throw new Error("this web view cannot record camera video");
+  const stream = await openCameraStream();
   const candidates = [
     ["video/mp4;codecs=avc1", "mp4"],
     ["video/mp4", "mp4"],
@@ -176,7 +196,13 @@ async function startCamera() {
     ["video/webm", "webm"],
   ];
   const pick = candidates.find(([m]) => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || ["", "webm"];
-  const rec = new MediaRecorder(stream, pick[0] ? { mimeType: pick[0], videoBitsPerSecond: 6_000_000 } : { videoBitsPerSecond: 6_000_000 });
+  let rec;
+  try {
+    rec = new MediaRecorder(stream, pick[0] ? { mimeType: pick[0], videoBitsPerSecond: 6_000_000 } : {});
+  } catch (e) {
+    stream.getTracks().forEach((t) => t.stop());
+    throw e;
+  }
   return { stream, rec, ext: pick[1] };
 }
 
@@ -205,8 +231,13 @@ async function beginRecording() {
   if (state.mode === "area" && !state.area) return chooseMode("area");
 
   let cam = null;
+  let cameraNote = "";
   if (state.camera) {
-    try { cam = await startCamera(); } catch (e) { return showError("Camera error: " + e); }
+    try {
+      cam = await startCamera();
+    } catch (e) {
+      cameraNote = `Camera unavailable (${e?.message || e}) — recording without it.`;
+    }
   }
 
   // countdown inside the HUD
@@ -253,6 +284,7 @@ async function beginRecording() {
   }
 
   state.phase = "recording";
+  if (cameraNote) showError(cameraNote);
   document.body.classList.remove("countdown");
   document.body.classList.add("hud");
   $("hudLeft").style.display = "flex";
