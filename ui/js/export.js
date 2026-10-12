@@ -104,7 +104,7 @@ async function pickCodec(W, H, fps, bitrate, want) {
 }
 
 /** Bits-per-pixel model shared with the Rust compressor. */
-function qualityBitrate(W, H, fps, quality, hevc) {
+export function qualityBitrate(W, H, fps, quality, hevc) {
   const q = Math.min(1, Math.max(0, quality / 100));
   let bpp = 0.015 + q * q * 0.2;
   if (hevc) bpp *= 0.62;

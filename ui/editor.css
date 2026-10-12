@@ -112,3 +112,12 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 .projects-btn { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 9px; color: #cfd1e0; -webkit-app-region: no-drag; }
 .projects-btn:hover { background: #151620; color: #fff; }
 .projects-btn svg { width: 18px; height: 18px; }
+
+.dialog .row .sub { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.dialog .row > span { max-width: 270px; }
+
+.dialog .estimate { margin-top: 14px; padding: 12px 14px; background: #0f1017; border: 1px solid #1d1f2c; border-radius: 12px; display: grid; gap: 6px; }
+.dialog .estimate > div { display: flex; justify-content: space-between; }
+.dialog .estimate b { font-variant-numeric: tabular-nums; }
+.dialog .row.check { cursor: pointer; }
+.dialog input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }

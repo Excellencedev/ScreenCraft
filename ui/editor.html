@@ -108,6 +108,19 @@
       <div class="seg" id="expQuality"><button data-v="35">Small</button><button data-v="55" class="on">Balanced</button><button data-v="75">High</button><button data-v="92">Max</button></div></div>
     <div class="row"><span>Motion blur</span>
       <div class="seg" id="expBlur"><button data-v="0">Off</button><button data-v="1" class="on">On</button></div></div>
+    <div class="row" id="rowCompress"><span>Compress after export<small class="sub">Re-encodes the finished file to make it smaller</small></span>
+      <div class="toggle" id="expCompress"></div></div>
+    <div id="compressOpts" hidden>
+      <div class="row"><span>Compression</span>
+        <div class="seg" id="expCPreset"><button data-v="balanced" class="on">Balanced</button><button data-v="small">Smaller</button><button data-v="tiny">Smallest</button></div></div>
+      <label class="row check"><span>Export both<small class="sub">Also keep the uncompressed file next to the compressed one</small></span>
+        <input type="checkbox" id="expKeep" /></label>
+    </div>
+    <div class="estimate" id="expEstimate">
+      <div><span class="muted">Original export</span><b id="estOriginal">—</b></div>
+      <div id="estCompressedRow" hidden><span class="muted">Compressed</span><b id="estCompressed">—</b></div>
+      <div id="estTotalRow" hidden><span class="muted">Total on disk</span><b id="estTotal">—</b></div>
+    </div>
     <div id="expProgress" hidden>
       <div class="bar"><div id="expBar"></div></div>
       <div id="expText" class="muted">Preparing…</div>
