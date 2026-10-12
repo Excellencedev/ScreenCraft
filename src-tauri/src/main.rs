@@ -5,6 +5,7 @@ mod capture;
 mod commands;
 mod compress;
 mod inputlog;
+mod levelmic;
 mod meter;
 mod state;
 mod windows;
@@ -80,6 +81,7 @@ fn main() {
             commands::projects::load_project,
             commands::projects::save_project,
             windows::cancel_quit,
+            levelmic::level_mic,
             windows::resize_bar,
             windows::open_menu_window,
             windows::menu_take_items,

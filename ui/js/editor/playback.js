@@ -3,7 +3,6 @@ import { invoke } from "../tauri.js";
 import { $, S, P, dir, TRACK_FPS, media, clamp, fmt, hooks } from "./state.js";
 import { outDuration, outToSrc, sliceOutStart } from "./timemap.js";
 import { draw } from "./draw.js";
-import { lookup } from "./scrubcache.js";
 import { masterGain, makeLimiter, monoMix } from "../audiolevel.js";
 
 // ---- transport UI (throttled)
@@ -46,19 +45,15 @@ let pending = null;
 let seekGuard = 0;
 
 /**
- * Keep a secondary element (camera video, mic) lined up with the screen video without
- * audible skips: small drift is absorbed by nudging its speed, only big drift seeks.
+ * Keep a secondary element (camera video, mic, music) lined up with the screen video.
+ * Only a hard re-seek is used when it drifts far: changing `playbackRate` on the fly
+ * (a speed nudge) can deadlock AVFoundation's player in WebKit's GPU process, which
+ * froze the whole editor.
  */
-function chase(el, targetMs, base = media.screen.playbackRate) {
-  const err = el.currentTime * 1000 - targetMs; // > 0: ahead
-  if (Math.abs(err) > 600) {
-    el.currentTime = Math.max(0, targetMs / 1000);
-    el.playbackRate = base;
-  } else if (Math.abs(err) > 90) {
-    el.playbackRate = base * (err > 0 ? 0.97 : 1.03);
-  } else if (Math.abs(err) < 30 && el.playbackRate !== base) {
-    el.playbackRate = base;
-  }
+function chase(el, targetMs, base = media.screen.playbackRate, limit = 350) {
+  const err = Math.abs(el.currentTime * 1000 - targetMs);
+  if (err > limit) el.currentTime = Math.max(0, targetMs / 1000);
+  if (el.playbackRate !== base) el.playbackRate = base;
 }
 
 function syncCamera(srcMs) {
@@ -105,23 +100,11 @@ function pump() {
 }
 
 /** Move the playhead. While dragging pass fast=true for keyframe-only seeks. */
-let proxyRaf = 0;
-let settleTimer = 0;
 export function requestSeek(t, fast = false) {
   S.tOut = clamp(t, 0, outDuration());
   const m = outToSrc(S.tOut);
   S.curSlice = m.idx;
   updateTransport(false);
-  clearTimeout(settleTimer);
-  const hit = fast && !S.playing ? lookup(m.src) : null;
-  if (hit) {
-    // paint straight from the in-memory proxy; settle on the exact frame once the pointer rests
-    S.proxy = hit;
-    pending = null;
-    if (!proxyRaf) proxyRaf = requestAnimationFrame(() => { proxyRaf = 0; draw(); });
-    settleTimer = setTimeout(() => requestSeek(S.tOut, false), 140);
-    return;
-  }
   S.proxy = null;
   pending = { src: m.src, fast };
   if (!seeking) pump();
@@ -143,11 +126,12 @@ function setLevel(el, node, gain) {
 function applySliceAudio(s) {
   const a = P().config.audio;
   const m = s.volume * masterGain(a.volume);
-  media.screen.playbackRate = clamp(s.timeScale, 0.0625, 16);
+  const rate = clamp(s.timeScale, 0.0625, 16);
+  if (media.screen.playbackRate !== rate) media.screen.playbackRate = rate;
   setLevel(media.screen, null, m * a.deviceVolume);
-  if (media.camera) media.camera.playbackRate = media.screen.playbackRate;
+  if (media.camera && media.camera.playbackRate !== rate) media.camera.playbackRate = rate;
   if (media.mic) {
-    media.mic.playbackRate = media.screen.playbackRate;
+    if (media.mic.playbackRate !== rate) media.mic.playbackRate = rate;
     // the baked mic already carries its auto-level at 2x; the master slider scales that back
     const micGain = media.micBaked ? (m / 2) * a.micVolume : m * a.micVolume * (media.micLevel || 1);
     setLevel(media.mic, null, micGain);
@@ -179,7 +163,7 @@ function musicTick() {
     const target = a.c.inMs + a.t;
     if (el.paused) {
       el.currentTime = target / 1000;
-      el.playbackRate = 1;
+      if (el.playbackRate !== 1) el.playbackRate = 1;
       el.play().catch(() => {});
     } else {
       chase(el, target, 1);
@@ -226,6 +210,7 @@ export function pause() {
   for (const el of Object.values(media.musicEls)) el.pause();
   setPlayIcon(false);
   draw();
+  hooks.swapMic?.();
 }
 function loop() {
   if (!S.playing) return;

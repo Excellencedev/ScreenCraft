@@ -14,9 +14,7 @@ import { showMenu } from "./menus.js";
 import { rawMenu } from "./rawfiles.js";
 import { openExport, bindExport } from "./exportDialog.js";
 import { contentRect, camAt } from "../render.js";
-import { buildScrubCache } from "./scrubcache.js";
 import { loadMusicElements, migrateMusic } from "./music.js";
-import { autoGainAsync, bakeMic } from "../audiolevel.js";
 
 hooks.updateTitle = () => {
   const t = $("title");
@@ -174,7 +172,6 @@ function bindUI() {
   });
 
   addEventListener("keydown", (e) => {
-    if (!$("prep").hidden) { e.preventDefault(); return; }
     if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
     const mod = e.metaKey || e.ctrlKey;
     if (e.code === "Space") { e.preventDefault(); S.playing ? pause() : play(); }
@@ -209,18 +206,19 @@ function loadVideo(url) {
   });
 }
 
-/** Level + centre the microphone once, then play that baked copy (see bakeMic). */
-async function levelMic(url) {
-  try {
-    const bytes = await (await fetch(url)).arrayBuffer();
-    const ctx = new AudioContext();
-    const buf = await ctx.decodeAudioData(bytes);
-    ctx.close?.();
-    media.micLevel = await autoGainAsync(buf);
-    const baked = await bakeMic(buf, media.micLevel);
-    const a = new Audio(baked);
-    a.preload = "auto";
-    await new Promise((res) => { a.onloadeddata = res; a.onerror = res; });
+/**
+ * The mic is levelled and centred by the native side (level_mic) in the background;
+ * once the leveled copy exists it replaces the original element between plays.
+ */
+let leveledUrl = null;
+function swapMic() {
+  if (!leveledUrl || S.playing) return;
+  const url = leveledUrl;
+  leveledUrl = null;
+  const a = new Audio(url);
+  a.preload = "auto";
+  a.onloadeddata = () => {
+    if (S.playing) { leveledUrl = url; return; }
     if (media.mic) {
       a.currentTime = media.mic.currentTime;
       media.mic.pause();
@@ -228,6 +226,15 @@ async function levelMic(url) {
     media.mic = a;
     media.micBaked = true;
     refreshSliceAudio();
+  };
+}
+hooks.swapMic = swapMic;
+
+async function levelMic() {
+  try {
+    const name = await invoke("level_mic", { dir, file: P().media.mic });
+    leveledUrl = convertFileSrc(`${dir}/${name}`);
+    swapMic();
   } catch (e) {
     console.warn("mic level", e);
   }
@@ -276,27 +283,7 @@ async function boot() {
     updateUndo();
     await computeTrack();
     await loadMusicElements();
-    // Pre-render frames into memory behind a spinner so the first scrub is already smooth.
-    const prep = $("prep");
-    prep.hidden = false;
-    $("app").inert = true; // nothing is clickable while frames are prepared
-    let finished = false;
-    const done = () => {
-      if (finished) return;
-      finished = true;
-      prep.hidden = true;
-      $("app").inert = false;
-      // the heavier audio work waits until the editor is usable
-      if (media.mic) setTimeout(() => levelMic(convertFileSrc(`${dir}/${P().media.mic}`)), 400);
-    };
-    buildScrubCache({
-      screen: media.screen.src,
-      camera: media.camera ? media.camera.src : null,
-    }, (f) => {
-      $("prepBar").style.width = Math.round(f * 100) + "%";
-      if (f >= 1) setTimeout(done, 150);
-    });
-    setTimeout(done, 120000); // safety net if frames can't be decoded
+    if (media.mic) levelMic();
     $("loading").hidden = true;
     requestSeek(0);
   } catch (e) {
