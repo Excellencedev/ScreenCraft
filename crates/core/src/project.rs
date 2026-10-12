@@ -49,6 +49,9 @@ pub struct Media {
     pub camera_offset_ms: f64,
     pub has_system_audio: bool,
     pub has_microphone: bool,
+    /// Separately recorded microphone track (so its volume can differ from system audio).
+    pub mic: Option<String>,
+    pub mic_offset_ms: f64,
 }
 
 impl Default for Media {
@@ -64,6 +67,8 @@ impl Default for Media {
             camera_offset_ms: 0.0,
             has_system_audio: false,
             has_microphone: false,
+            mic: None,
+            mic_offset_ms: 0.0,
         }
     }
 }
@@ -273,7 +278,7 @@ impl Default for Background {
     fn default() -> Self {
         Self {
             kind: "wallpaper".into(),
-            wallpaper: "aurora".into(),
+            wallpaper: "sunset".into(),
             color: "#4776e6".into(),
             gradient_from: "#4776e6".into(),
             gradient_to: "#8e54e9".into(),
@@ -362,13 +367,17 @@ impl Default for Animations {
 #[serde(rename_all = "camelCase", default)]
 pub struct AudioConfig {
     pub volume: f64,
+    /// Microphone level (separate mic track).
+    pub mic_volume: f64,
+    /// Device / system audio level (the screen recording's audio).
+    pub device_volume: f64,
     pub mute_microphone: bool,
     pub mute_system_audio: bool,
 }
 
 impl Default for AudioConfig {
     fn default() -> Self {
-        Self { volume: 1.0, mute_microphone: false, mute_system_audio: false }
+        Self { volume: 1.0, mic_volume: 1.0, device_volume: 1.0, mute_microphone: false, mute_system_audio: false }
     }
 }
 

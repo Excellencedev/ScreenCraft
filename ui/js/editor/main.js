@@ -10,6 +10,7 @@ import {
 } from "./timeline.js";
 import { renderPanel } from "./panels/index.js";
 import { presetsMenu } from "./presets.js";
+import { showMenu } from "./menus.js";
 import { rawMenu } from "./rawfiles.js";
 import { openExport, bindExport } from "./exportDialog.js";
 import { contentRect, camAt } from "../render.js";
@@ -37,11 +38,16 @@ function bindUI() {
   $("btnRedo").onclick = redo;
   $("btnSplit").onclick = splitAtPlayhead;
   $("btnDelete").onclick = deleteSelected;
-  $("btnAddZoom").onclick = addZoomAtPlayhead;
   $("btnZoomHere").onclick = addZoomAtPlayhead;
   $("btnDuplicate").onclick = duplicateSelected;
   $("btnAutoZoom").onclick = autoZoom;
-  $("btnFolder").onclick = () => invoke("reveal_in_finder", { path: dir });
+  $("btnFolder").onclick = async (e) => {
+    const list = await invoke("recent_projects");
+    const items = [{ header: "Projects" }];
+    for (const pr of list.slice(0, 10)) items.push({ label: pr.name, run: () => invoke("open_editor", { dir: pr.dir }) });
+    items.push("-", { label: "Show this project in Finder", run: () => invoke("reveal_in_finder", { path: dir }) });
+    showMenu(e.currentTarget, items);
+  };
   $("btnCrop").onclick = () => { S.tab = "crop"; renderPanel(); };
   $("btnExport").onclick = openExport;
   $("btnCompress").onclick = () => invoke("show_compressor", { input: `${dir}/${P().media.screen}` });
@@ -119,6 +125,14 @@ async function boot() {
     media.screen = await loadVideo(convertFileSrc(`${dir}/${P().media.screen}`));
     if (P().media.camera) media.camera = await loadVideo(convertFileSrc(`${dir}/${P().media.camera}`)).catch(() => null);
     if (media.camera) media.camera.muted = true;
+    if (P().media.mic) {
+      media.mic = await new Promise((res) => {
+        const a = new Audio(convertFileSrc(`${dir}/${P().media.mic}`));
+        a.preload = "auto";
+        a.onloadeddata = () => res(a);
+        a.onerror = () => res(null);
+      });
+    }
     const v = media.screen;
     // trust the real file over the recorded numbers
     if (v.videoWidth) {

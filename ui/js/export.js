@@ -38,34 +38,50 @@ async function writeFile(path, bytes, onProgress) {
   await invoke("export_end");
 }
 
-/** Build the exported audio timeline (slices re-timed, volumes applied). */
-async function renderAudio(project, dir, outDurSec) {
-  const url = convertFileSrc(`${dir}/${project.media.screen}`);
+async function decodeFile(url) {
   const bytes = await (await fetch(url)).arrayBuffer();
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  let buf;
   try {
-    buf = await ctx.decodeAudioData(bytes);
+    return await ctx.decodeAudioData(bytes);
   } catch {
     return null;
   } finally {
     ctx.close?.();
   }
-  if (!buf || !buf.length) return null;
+}
+
+/** Build the exported audio timeline: device audio and microphone mixed with their own levels. */
+async function renderAudio(project, dir, outDurSec) {
+  const a = project.config.audio;
+  const tracks = [];
+  const device = await decodeFile(convertFileSrc(`${dir}/${project.media.screen}`));
+  if (device && device.length) tracks.push({ buf: device, gain: a.deviceVolume ?? 1, offset: 0 });
+  if (project.media.mic) {
+    const mic = await decodeFile(convertFileSrc(`${dir}/${project.media.mic}`));
+    if (mic && mic.length) tracks.push({ buf: mic, gain: a.micVolume ?? 1, offset: (project.media.micOffsetMs || 0) / 1000 });
+  }
+  if (!tracks.length) return null;
   const sr = 48000;
   const off = new OfflineAudioContext(2, Math.ceil(outDurSec * sr), sr);
+  const master = a.volume ?? 1;
   let at = 0;
-  const master = project.config.audio.volume;
   for (const s of project.scene.slices) {
     const srcDur = (s.sourceEndMs - s.sourceStartMs) / 1000;
     const outDur = srcDur / s.timeScale;
-    const node = off.createBufferSource();
-    node.buffer = buf;
-    node.playbackRate.value = s.timeScale;
-    const g = off.createGain();
-    g.gain.value = s.volume * master;
-    node.connect(g).connect(off.destination);
-    node.start(at, s.sourceStartMs / 1000, srcDur);
+    for (const t of tracks) {
+      const from = s.sourceStartMs / 1000 + t.offset;
+      const node = off.createBufferSource();
+      node.buffer = t.buf;
+      node.playbackRate.value = s.timeScale;
+      const g = off.createGain();
+      g.gain.value = s.volume * master * t.gain;
+      node.connect(g).connect(off.destination);
+      // a mic that started slightly after the screen has a negative offset: delay it instead
+      const when = at + Math.max(0, -from) / s.timeScale;
+      const bufStart = Math.max(0, from);
+      const dur = Math.max(0, srcDur - Math.max(0, -from));
+      if (dur > 0) node.start(when, bufStart, dur);
+    }
     at += outDur;
   }
   return off.startRendering();

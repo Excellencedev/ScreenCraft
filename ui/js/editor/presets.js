@@ -3,7 +3,7 @@ import { change } from "./history.js";
 import { showMenu } from "./menus.js";
 
 const BUILTIN = {
-  Clean: { styles: { paddingRatio: 0.02, cornerRadius: 14, background: { kind: "wallpaper", wallpaper: "aurora" } } },
+  Clean: { styles: { paddingRatio: 0.02, cornerRadius: 14, background: { kind: "wallpaper", wallpaper: "sunset" } } },
   Minimal: { styles: { paddingRatio: 0.04, cornerRadius: 10, background: { kind: "color", color: "#0b0c12" }, shadow: { intensity: 0.15 } } },
   Vivid: { styles: { paddingRatio: 0.12, cornerRadius: 24, background: { kind: "gradient", gradientFrom: "#ff6ad5", gradientTo: "#3b82c4", gradientAngle: 135 } }, cursor: { clickEffect: "ripple", size: 34 } },
   Sunset: { styles: { paddingRatio: 0.1, cornerRadius: 18, background: { kind: "wallpaper", wallpaper: "sunset" } } },

@@ -21,6 +21,7 @@ pub struct AppState {
     pub meter: Meter,
     pub recording_dir: Mutex<Option<PathBuf>>,
     pub camera: Mutex<Option<(File, String)>>,
+    pub mic: Mutex<Option<(File, String)>>,
     pub export: Mutex<Option<File>>,
     pub inputs: Mutex<HashMap<PathBuf, InputLog>>,
     pub settings: Mutex<Settings>,

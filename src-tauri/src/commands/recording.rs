@@ -69,9 +69,31 @@ pub fn camera_chunk(state: State<AppState>, request: Request<'_>) -> CmdResult<(
 }
 
 #[tauri::command]
-pub fn stop_recording(state: State<AppState>, camera_started_unix_ms: Option<f64>) -> CmdResult<String> {
+pub fn mic_begin(state: State<AppState>, ext: String) -> CmdResult<()> {
+    let dir = state.recording_dir.lock().unwrap().clone().ok_or("not recording")?;
+    let file = File::create(dir.join(format!("mic.{ext}"))).map_err(|e| e.to_string())?;
+    *state.mic.lock().unwrap() = Some((file, ext));
+    Ok(())
+}
+
+#[tauri::command]
+pub fn mic_chunk(state: State<AppState>, request: Request<'_>) -> CmdResult<()> {
+    let InvokeBody::Raw(bytes) = request.body() else { return Err("expected raw body".into()) };
+    if let Some((f, _)) = state.mic.lock().unwrap().as_mut() {
+        f.write_all(bytes).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn stop_recording(
+    state: State<AppState>,
+    camera_started_unix_ms: Option<f64>,
+    mic_started_unix_ms: Option<f64>,
+) -> CmdResult<String> {
     let info = state.capture.stop()?;
     let cam = state.camera.lock().unwrap().take();
+    let mic_file = state.mic.lock().unwrap().take();
     *state.recording_dir.lock().unwrap() = None;
 
     let log: InputLog = fs::read(info.dir.join("input.json"))
@@ -88,6 +110,14 @@ pub fn stop_recording(state: State<AppState>, camera_started_unix_ms: Option<f64
         (Some(_), Some(cam_start)) => info.started_unix_ms - cam_start,
         _ => 0.0,
     };
+    let mic = mic_file.map(|(f, ext)| {
+        drop(f);
+        format!("mic.{ext}")
+    });
+    let mic_offset_ms = match (&mic, mic_started_unix_ms) {
+        (Some(_), Some(start)) => info.started_unix_ms - start,
+        _ => 0.0,
+    };
     let media = Media {
         screen: "screen.mp4".into(),
         camera,
@@ -98,7 +128,9 @@ pub fn stop_recording(state: State<AppState>, camera_started_unix_ms: Option<f64
         bounds: info.bounds,
         camera_offset_ms,
         has_system_audio: info.has_system_audio,
-        has_microphone: info.has_microphone,
+        has_microphone: mic.is_some() || info.has_microphone,
+        mic,
+        mic_offset_ms,
     };
     let name = info.dir.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
     let mut project = Project::from_recording(&name, media);

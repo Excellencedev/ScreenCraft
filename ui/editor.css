@@ -3,7 +3,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 #app { display: grid; grid-template-rows: 52px minmax(0, 1fr) 236px; height: 100vh; }
 #top { display: flex; align-items: center; gap: 10px; padding: 0 14px; -webkit-app-region: drag; border-bottom: 1px solid #101119; }
 #top button, #top select { -webkit-app-region: no-drag; }
-.traffic-space { width: 70px; }
+.traffic-space { width: 0; }
 .title { position: absolute; left: 50%; transform: translateX(-50%); color: #cfd1e0; font-weight: 500; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 .icon-btn { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; color: #b6b9cc; }
@@ -107,3 +107,8 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 #menu .mh { padding: 6px 10px 2px; color: var(--muted); font-size: 11px; }
 #tlScroll { contain: layout paint; }
 .block { will-change: transform; }
+
+[hidden] { display: none !important; }
+.projects-btn { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 9px; color: #cfd1e0; -webkit-app-region: no-drag; }
+.projects-btn:hover { background: #151620; color: #fff; }
+.projects-btn svg { width: 18px; height: 18px; }

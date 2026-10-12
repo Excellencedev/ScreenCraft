@@ -50,6 +50,13 @@ function syncCamera(srcMs) {
   if (Math.abs(cam.currentTime - t) > 0.15 || !S.playing) cam.currentTime = t;
 }
 
+function syncMic(srcMs) {
+  const m = media.mic;
+  if (!m) return;
+  const t = Math.max(0, (srcMs + (P().media.micOffsetMs || 0)) / 1000);
+  if (Math.abs(m.currentTime - t) > 0.12 || !S.playing) m.currentTime = t;
+}
+
 function pump() {
   if (!pending) return;
   const { src, fast } = pending;
@@ -57,6 +64,7 @@ function pump() {
   const v = media.screen;
   const target = src / 1000;
   syncCamera(src);
+  syncMic(src);
   if (Math.abs(v.currentTime - target) < 0.001) {
     draw();
     if (pending) pump();
@@ -90,9 +98,14 @@ export const seekOut = (t) => requestSeek(t, false);
 
 // ---- playback
 function applySliceAudio(s) {
+  const a = P().config.audio;
   media.screen.playbackRate = clamp(s.timeScale, 0.0625, 16);
-  media.screen.volume = clamp(s.volume * P().config.audio.volume, 0, 1);
+  media.screen.volume = clamp(s.volume * a.volume * a.deviceVolume, 0, 1);
   if (media.camera) media.camera.playbackRate = media.screen.playbackRate;
+  if (media.mic) {
+    media.mic.playbackRate = media.screen.playbackRate;
+    media.mic.volume = clamp(s.volume * a.volume * a.micVolume, 0, 1);
+  }
 }
 export const refreshSliceAudio = () => applySliceAudio(P().scene.slices[S.curSlice]);
 
@@ -104,8 +117,10 @@ export function play() {
   media.screen.currentTime = m.src / 1000;
   applySliceAudio(P().scene.slices[m.idx]);
   syncCamera(m.src);
+  syncMic(m.src);
   media.screen.play().catch(console.error);
   media.camera?.play().catch(() => {});
+  media.mic?.play().catch(() => {});
   S.playing = true;
   $("icoPlay").hidden = true;
   $("icoPause").hidden = false;
@@ -116,6 +131,7 @@ export function pause() {
   S.playing = false;
   media.screen.pause();
   media.camera?.pause();
+  media.mic?.pause();
   $("icoPlay").hidden = false;
   $("icoPause").hidden = true;
   draw();
@@ -133,6 +149,7 @@ function loop() {
       v.currentTime = n.sourceStartMs / 1000;
       applySliceAudio(n);
       syncCamera(n.sourceStartMs);
+      syncMic(n.sourceStartMs);
     } else {
       S.tOut = outDuration();
       pause();
@@ -146,6 +163,7 @@ function loop() {
   const cur = sl[S.curSlice];
   S.tOut = sliceOutStart(S.curSlice) + (clamp(v.currentTime * 1000, cur.sourceStartMs, cur.sourceEndMs) - cur.sourceStartMs) / cur.timeScale;
   if (media.camera && Math.abs(media.camera.currentTime * 1000 - (v.currentTime * 1000 + P().media.cameraOffsetMs)) > 250) syncCamera(v.currentTime * 1000);
+  if (media.mic && Math.abs(media.mic.currentTime * 1000 - (v.currentTime * 1000 + (P().media.micOffsetMs || 0))) > 200) syncMic(v.currentTime * 1000);
   updateTransport(false);
   draw();
   requestAnimationFrame(loop);

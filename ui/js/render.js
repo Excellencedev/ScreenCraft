@@ -153,17 +153,6 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
   }
   ctx.restore();
 
-  // inset border
-  if (st.inset.enabled) {
-    ctx.save();
-    ctx.lineWidth = st.inset.size * s;
-    ctx.strokeStyle = st.inset.color;
-    ctx.globalAlpha = st.inset.alpha;
-    rr(ctx, r.x + ctx.lineWidth / 2, r.y + ctx.lineWidth / 2, r.w - ctx.lineWidth, r.h - ctx.lineWidth, Math.max(0, radius - ctx.lineWidth / 2));
-    ctx.stroke();
-    ctx.restore();
-  }
-
   // camera bubble
   const cc = p.config.camera;
   const cv = src.camera;

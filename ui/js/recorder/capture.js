@@ -8,8 +8,42 @@ import { syncMeters } from "./meters.js";
 
 let cameraRec = null;
 let cameraStartedMs = null;
+let micRec = null;
+let micStartedMs = null;
 let timerHandle = null;
 let writeChain = Promise.resolve();
+let micChain = Promise.resolve();
+
+/** Record the microphone on its own so its level can be mixed independently of system audio. */
+async function startMic() {
+  if (!window.MediaRecorder) throw new Error("this web view cannot record audio");
+  let deviceId;
+  try {
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput");
+    deviceId = devs.find((d) => state.micName && d.label && d.label.includes(state.micName.slice(0, 10)))?.deviceId;
+  } catch {}
+  const stream = await Promise.race([
+    navigator.mediaDevices.getUserMedia({
+      audio: {
+        deviceId: deviceId ? { ideal: deviceId } : undefined,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+      video: false,
+    }),
+    new Promise((_, rej) => setTimeout(() => rej(new Error("Microphone timed out")), 8000)),
+  ]);
+  const mime = ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm"].find((m) => MediaRecorder.isTypeSupported(m)) || "";
+  let rec;
+  try {
+    rec = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 192000 } : {});
+  } catch (e) {
+    stream.getTracks().forEach((t) => t.stop());
+    throw e;
+  }
+  return { stream, rec, ext: mime.includes("mp4") ? "m4a" : "webm" };
+}
 
 async function startCamera() {
   if (!window.MediaRecorder) throw new Error("this web view cannot record camera video");
@@ -66,6 +100,15 @@ export async function beginRecording() {
     }
   }
 
+  let mic = null;
+  if (state.mic) {
+    try {
+      mic = await startMic();
+    } catch (e) {
+      cameraNote += (cameraNote ? " " : "") + `Microphone unavailable (${e?.message || e}).`;
+    }
+  }
+
   state.phase = "countdown";
   document.body.classList.add("countdown");
   $("hudLeft").style.display = "none";
@@ -77,6 +120,7 @@ export async function beginRecording() {
     await new Promise((r) => setTimeout(r, 1000));
     if (state.phase !== "countdown") {
       if (cam && !cam.shared) cam.stream.getTracks().forEach((t) => t.stop());
+      mic?.stream.getTracks().forEach((t) => t.stop());
       return;
     }
   }
@@ -90,16 +134,28 @@ export async function beginRecording() {
         windowId: state.mode === "window" ? state.windowId : null,
         area: state.mode === "area" ? state.area : null,
         systemAudio: state.sys,
-        microphone: state.mic,
-        microphoneId: state.mic ? state.micId : null,
+        microphone: false, // the mic is recorded separately (see startMic)
+        microphoneId: null,
         fps: state.fps,
         maxLongSide: state.resolution || null,
       },
     });
   } catch (e) {
     if (cam && !cam.shared) cam.stream.getTracks().forEach((t) => t.stop());
+    mic?.stream.getTracks().forEach((t) => t.stop());
     showError(String(e));
     return resetUI();
+  }
+
+  if (mic) {
+    await invoke("mic_begin", { ext: mic.ext });
+    mic.rec.ondataavailable = (ev) => {
+      if (!ev.data || !ev.data.size) return;
+      micChain = micChain.then(async () => invoke("mic_chunk", await ev.data.arrayBuffer()));
+    };
+    micStartedMs = Date.now();
+    mic.rec.start(500);
+    micRec = mic;
   }
 
   if (cam) {
@@ -153,14 +209,26 @@ export async function finishRecording() {
     $("hudCam").classList.remove("on");
     await writeChain;
   }
+  if (micRec) {
+    await new Promise((res) => {
+      micRec.rec.onstop = res;
+      micRec.rec.stop();
+    });
+    micRec.stream.getTracks().forEach((t) => t.stop());
+    await micChain;
+  }
   try {
-    const dir = await invoke("stop_recording", { cameraStartedUnixMs: cameraRec ? cameraStartedMs : null });
+    const dir = await invoke("stop_recording", {
+      cameraStartedUnixMs: cameraRec ? cameraStartedMs : null,
+      micStartedUnixMs: micRec ? micStartedMs : null,
+    });
     await invoke("hide_area_frame");
     await invoke("open_editor", { dir });
   } catch (e) {
     showError(String(e));
   }
   cameraRec = null;
+  micRec = null;
   resetUI();
 }
 

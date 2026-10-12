@@ -2,8 +2,8 @@
 // generated at draw time so ScreenCraft ships no image assets.
 
 const SPECS = {
-  aurora:   { base: ["#0b1026", "#1d1b4b"], blobs: [["#00e0b0", .2, .25, .55], ["#7a5cff", .8, .3, .6], ["#ff6ad5", .55, .9, .5]] },
   sunset:   { base: ["#2b1055", "#7597de"], blobs: [["#ff7e5f", .2, .85, .7], ["#feb47b", .75, .8, .6], ["#ff4e8a", .5, .2, .5]] },
+  aurora:   { base: ["#0b1026", "#1d1b4b"], blobs: [["#00e0b0", .2, .25, .55], ["#7a5cff", .8, .3, .6], ["#ff6ad5", .55, .9, .5]] },
   ocean:    { base: ["#021b3a", "#0a4a8a"], blobs: [["#00c6ff", .15, .2, .6], ["#0072ff", .85, .7, .7], ["#4be1ec", .5, .95, .4]] },
   forest:   { base: ["#07201a", "#1c4a38"], blobs: [["#6fe3a0", .25, .3, .5], ["#2f9e6b", .8, .75, .7], ["#c9f27a", .6, .1, .35]] },
   midnight: { base: ["#05060d", "#15172e"], blobs: [["#3a3fbf", .2, .8, .6], ["#8a2be2", .85, .2, .5], ["#1f6feb", .6, .6, .4]] },
