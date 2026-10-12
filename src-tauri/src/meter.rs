@@ -35,7 +35,7 @@ impl SCStreamOutputTrait for Handler {
         let bits = peak.to_bits();
         let _ = self
             .peak
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| (f32::from_bits(old) < peak).then_some(bits));
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |old| (f32::from_bits(old) < peak).then_some(bits));
     }
 }
 
