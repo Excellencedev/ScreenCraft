@@ -297,7 +297,7 @@ pub struct Styles {
 impl Default for Styles {
     fn default() -> Self {
         Self {
-            padding_ratio: 0.1,
+            padding_ratio: 0.02,
             corner_radius: 16.0,
             shadow: Shadow::default(),
             inset: Inset::default(),
