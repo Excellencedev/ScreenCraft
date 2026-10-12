@@ -4,7 +4,7 @@ import { $, S, P, dir, TRACK_FPS, media, clamp, fmt, hooks } from "./state.js";
 import { outDuration, outToSrc, sliceOutStart } from "./timemap.js";
 import { draw } from "./draw.js";
 import { lookup } from "./scrubcache.js";
-import { masterGain, makeLimiter } from "../audiolevel.js";
+import { masterGain, makeLimiter, monoMix } from "../audiolevel.js";
 
 // ---- transport UI (throttled)
 let lastTransport = 0;
@@ -45,6 +45,23 @@ let seeking = false;
 let pending = null;
 let seekGuard = 0;
 
+/**
+ * Keep a secondary element (camera video, mic) lined up with the screen video without
+ * audible skips: small drift is absorbed by nudging its speed, only big drift seeks.
+ */
+function chase(el, targetMs) {
+  const base = media.screen.playbackRate;
+  const err = el.currentTime * 1000 - targetMs; // > 0: ahead
+  if (Math.abs(err) > 600) {
+    el.currentTime = Math.max(0, targetMs / 1000);
+    el.playbackRate = base;
+  } else if (Math.abs(err) > 35) {
+    el.playbackRate = base * (err > 0 ? 0.97 : 1.03);
+  } else if (el.playbackRate !== base) {
+    el.playbackRate = base;
+  }
+}
+
 function syncCamera(srcMs) {
   const cam = media.camera;
   if (!cam) return;
@@ -64,7 +81,8 @@ function pump() {
   const { src, fast } = pending;
   pending = null;
   const v = media.screen;
-  const target = src / 1000;
+  // a hair past 0: some recordings have no frame exactly at 0 and would paint black
+  const target = Math.max(src / 1000, 0.05);
   syncCamera(src);
   syncMic(src);
   if (Math.abs(v.currentTime - target) < 0.001) {
@@ -124,11 +142,13 @@ function ensureAudio() {
     const ctx = new AudioContext();
     const limiter = makeLimiter(ctx);
     limiter.connect(ctx.destination);
-    const wire = (el) => {
+    const wire = (el, mono) => {
       if (!el) return null;
       try {
         const g = ctx.createGain();
-        ctx.createMediaElementSource(el).connect(g);
+        const src = ctx.createMediaElementSource(el);
+        if (mono) src.connect(monoMix(ctx)).connect(g);
+        else src.connect(g);
         g.connect(limiter);
         el.volume = 1;
         return g;
@@ -136,8 +156,8 @@ function ensureAudio() {
         return null;
       }
     };
-    bus.dev = wire(media.screen);
-    bus.mic = wire(media.mic);
+    bus.dev = wire(media.screen, false);
+    bus.mic = wire(media.mic, true);
     bus.ctx = ctx;
     ctx.resume?.().catch(() => {});
   } catch {}
@@ -221,8 +241,8 @@ function loop() {
   }
   const cur = sl[S.curSlice];
   S.tOut = sliceOutStart(S.curSlice) + (clamp(v.currentTime * 1000, cur.sourceStartMs, cur.sourceEndMs) - cur.sourceStartMs) / cur.timeScale;
-  if (media.camera && Math.abs(media.camera.currentTime * 1000 - (v.currentTime * 1000 + P().media.cameraOffsetMs)) > 250) syncCamera(v.currentTime * 1000);
-  if (media.mic && Math.abs(media.mic.currentTime * 1000 - (v.currentTime * 1000 + (P().media.micOffsetMs || 0))) > 200) syncMic(v.currentTime * 1000);
+  if (media.camera) chase(media.camera, v.currentTime * 1000 + P().media.cameraOffsetMs);
+  if (media.mic) chase(media.mic, v.currentTime * 1000 + (P().media.micOffsetMs || 0));
   updateTransport(false);
   draw();
   requestAnimationFrame(loop);

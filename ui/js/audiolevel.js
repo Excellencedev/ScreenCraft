@@ -9,8 +9,14 @@ export const masterGain = (v) => Math.max(0, v ?? 0.5) * 2;
 export function autoGain(buf) {
   const sr = buf.sampleRate;
   const win = Math.max(1, Math.round(sr * 0.05));
-  const ch = [];
-  for (let c = 0; c < buf.numberOfChannels; c++) ch.push(buf.getChannelData(c));
+  // measured on the mono mix, which is how the microphone is played (see monoMix)
+  const n = buf.numberOfChannels;
+  const mix = new Float32Array(buf.length);
+  for (let c = 0; c < n; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < mix.length; i++) mix[i] += d[i] / n;
+  }
+  const ch = [mix];
   const rms = [];
   let peak = 0;
   for (let i = 0; i + win <= buf.length; i += win) {
@@ -44,4 +50,17 @@ export function makeLimiter(ctx) {
   c.attack.value = 0.003;
   c.release.value = 0.15;
   return c;
+}
+
+/**
+ * The microphone is always played as a centred signal: its channels are averaged and
+ * sent to both ears. (Many mics deliver two channels with one of them empty, which
+ * otherwise sounds like left-ear-only audio.)
+ */
+export function monoMix(ctx) {
+  const g = ctx.createGain();
+  g.channelCount = 1;
+  g.channelCountMode = "explicit";
+  g.channelInterpretation = "speakers";
+  return g;
 }

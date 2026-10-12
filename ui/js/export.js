@@ -1,4 +1,4 @@
-import { masterGain, autoGain, makeLimiter } from "./audiolevel.js";
+import { masterGain, autoGain, makeLimiter, monoMix } from "./audiolevel.js";
 import { Muxer, ArrayBufferTarget } from "../vendor/mp4-muxer.mjs";
 import { GIFEncoder, quantize, applyPalette } from "../vendor/gifenc.esm.js";
 import { invoke, convertFileSrc } from "./tauri.js";
@@ -56,10 +56,10 @@ async function renderAudio(project, dir, outDurSec) {
   const a = project.config.audio;
   const tracks = [];
   const device = await decodeFile(convertFileSrc(`${dir}/${project.media.screen}`));
-  if (device && device.length) tracks.push({ buf: device, gain: a.deviceVolume ?? 1, offset: 0, level: 1 });
+  if (device && device.length) tracks.push({ buf: device, gain: a.deviceVolume ?? 1, offset: 0, level: 1, mono: false });
   if (project.media.mic) {
     const mic = await decodeFile(convertFileSrc(`${dir}/${project.media.mic}`));
-    if (mic && mic.length) tracks.push({ buf: mic, gain: a.micVolume ?? 1, offset: (project.media.micOffsetMs || 0) / 1000, level: autoGain(mic) });
+    if (mic && mic.length) tracks.push({ buf: mic, gain: a.micVolume ?? 1, offset: (project.media.micOffsetMs || 0) / 1000, level: autoGain(mic), mono: true });
   }
   if (!tracks.length) return null;
   const sr = 48000;
@@ -78,7 +78,9 @@ async function renderAudio(project, dir, outDurSec) {
       node.playbackRate.value = s.timeScale;
       const g = off.createGain();
       g.gain.value = s.volume * master * t.gain * t.level;
-      node.connect(g).connect(limiter);
+      if (t.mono) node.connect(monoMix(off)).connect(g);
+      else node.connect(g);
+      g.connect(limiter);
       // a mic that started slightly after the screen has a negative offset: delay it instead
       const when = at + Math.max(0, -from) / s.timeScale;
       const bufStart = Math.max(0, from);

@@ -62,7 +62,7 @@ async function fill(url, offsetMs, store, width, onFill) {
       done.add(i);
       // stay out of the way of playback and scrubbing
       while (S.playing || S.scrubbing) await new Promise((r) => setTimeout(r, 150));
-      await seekTo(v, Math.max(0, i * cache.step + offsetMs) / 1000);
+      await seekTo(v, Math.max(0.05, i * cache.step + offsetMs) / 1000);
       const c = document.createElement("canvas");
       c.width = width;
       c.height = h;

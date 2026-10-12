@@ -54,6 +54,10 @@ async function startMic() {
     lim.threshold.value = -3;
     lim.knee.value = 0;
     lim.ratio.value = 20;
+    // average the channels (many mics leave one empty) and send the result to both ears
+    boost.channelCount = 1;
+    boost.channelCountMode = "explicit";
+    boost.channelInterpretation = "speakers";
     src.connect(boost).connect(lim).connect(dest);
     recStream = dest.stream;
   } catch {
