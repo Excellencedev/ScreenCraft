@@ -83,7 +83,6 @@ function bindUI() {
   };
   $("btnCrop").onclick = () => { S.tab = "crop"; renderPanel(); };
   $("btnExport").onclick = openExport;
-  $("btnCompress").onclick = () => invoke("show_compressor", { input: `${dir}/${P().media.screen}` });
   $("btnRaw").onclick = (e) => rawMenu(e.currentTarget);
   $("btnPresets").onclick = (e) => presetsMenu(e.currentTarget);
   $("selAspect").onchange = (e) => change(null, () => (P().config.output.aspectRatio = e.target.value), { track: false });
