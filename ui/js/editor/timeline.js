@@ -3,6 +3,7 @@
 import { invoke } from "../tauri.js";
 import { $, S, P, dir, uid, clamp, fmt, hooks } from "./state.js";
 import { sliceLen, outDuration, outToSrc, spansOut } from "./timemap.js";
+import { addMusic } from "./music.js";
 import { change } from "./history.js";
 import { requestSeek, pause, play, updateTransport, setTimelineWidth } from "./playback.js";
 
@@ -66,6 +67,26 @@ export function renderTimeline() {
     }
   }
   zt.replaceChildren(zf);
+
+  // music track
+  const mt = $("trackMusic");
+  const mu = P().scene.music;
+  if (!mu) {
+    const b = document.createElement("button");
+    b.className = "add-music";
+    b.textContent = "+ Add music";
+    b.onclick = addMusic;
+    mt.replaceChildren(b);
+  } else {
+    const el = document.createElement("div");
+    const len = Math.max(0, Math.min(mu.durationMs, dur - mu.offsetMs));
+    el.className = "block music" + (S.selected?.type === "music" ? " sel" : "");
+    el.style.left = mu.offsetMs * pxPerMs + "px";
+    el.style.width = Math.max(14, len * pxPerMs - 2) + "px";
+    el.innerHTML = `<span>♪ ${mu.name || "Music"}</span><span class="t">${(mu.durationMs / 1000).toFixed(1)}s</span>`;
+    el.onpointerdown = (e) => beginMusicDrag(e, mu, el, pxPerMs);
+    mt.replaceChildren(el);
+  }
   updateTransport();
 }
 
@@ -178,7 +199,54 @@ function beginZoomDrag(e, z, el, pxPerMs, a0, b0) {
     try { el.releasePointerCapture(ev.pointerId); } catch {}
     if (!moved) return;
     const ns = outToSrc(na).src, ne = outToSrc(nb).src;
-    change("zoom-drag-" + z.id, () => { z.sourceStartMs = ns; z.sourceEndMs = ne; }, { timeline: true });
+    change("zoom-drag-" + z.id, () => {
+      const spans = spansOut(z.sourceStartMs, z.sourceEndMs);
+      // the 1 ms eases a split leaves behind only make sense while the halves touch
+      if (z.easeInMs === 1) z.easeInMs = null;
+      if (z.easeOutMs === 1) z.easeOutMs = null;
+      if (spans.length <= 1) {
+        z.sourceStartMs = ns;
+        z.sourceEndMs = ne;
+        return;
+      }
+      // The region shows up in several places (clips were re-ordered): detach the stretch that
+      // was dragged and keep every other stretch as its own region, so nothing disappears.
+      const k = Math.max(0, spans.findIndex((sp) => Math.abs(sp[0] - a0) < 2 && Math.abs(sp[1] - b0) < 2));
+      const copies = spans.map((sp, j) => (j === k ? null : { ...JSON.parse(JSON.stringify(z)), id: uid(), sourceStartMs: sp[2], sourceEndMs: sp[3] }));
+      const zs = P().scene.zooms;
+      const at = zs.indexOf(z);
+      z.sourceStartMs = ns;
+      z.sourceEndMs = ne;
+      zs.splice(at + 1, 0, ...copies.filter(Boolean));
+    }, { timeline: true });
+  };
+}
+
+/** Music block: drag to place it on the timeline. */
+function beginMusicDrag(e, mu, el, pxPerMs) {
+  e.stopPropagation();
+  e.preventDefault();
+  el.setPointerCapture(e.pointerId);
+  S.selected = { type: "music" };
+  S.tab = "audio";
+  document.querySelectorAll(".block.sel").forEach((b) => b.classList.remove("sel"));
+  el.classList.add("sel");
+  hooks.renderPanel();
+  const x0 = e.clientX;
+  const a0 = mu.offsetMs;
+  const total = outDuration();
+  let na = a0, moved = false;
+  el.onpointermove = (ev) => {
+    if (!moved && Math.abs(ev.clientX - x0) < 3) return;
+    moved = true;
+    na = clamp(a0 + (ev.clientX - x0) / pxPerMs, 0, Math.max(0, total - 500));
+    el.style.left = na * pxPerMs + "px";
+  };
+  el.onpointerup = (ev) => {
+    el.onpointermove = el.onpointerup = null;
+    try { el.releasePointerCapture(ev.pointerId); } catch {}
+    if (!moved) return;
+    change(null, () => { P().scene.music.offsetMs = Math.round(na); }, { track: false, timeline: true });
   };
 }
 
@@ -186,7 +254,7 @@ function beginZoomDrag(e, z, el, pxPerMs, a0, b0) {
 export function bindScrub() {
   const inner = $("tlInner");
   inner.addEventListener("pointerdown", (e) => {
-    if (e.target.closest(".block")) return;
+    if (e.target.closest(".block, .add-music")) return;
     S.selected = null;
     document.querySelectorAll(".block.sel").forEach((b) => b.classList.remove("sel"));
     hooks.renderPanel();
@@ -214,15 +282,52 @@ export function bindScrub() {
 }
 
 // ---- edit operations
+/**
+ * Split at the playhead. Nothing selected: everything (clips and zoom regions) is cut.
+ * A clip or zoom selected: only that one.
+ */
 export function splitAtPlayhead() {
+  const sel = S.selected;
   const { src, idx } = outToSrc(S.tOut);
-  const s = P().scene.slices[idx];
-  if (src <= s.sourceStartMs + 50 || src >= s.sourceEndMs - 50) return;
+  const slices = P().scene.slices;
+  const doClips = !sel || sel.type === "slice";
+  const doZooms = !sel || sel.type === "zoom";
+
+  // the clip to cut: the selected one if the playhead is on it, else the one under the playhead
+  let clipIdx = -1;
+  if (doClips) {
+    if (sel?.type === "slice") {
+      const si = slices.findIndex((x) => x.id === sel.id);
+      if (si === idx) clipIdx = si;
+    } else clipIdx = idx;
+    if (clipIdx >= 0) {
+      const s = slices[clipIdx];
+      if (src <= s.sourceStartMs + 50 || src >= s.sourceEndMs - 50) clipIdx = -1;
+    }
+  }
+  const zooms = doZooms
+    ? P().scene.zooms.filter((z) => (sel ? z.id === sel.id : true) && src > z.sourceStartMs + 50 && src < z.sourceEndMs - 50)
+    : [];
+  if (clipIdx < 0 && !zooms.length) return;
+
   change(null, () => {
-    const right = { ...s, id: uid(), sourceStartMs: src };
-    s.sourceEndMs = src;
-    P().scene.slices.splice(idx + 1, 0, right);
-    S.selected = { type: "slice", id: right.id };
+    if (clipIdx >= 0) {
+      const s = slices[clipIdx];
+      const right = { ...s, id: uid(), sourceStartMs: src };
+      s.sourceEndMs = src;
+      slices.splice(clipIdx + 1, 0, right);
+      if (sel?.type === "slice") S.selected = { type: "slice", id: right.id };
+    }
+    for (const z of zooms) {
+      const right = { ...JSON.parse(JSON.stringify(z)), id: uid(), sourceStartMs: src };
+      // tiny eases at the cut so the camera doesn't dip between the two halves
+      z.sourceEndMs = src;
+      z.easeOutMs = 1;
+      right.easeInMs = 1;
+      const at = P().scene.zooms.indexOf(z);
+      P().scene.zooms.splice(at + 1, 0, right);
+      if (sel?.type === "zoom") S.selected = { type: "zoom", id: right.id };
+    }
   }, { panel: true, timeline: true });
 }
 
@@ -241,7 +346,9 @@ export function duplicateSelected() {
 export function deleteSelected() {
   const sel = S.selected;
   if (!sel) return;
-  if (sel.type === "zoom") {
+  if (sel.type === "music") {
+    change(null, () => { P().scene.music = null; S.selected = null; }, { panel: true, timeline: true, track: false });
+  } else if (sel.type === "zoom") {
     change(null, () => { P().scene.zooms = P().scene.zooms.filter((z) => z.id !== sel.id); S.selected = null; }, { panel: true, timeline: true });
   } else if (P().scene.slices.length > 1) {
     change(null, () => { P().scene.slices = P().scene.slices.filter((s) => s.id !== sel.id); S.selected = null; }, { panel: true, timeline: true });

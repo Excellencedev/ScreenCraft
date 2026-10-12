@@ -146,6 +146,19 @@ impl Default for ZoomRegion {
 pub struct Scene {
     pub slices: Vec<Slice>,
     pub zooms: Vec<ZoomRegion>,
+    /// Background music laid under the edit (placed on the output timeline).
+    pub music: Option<MusicTrack>,
+}
+
+/// An audio file in the project folder, positioned on the edited timeline.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MusicTrack {
+    pub file: String,
+    pub name: String,
+    /// Where the music starts on the output timeline.
+    pub offset_ms: f64,
+    pub duration_ms: f64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -374,13 +387,15 @@ pub struct AudioConfig {
     pub mic_volume: f64,
     /// Device / system audio level (the screen recording's audio).
     pub device_volume: f64,
+    /// Background music level.
+    pub music_volume: f64,
     pub mute_microphone: bool,
     pub mute_system_audio: bool,
 }
 
 impl Default for AudioConfig {
     fn default() -> Self {
-        Self { volume: 0.5, mic_volume: 1.0, device_volume: 1.0, mute_microphone: false, mute_system_audio: false }
+        Self { volume: 0.5, mic_volume: 1.0, device_volume: 1.0, music_volume: 0.5, mute_microphone: false, mute_system_audio: false }
     }
 }
 
@@ -433,7 +448,7 @@ impl Project {
         };
         Self {
             name: name.into(),
-            scene: Scene { slices: vec![slice], zooms: Vec::new() },
+            scene: Scene { slices: vec![slice], zooms: Vec::new(), music: None },
             media,
             ..Default::default()
         }

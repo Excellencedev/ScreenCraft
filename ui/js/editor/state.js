@@ -22,7 +22,7 @@ export const S = {
 };
 
 /** Decoded media elements and images used by the compositor. */
-export const media = { screen: null, camera: null, mic: null, bgImage: null, micLevel: 1 };
+export const media = { screen: null, camera: null, mic: null, music: null, bgImage: null, micLevel: 1 };
 
 export const P = () => S.project;
 export const uid = () => Math.random().toString(36).slice(2, 10);

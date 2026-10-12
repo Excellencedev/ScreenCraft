@@ -4,11 +4,11 @@
 // because WebKit refuses to autoplay a hidden video without a user gesture.)
 import { S, P } from "./state.js";
 
-const MAX_SLOTS = 400;
+const MAX_SLOTS = 240;
 const SCREEN_W = 480;
 const CAM_W = 240;
 
-export const cache = { step: 100, screen: [], camera: [], filled: 0, slots: 0 };
+export const cache = { step: 100, screen: [], camera: [], filled: 0, camFilled: 0, slots: 0 };
 
 export function lookup(srcMs) {
   const i = Math.round(srcMs / cache.step);
@@ -75,10 +75,21 @@ async function fill(url, offsetMs, store, width, onFill) {
   v.remove();
 }
 
-export function buildScrubCache(urls) {
+/**
+ * Starts the background pass. `onProgress(f)` gets 0..1 where 1 means "good enough to
+ * scrub smoothly" (every other slot filled, so the nearest frame is always close).
+ */
+export function buildScrubCache(urls, onProgress) {
   const dur = P().media.durationMs;
   cache.step = Math.max(1000 / 12, dur / MAX_SLOTS);
   cache.slots = Math.ceil(dur / cache.step);
-  fill(urls.screen, 0, cache.screen, SCREEN_W, () => { cache.filled++; }).catch(console.error);
-  if (urls.camera) fill(urls.camera, P().media.cameraOffsetMs || 0, cache.camera, CAM_W).catch(console.error);
+  const need = Math.max(1, cache.slots * 0.5);
+  const report = () => {
+    const a = cache.filled / need;
+    const b = urls.camera ? cache.camFilled / need : 1;
+    onProgress?.(Math.min(1, a, b));
+  };
+  fill(urls.screen, 0, cache.screen, SCREEN_W, () => { cache.filled++; report(); }).catch(console.error);
+  if (urls.camera) fill(urls.camera, P().media.cameraOffsetMs || 0, cache.camera, CAM_W, () => { cache.camFilled++; report(); }).catch(console.error);
+  report();
 }

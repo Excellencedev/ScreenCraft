@@ -1,6 +1,6 @@
 html, body { background: var(--bg); overflow: hidden; }
 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-#app { display: grid; grid-template-rows: 52px minmax(0, 1fr) 236px; height: 100vh; }
+#app { display: grid; grid-template-rows: 52px minmax(0, 1fr) 250px; height: 100vh; }
 #top { display: flex; align-items: center; gap: 10px; padding: 0 14px; -webkit-app-region: drag; border-bottom: 1px solid #101119; }
 #top button, #top select { -webkit-app-region: no-drag; }
 .traffic-space { width: 0; }
@@ -70,7 +70,7 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 #ruler { position: absolute; left: 0; right: 0; top: 0; height: 24px; cursor: pointer; }
 #ruler .tick { position: absolute; top: 14px; width: 1px; height: 6px; background: #3a3c50; }
 #ruler .lab { position: absolute; top: 0; color: var(--muted); font-size: 11px; transform: translateX(-50%); display: block; margin: 0; }
-.track { position: relative; height: 54px; margin-top: 8px; }
+.track { position: relative; height: 42px; margin-top: 6px; }
 #trackZoom { height: 46px; }
 .block { position: absolute; top: 0; bottom: 0; border-radius: 9px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; cursor: grab; border: 2px solid transparent; }
 .block.clip { background: linear-gradient(#d49a33, #b97f1f); color: #2b1c00; cursor: grab; }
@@ -124,3 +124,19 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 
 .title:hover { background: rgba(255,255,255,.06); }
 .title.editing { background: rgba(255,255,255,.1); outline: 1px solid var(--accent, #4a8cff); text-overflow: clip; }
+
+.block.music { background: linear-gradient(#3da57a, #2f8a64); color: #fff; }
+.add-music { position: absolute; inset: 0; border: 1.5px dashed #2a2c3d; border-radius: 9px; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 6px; }
+.add-music:hover { border-color: #3da57a; color: #cdeedd; background: rgba(61,165,122,.08); }
+#trackMusic .block span { white-space: nowrap; }
+
+#prep { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: rgba(8,9,14,.88); backdrop-filter: blur(6px); }
+.prep-card { display: grid; justify-items: center; gap: 10px; width: 320px; text-align: center; }
+.prep-title { font-size: 16px; font-weight: 600; color: #e8e9f2; }
+.prep-sub { color: var(--muted); font-size: 12px; }
+.prep-bar { width: 100%; height: 5px; border-radius: 3px; background: #1d1f2c; overflow: hidden; margin-top: 4px; }
+#prepBar { height: 100%; width: 0; background: var(--accent-2); transition: width .2s; }
+.prep-skip { margin-top: 6px; color: var(--muted); padding: 4px 10px; border-radius: 8px; }
+.prep-skip:hover { color: #fff; background: #1a1c28; }
+.spinner { width: 38px; height: 38px; border-radius: 50%; border: 3px solid #23253a; border-top-color: var(--accent-2); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

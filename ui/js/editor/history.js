@@ -44,6 +44,7 @@ export function change(key, mutate, { track = true, panel = false, timeline = fa
 }
 
 function after() {
+  hooks.syncMusic?.();
   scheduleSave();
   updateUndo();
   hooks.scheduleTrack();

@@ -4,7 +4,7 @@ import { $, S, P, dir, hooks, media, clamp } from "./state.js";
 import { outDuration } from "./timemap.js";
 import { change, undo, redo, updateUndo } from "./history.js";
 import { draw, frameIndex, displayedRect } from "./draw.js";
-import { play, pause, requestSeek, scheduleTrack, computeTrack, refreshSliceAudio } from "./playback.js";
+import { play, pause, requestSeek, scheduleTrack, computeTrack, refreshSliceAudio, syncMusic } from "./playback.js";
 import {
   renderTimeline, bindScrub, splitAtPlayhead, deleteSelected, addZoomAtPlayhead, autoZoom, duplicateSelected,
 } from "./timeline.js";
@@ -15,9 +15,11 @@ import { rawMenu } from "./rawfiles.js";
 import { openExport, bindExport } from "./exportDialog.js";
 import { contentRect, camAt } from "../render.js";
 import { buildScrubCache } from "./scrubcache.js";
+import { loadMusicElement } from "./music.js";
 import { autoGain } from "../audiolevel.js";
 
 hooks.draw = draw;
+hooks.syncMusic = syncMusic;
 hooks.renderTimeline = renderTimeline;
 hooks.renderPanel = renderPanel;
 hooks.scheduleTrack = scheduleTrack;
@@ -205,10 +207,20 @@ async function boot() {
     syncControls();
     updateUndo();
     await computeTrack();
+    await loadMusicElement();
+    // Pre-render frames into memory behind a spinner so the first scrub is already smooth.
+    const prep = $("prep");
+    prep.hidden = false;
+    const done = () => { prep.hidden = true; };
+    $("prepSkip").onclick = done;
     buildScrubCache({
       screen: media.screen.src,
       camera: media.camera ? media.camera.src : null,
+    }, (f) => {
+      $("prepBar").style.width = Math.round(f * 100) + "%";
+      if (f >= 1) setTimeout(done, 150);
     });
+    setTimeout(done, 45000); // never trap the user
     $("loading").hidden = true;
     requestSeek(0);
   } catch (e) {

@@ -61,12 +61,25 @@ async function renderAudio(project, dir, outDurSec) {
     const mic = await decodeFile(convertFileSrc(`${dir}/${project.media.mic}`));
     if (mic && mic.length) tracks.push({ buf: mic, gain: a.micVolume ?? 1, offset: (project.media.micOffsetMs || 0) / 1000, level: autoGain(mic), mono: true });
   }
-  if (!tracks.length) return null;
+  let music = null;
+  if (project.scene.music) {
+    const buf = await decodeFile(convertFileSrc(`${dir}/${project.scene.music.file}`));
+    if (buf && buf.length) music = { buf, offset: Math.max(0, project.scene.music.offsetMs) / 1000 };
+  }
+  if (!tracks.length && !music) return null;
   const sr = 48000;
   const off = new OfflineAudioContext(2, Math.ceil(outDurSec * sr), sr);
   const master = masterGain(a.volume);
   const limiter = makeLimiter(off);
   limiter.connect(off.destination);
+  if (music && music.offset < outDurSec) {
+    const g = off.createGain();
+    g.gain.value = master * (a.musicVolume ?? 0.5);
+    const node = off.createBufferSource();
+    node.buffer = music.buf;
+    node.connect(g).connect(limiter);
+    node.start(music.offset, 0, Math.min(music.buf.duration, outDurSec - music.offset));
+  }
   let at = 0;
   for (const s of project.scene.slices) {
     const srcDur = (s.sourceEndMs - s.sourceStartMs) / 1000;

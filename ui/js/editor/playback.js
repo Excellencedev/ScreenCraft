@@ -49,8 +49,7 @@ let seekGuard = 0;
  * Keep a secondary element (camera video, mic) lined up with the screen video without
  * audible skips: small drift is absorbed by nudging its speed, only big drift seeks.
  */
-function chase(el, targetMs) {
-  const base = media.screen.playbackRate;
+function chase(el, targetMs, base = media.screen.playbackRate) {
   const err = el.currentTime * 1000 - targetMs; // > 0: ahead
   if (Math.abs(err) > 600) {
     el.currentTime = Math.max(0, targetMs / 1000);
@@ -132,7 +131,7 @@ export const seekOut = (t) => requestSeek(t, false);
 // ---- playback
 // Audio goes through WebAudio so the master volume and the mic's auto-level can exceed
 // the 100% an <audio>/<video> element allows, with a limiter against clipping.
-const bus = { ctx: null, dev: null, mic: null };
+const bus = { ctx: null, dev: null, mic: null, music: null, limiter: null };
 function ensureAudio() {
   if (bus.ctx) {
     bus.ctx.resume?.().catch(() => {});
@@ -142,6 +141,7 @@ function ensureAudio() {
     const ctx = new AudioContext();
     const limiter = makeLimiter(ctx);
     limiter.connect(ctx.destination);
+    bus.limiter = limiter;
     const wire = (el, mono) => {
       if (!el) return null;
       try {
@@ -158,6 +158,7 @@ function ensureAudio() {
     };
     bus.dev = wire(media.screen, false);
     bus.mic = wire(media.mic, true);
+    bus.music = wire(media.music, false);
     bus.ctx = ctx;
     ctx.resume?.().catch(() => {});
   } catch {}
@@ -178,7 +179,48 @@ function applySliceAudio(s) {
     media.mic.playbackRate = media.screen.playbackRate;
     setLevel(media.mic, bus.mic, m * a.micVolume * (media.micLevel || 1));
   }
+  applyMusicLevel();
 }
+
+function applyMusicLevel() {
+  if (!media.music) return;
+  const a = P().config.audio;
+  if (!bus.music && bus.ctx) {
+    // music added after playback started: wire it now
+    try {
+      const g = bus.ctx.createGain();
+      bus.ctx.createMediaElementSource(media.music).connect(g);
+      g.connect(bus.limiter);
+      media.music.volume = 1;
+      bus.music = g;
+    } catch {}
+  }
+  setLevel(media.music, bus.music, masterGain(a.volume) * (a.musicVolume ?? 0.5));
+}
+
+/** Music is placed on the output timeline, so it follows tOut rather than source time. */
+function musicTick() {
+  const mu = media.music, m = P().scene.music;
+  if (!mu || !m) return;
+  const t = S.tOut - m.offsetMs;
+  const inside = t >= 0 && t < m.durationMs - 30;
+  if (!S.playing || !inside) {
+    if (!mu.paused) mu.pause();
+    return;
+  }
+  applyMusicLevel();
+  if (mu.paused) {
+    mu.currentTime = t / 1000;
+    mu.playbackRate = 1;
+    mu.play().catch(() => {});
+  } else {
+    chase(mu, t, 1);
+  }
+}
+export const syncMusic = () => {
+  if (media.music && !P().scene.music) { media.music.pause(); media.music = null; }
+  applyMusicLevel();
+};
 export const refreshSliceAudio = () => applySliceAudio(P().scene.slices[S.curSlice]);
 
 /** SVG elements have no `.hidden` property, so toggle the attribute directly. */
@@ -203,6 +245,7 @@ export function play() {
   media.camera?.play().catch(() => {});
   media.mic?.play().catch(() => {});
   S.playing = true;
+  musicTick();
   setPlayIcon(true);
   requestAnimationFrame(loop);
 }
@@ -212,6 +255,7 @@ export function pause() {
   media.screen.pause();
   media.camera?.pause();
   media.mic?.pause();
+  media.music?.pause();
   setPlayIcon(false);
   draw();
 }
@@ -244,6 +288,7 @@ function loop() {
   if (media.camera) chase(media.camera, v.currentTime * 1000 + P().media.cameraOffsetMs);
   if (media.mic) chase(media.mic, v.currentTime * 1000 + (P().media.micOffsetMs || 0));
   updateTransport(false);
+  musicTick();
   draw();
   requestAnimationFrame(loop);
 }

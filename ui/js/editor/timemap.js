@@ -35,13 +35,29 @@ export function srcToOut(t) {
   return null;
 }
 
-/** Every [outStart, outEnd] stretch of the timeline that shows source range [a, b]. */
+/**
+ * Every stretch of the timeline that shows source range [a, b], as
+ * [outStart, outEnd, srcStart, srcEnd]. Pieces that are back-to-back both on the
+ * timeline and in the source (e.g. after a split) are merged into one stretch.
+ */
 export function spansOut(a, b) {
   const out = [];
   let acc = 0;
+  let prev = null;
   for (const s of P().scene.slices) {
     const lo = Math.max(a, s.sourceStartMs), hi = Math.min(b, s.sourceEndMs);
-    if (hi > lo) out.push([acc + (lo - s.sourceStartMs) / s.timeScale, acc + (hi - s.sourceStartMs) / s.timeScale]);
+    if (hi > lo) {
+      const o0 = acc + (lo - s.sourceStartMs) / s.timeScale;
+      const o1 = acc + (hi - s.sourceStartMs) / s.timeScale;
+      const last = out[out.length - 1];
+      if (last && prev === s.timeScale && Math.abs(last[1] - o0) < 0.5 && Math.abs(last[3] - lo) < 0.5) {
+        last[1] = o1;
+        last[3] = hi;
+      } else {
+        out.push([o0, o1, lo, hi]);
+      }
+      prev = s.timeScale;
+    }
     acc += sliceLen(s);
   }
   return out;
