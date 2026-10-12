@@ -139,7 +139,19 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
   const vW = v && (v.videoWidth || v.width), vH = v && (v.videoHeight || v.height);
   if (v && vW) {
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(v, vx * vW, vy * vH, vwN * vW, vhN * vH, r.x, r.y, r.w, r.h);
+    // Keep the source rectangle inside the image. While the camera is pushed against the
+    // edge during a zoom, rounding can leave it a hair outside, and WebKit then skips the
+    // whole draw (a black frame). Clamp it and shrink the destination to match.
+    const sx = vx * vW, sy = vy * vH, sw = vwN * vW, sh = vhN * vH;
+    const x0 = Math.max(0, sx), y0 = Math.max(0, sy);
+    const x1 = Math.min(vW, sx + sw), y1 = Math.min(vH, sy + sh);
+    if (x1 - x0 > 0.5 && y1 - y0 > 0.5) {
+      ctx.drawImage(
+        v, x0, y0, x1 - x0, y1 - y0,
+        r.x + ((x0 - sx) / sw) * r.w, r.y + ((y0 - sy) / sh) * r.h,
+        ((x1 - x0) / sw) * r.w, ((y1 - y0) / sh) * r.h,
+      );
+    }
   }
 
   // click effects + cursor live inside the clipped screen

@@ -2,7 +2,7 @@
 // JPEG per frame served on sc://localhost. Nothing here plays or seeks a <video>.
 const BASE = "sc://localhost";
 const KEEP = 90; // decoded bitmaps kept around the playhead
-const MAX_INFLIGHT = 10;
+const MAX_INFLIGHT = 12;
 
 export class Strip {
   constructor(kind, meta, dir) {
@@ -35,7 +35,7 @@ export class Strip {
   want(i, dir = 0) {
     this.center = i;
     const list = [i];
-    if (dir !== 0) for (let k = 1; k <= 8; k++) list.push(i + dir * k);
+    if (dir !== 0) for (let k = 1; k <= 12; k++) list.push(i + dir * k);
     else list.push(i - 1, i + 1);
     for (const f of list) this.fetch(f);
   }
@@ -46,7 +46,7 @@ export class Strip {
     this.pending.add(i);
     fetch(`${BASE}/frame/${this.kind}/${i}?d=${this.dir}`)
       .then((r) => (r.ok ? r.blob() : Promise.reject(new Error("frame " + r.status))))
-      .then((b) => createImageBitmap(b))
+      .then((b) => createImageBitmap(b, { premultiplyAlpha: "none", colorSpaceConversion: "none" }))
       .then((bmp) => {
         this.pending.delete(i);
         this.cache.set(i, bmp);

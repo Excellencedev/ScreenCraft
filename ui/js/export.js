@@ -6,26 +6,12 @@ import { outputSize, paintFrame, camAt, lerpCam } from "./render.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function makeVideo(url) {
-  const v = document.createElement("video");
-  v.muted = true;
-  v.preload = "auto";
-  v.playsInline = true;
-  v.src = url;
-  return new Promise((res, rej) => {
-    v.onloadeddata = () => res(v);
-    v.onerror = () => rej(new Error("could not load " + url));
-  });
-}
-
-function seek(v, t) {
-  return new Promise((res) => {
-    t = Math.max(0, Math.min(t, (v.duration || t) - 0.001));
-    if (Math.abs(v.currentTime - t) < 0.0005 && v.readyState >= 2) return res();
-    const h = () => { v.removeEventListener("seeked", h); res(); };
-    v.addEventListener("seeked", h);
-    v.currentTime = t;
-  });
+/** A full-resolution source frame decoded natively (see src-tauri/src/srcframes.rs). */
+async function srcFrame(dir, kind, tMs, quality = 90) {
+  const url = `sc://localhost/src/${kind}?t=${Math.max(0, tMs).toFixed(3)}&d=${encodeURIComponent(dir)}&q=${quality}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("could not read a source frame");
+  return createImageBitmap(await r.blob());
 }
 
 async function writeFile(path, bytes, onProgress) {
@@ -168,8 +154,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
   const { W, H } = outputSize(project, resolution);
   onProgress(0, "Computing camera path…");
   const track = await invoke("compute_render_track", { dir, project, fps });
-  const screen = await makeVideo(convertFileSrc(`${dir}/${project.media.screen}`));
-  const camera = project.media.camera ? await makeVideo(convertFileSrc(`${dir}/${project.media.camera}`)).catch(() => null) : null;
+  const hasCam = !!project.media.camera;
 
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
@@ -208,15 +193,25 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
   venc.configure(vcfg);
 
   const total = track.count;
-  const src = { screen, camera, bgImage, cache: {} };
+  const src = { screen: null, camera: null, bgImage, cache: {} };
+  const fetchPair = async (ti) => ({
+    screen: await srcFrame(dir, "screen", track.tSrc[ti], 92),
+    camera: hasCam ? await srcFrame(dir, "camera", track.tSrc[ti] + project.media.cameraOffsetMs, 88).catch(() => null) : null,
+  });
+  let pendingPair = null;
   const srcRatio = (i) => Math.max(0, Math.min(total - 1, i));
   for (let i = 0; i < total; i++) {
     if (shouldCancel?.()) { venc.close(); throw new Error("cancelled"); }
     if (encError) throw encError;
     const t = srcRatio(i);
     const tOut = (i * 1000) / fps;
-    await seek(screen, track.tSrc[t] / 1000);
-    if (camera) await seek(camera, Math.max(0, (track.tSrc[t] + project.media.cameraOffsetMs) / 1000));
+    src.screen?.close?.();
+    src.camera?.close?.();
+    // frame i+1 is requested as soon as frame i arrives, so native decode/encode overlaps painting
+    const got = await (pendingPair || fetchPair(t));
+    src.screen = got.screen;
+    src.camera = got.camera;
+    pendingPair = i + 1 < total ? fetchPair(srcRatio(i + 1)) : null;
     const cam = camAt(track, i);
     const prev = camAt(track, srcRatio(i - 1)), next = camAt(track, srcRatio(i + 1));
     const motion = Math.abs(next.zoom - prev.zoom) * 4 + Math.abs(next.cx - prev.cx) * 12 + Math.abs(next.cy - prev.cy) * 12;
@@ -280,8 +275,7 @@ export async function exportGif({ project, dir, path, resolution, onProgress, sh
   const { W, H } = outputSize(project, res);
   onProgress(0, "Computing camera path…");
   const track = await invoke("compute_render_track", { dir, project, fps });
-  const screen = await makeVideo(convertFileSrc(`${dir}/${project.media.screen}`));
-  const camera = project.media.camera ? await makeVideo(convertFileSrc(`${dir}/${project.media.camera}`)).catch(() => null) : null;
+  const hasCam = !!project.media.camera;
   let bgImage = null;
   if (project.config.styles.background.kind === "image" && project.config.styles.background.image) {
     bgImage = new Image();
@@ -292,13 +286,16 @@ export async function exportGif({ project, dir, path, resolution, onProgress, sh
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const gifCache = {};
+  const gifSrc = { screen: null, camera: null, bgImage, cache: gifCache };
   const gif = GIFEncoder();
   const delay = Math.round(1000 / fps);
   for (let i = 0; i < track.count; i++) {
     if (shouldCancel?.()) throw new Error("cancelled");
-    await seek(screen, track.tSrc[i] / 1000);
-    if (camera) await seek(camera, Math.max(0, (track.tSrc[i] + project.media.cameraOffsetMs) / 1000));
-    paintFrame(ctx, W, H, project, camAt(track, i), (i * 1000) / fps, track.clicks, { screen, camera, bgImage, cache: gifCache });
+    gifSrc.screen?.close?.();
+    gifSrc.camera?.close?.();
+    gifSrc.screen = await srcFrame(dir, "screen", track.tSrc[i], 88);
+    gifSrc.camera = hasCam ? await srcFrame(dir, "camera", track.tSrc[i] + project.media.cameraOffsetMs, 85).catch(() => null) : null;
+    paintFrame(ctx, W, H, project, camAt(track, i), (i * 1000) / fps, track.clicks, gifSrc);
     const { data } = ctx.getImageData(0, 0, W, H);
     const palette = quantize(data, 256, { format: "rgb565" });
     const index = applyPalette(data, palette, "rgb565");

@@ -7,8 +7,6 @@ const canvas = $("preview");
 const ctx = canvas.getContext("2d", { alpha: false });
 const drawSrc = { screen: null, camera: null, bgImage: null, cache: {} };
 
-let dyn = 1; // adaptive scale while playing
-let drawMs = 8;
 let markerShown = false;
 
 /** On-screen rectangle actually covered by the (letterboxed) canvas picture. */
@@ -29,9 +27,8 @@ export function displayedRect() {
 export const frameIndex = () => Math.round((S.tOut * TRACK_FPS) / 1000);
 
 function sizeCanvas() {
-  // lower resolution while playing/scrubbing keeps interaction smooth; full quality when idle
-  const f = S.scrubbing ? 0.6 : S.playing ? dyn : 1;
-  const { W, H } = outputSize(P(), Math.round(S.previewRes * f));
+  // Fixed size: resizing a canvas clears it, which showed up as black flashes mid-playback.
+  const { W, H } = outputSize(P(), S.previewRes);
   if (canvas.width !== W || canvas.height !== H) {
     canvas.width = W;
     canvas.height = H;
@@ -58,17 +55,11 @@ export function draw() {
   }
   drawSrc.bgImage = media.bgImage;
   if (!drawSrc.screen) return;
-  const t0 = performance.now();
   paintFrame(ctx, W, H, P(), cam, S.tOut, S.track.clicks, drawSrc);
   if (S.selected?.type === "zoom") updateManualMarker(cam);
   else if (markerShown) {
     $("manualMarker").hidden = true;
     markerShown = false;
-  }
-  if (S.playing) {
-    drawMs = drawMs * 0.85 + (performance.now() - t0) * 0.15;
-    if (drawMs > 20 && dyn > 0.5) { dyn = Math.max(0.5, dyn - 0.25); drawMs = 10; }
-    else if (drawMs < 6 && dyn < 1) { dyn = Math.min(1, dyn + 0.25); drawMs = 10; }
   }
 }
 

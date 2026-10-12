@@ -7,6 +7,7 @@ mod compress;
 mod inputlog;
 mod levelmic;
 mod proxy;
+mod srcframes;
 mod meter;
 mod state;
 mod windows;
@@ -34,27 +35,46 @@ fn main() {
                 })
                 .build(),
         )
-        .register_uri_scheme_protocol("sc", |_ctx, req| {
-            // /frame/<screen|camera>/<n>?d=<project dir>
+        .register_asynchronous_uri_scheme_protocol("sc", |_ctx, req, responder| {
+            // /frame/<screen|camera>/<n>?d=<dir>        proxy frame (preview)
+            // /src/<screen|camera>?t=<ms>&d=<dir>&q=<1-100>   full-res source frame (export)
             let uri = req.uri().to_string();
             let path = req.uri().path().to_string();
             let parts: Vec<&str> = path.trim_matches('/').split('/').collect();
-            let dir = uri
-                .split("?d=")
-                .nth(1)
-                .map(|d| urlencoding_decode(d.split('&').next().unwrap_or("")))
-                .unwrap_or_default();
-            let body = if parts.len() == 3 && parts[0] == "frame" {
-                parts[2].parse::<usize>().ok().and_then(|n| proxy::frame_bytes(&dir, parts[1], n))
-            } else {
-                None
+            let query = uri.split('?').nth(1).unwrap_or("").to_string();
+            let param = |k: &str| -> String {
+                query
+                    .split('&')
+                    .find_map(|kv| kv.strip_prefix(&format!("{k}=")))
+                    .map(urlencoding_decode)
+                    .unwrap_or_default()
             };
-            let b = tauri::http::Response::builder()
-                .header("Access-Control-Allow-Origin", "*")
-                .header("Cache-Control", "no-store");
-            match body {
-                Some(bytes) => b.header("Content-Type", "image/jpeg").body(bytes).unwrap(),
-                None => b.status(404).body(Vec::new()).unwrap(),
+            let respond = move |body: Option<Vec<u8>>| {
+                let b = tauri::http::Response::builder()
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Cache-Control", "no-store");
+                let r = match body {
+                    Some(bytes) => b.header("Content-Type", "image/jpeg").body(bytes).unwrap(),
+                    None => b.status(404).body(Vec::new()).unwrap(),
+                };
+                responder.respond(r);
+            };
+            let dir = param("d");
+            if parts.len() == 3 && parts[0] == "frame" {
+                let n = parts[2].parse::<usize>().ok();
+                respond(n.and_then(|n| proxy::frame_bytes(&dir, parts[1], n)));
+            } else if parts.len() == 2 && parts[0] == "src" {
+                let t_ms = param("t").parse::<f64>().unwrap_or(0.0);
+                let quality = param("q").parse::<u8>().unwrap_or(90).clamp(30, 100);
+                srcframes::submit(srcframes::Request {
+                    dir,
+                    kind: parts[1].to_string(),
+                    t_ms,
+                    quality,
+                    reply: Box::new(respond),
+                });
+            } else {
+                respond(None);
             }
         })
         .menu(|handle| {
