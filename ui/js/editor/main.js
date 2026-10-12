@@ -212,7 +212,6 @@ async function boot() {
     const prep = $("prep");
     prep.hidden = false;
     const done = () => { prep.hidden = true; };
-    $("prepSkip").onclick = done;
     buildScrubCache({
       screen: media.screen.src,
       camera: media.camera ? media.camera.src : null,
@@ -220,7 +219,7 @@ async function boot() {
       $("prepBar").style.width = Math.round(f * 100) + "%";
       if (f >= 1) setTimeout(done, 150);
     });
-    setTimeout(done, 45000); // never trap the user
+    setTimeout(done, 120000); // safety net if frames can't be decoded
     $("loading").hidden = true;
     requestSeek(0);
   } catch (e) {
