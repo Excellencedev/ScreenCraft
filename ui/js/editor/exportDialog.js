@@ -119,12 +119,15 @@ async function run() {
   try {
     const project = JSON.parse(JSON.stringify(P()));
     const quality = exp.quality;
-    rawPath = doCompress ? (exp.keep ? `${stripExt(path)} (uncompressed).mp4` : `${stripExt(path)}.sc-tmp-${Date.now()}.mp4`) : path;
+    // outputs are "name" (the plain export) and "name compressed"
+    const compressedPath = `${stripExt(path)} compressed.mp4`;
+    rawPath = doCompress ? (exp.keep ? path : `${stripExt(path)}.sc-tmp-${Date.now()}.mp4`) : path;
     const common = { project, dir, path: rawPath, resolution: exp.res, onProgress, shouldCancel: () => exp.cancel };
     if (ext === "gif") await exportGif(common);
     else await exportMp4({ ...common, fps: exp.fps, motionBlur: exp.blur ? 0.8 : 0, codec: exp.codec, quality });
 
     let summary = "Saved! Revealing in Finder…";
+    let finalPath = path;
     if (doCompress) {
       const c = COMPRESS[exp.cpreset];
       unlisten = await listen("compress-progress", (e) => {
@@ -134,15 +137,16 @@ async function run() {
       $("expText").textContent = "Step 2 of 2 · Compressing…";
       const info = await invoke("probe_video", { path: rawPath });
       const size = await invoke("compress_video", {
-        opts: { input: rawPath, output: path, codec: c.codec, quality: c.quality, height: c.height, fps: null, audio: c.audio, optimizeForWeb: true },
+        opts: { input: rawPath, output: compressedPath, codec: c.codec, quality: c.quality, height: c.height, fps: null, audio: c.audio, optimizeForWeb: true },
       });
       if (!exp.keep) await invoke("remove_file", { path: rawPath }).catch(() => {});
       rawPath = null;
+      finalPath = compressedPath;
       summary = `Saved! ${fmtMB(info.fileSize)} → ${fmtMB(size)} · revealing in Finder…`;
     }
     $("expBar").style.width = "100%";
     $("expText").textContent = summary;
-    invoke("reveal_in_finder", { path });
+    invoke("reveal_in_finder", { path: finalPath });
     setTimeout(close, 1400);
   } catch (e) {
     $("expText").textContent = exp.cancel ? "Cancelled" : "Export failed: " + (e?.message || e);
