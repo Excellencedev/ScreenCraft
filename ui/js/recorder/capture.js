@@ -1,6 +1,6 @@
 // Start / stop recording (screen via Rust, camera via MediaRecorder).
 import { invoke } from "../tauri.js";
-import { $, state, QUALITY, showError, hooks } from "./state.js";
+import { $, state, showError, hooks } from "./state.js";
 import { showBar, resizeBar } from "./window.js";
 import { closeMenu, isMenuOpen } from "./menu.js";
 import { getPreview, openCameraStream, startDrawLoop, syncPreview } from "./preview.js";
@@ -92,8 +92,8 @@ export async function beginRecording() {
         systemAudio: state.sys,
         microphone: state.mic,
         microphoneId: state.mic ? state.micId : null,
-        fps: QUALITY[state.quality].fps,
-        quality: state.quality,
+        fps: state.fps,
+        maxLongSide: state.resolution || null,
       },
     });
   } catch (e) {

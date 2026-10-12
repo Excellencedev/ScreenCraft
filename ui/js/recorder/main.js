@@ -1,5 +1,5 @@
 import { invoke, listen } from "../tauri.js";
-import { $, state, QUALITY, savePrefs, showError, hooks } from "./state.js";
+import { $, state, RESOLUTIONS, FPS_CHOICES, savePrefs, showError, hooks } from "./state.js";
 import { win, showBar, enableDragging } from "./window.js";
 import { openMenu, closeMenu, isMenuOpen } from "./menu.js";
 import { syncPreview } from "./preview.js";
@@ -18,7 +18,8 @@ function render() {
   set("optCamera", state.camera, state.camera ? state.cameraLabel || "Camera" : "No camera");
   set("optMic", state.mic, state.mic ? state.micName || "Microphone" : "No microphone");
   set("optSys", state.sys, state.sys ? "System audio" : "No system audio");
-  $("qualLabel").textContent = QUALITY[state.quality].label;
+  const res = RESOLUTIONS.find((r) => r.value === state.resolution) || RESOLUTIONS[0];
+  $("qualLabel").textContent = `${res.short} · ${state.fps} fps`;
   $("recLabel").textContent = {
     display: "Record display",
     window: state.windowTitle ? "Record window" : "Choose window",
@@ -102,24 +103,41 @@ async function folderMenu() {
   await openMenu(items, $("optFolder"));
 }
 
-async function qualityMenu() {
+async function captureMenu() {
+  // show real pixel sizes for the selected display when we know them
+  const d = state.sources?.displays.find((x) => x.id === state.displayId);
+  const dims = (long) => {
+    if (!d || !long) return "";
+    const k = long / Math.max(d.width, d.height);
+    return `${Math.round(d.width * k)} × ${Math.round(d.height * k)}`;
+  };
   await openMenu(
     [
-      { header: "Capture quality" },
-      ...Object.entries(QUALITY).map(([k, q]) => ({
-        label: q.label, sub: q.sub, checked: state.quality === k,
-        onPick: () => { state.quality = k; savePrefs(); render(); },
+      { header: "Resolution" },
+      ...RESOLUTIONS.map((r) => ({
+        label: r.label,
+        sub: r.value ? dims(r.value) : d ? `${d.width * 2} × ${d.height * 2} on Retina` : "Full pixel size of the display",
+        checked: state.resolution === r.value,
+        onPick: () => { state.resolution = r.value; savePrefs(); render(); },
+      })),
+      { header: "Frame rate" },
+      ...FPS_CHOICES.map((f) => ({
+        label: `${f} fps`,
+        sub: f === 60 ? "Smoother motion, larger files" : "Lighter to record and edit",
+        checked: state.fps === f,
+        onPick: () => { state.fps = f; savePrefs(); render(); },
       })),
     ],
     $("optQuality"),
   );
 }
 
+
 document.querySelectorAll(".tool").forEach((b) => (b.onclick = () => chooseMode(b.dataset.mode)));
 $("optCamera").onclick = () => toggleMenu(cameraMenu);
 $("optMic").onclick = () => toggleMenu(micMenu);
 $("optSys").onclick = () => toggleMenu(systemMenu);
-$("optQuality").onclick = () => toggleMenu(qualityMenu);
+$("optQuality").onclick = () => toggleMenu(captureMenu);
 $("optFolder").onclick = () => toggleMenu(folderMenu);
 $("btnRec").onclick = beginRecording;
 $("btnStop").onclick = finishRecording;

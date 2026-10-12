@@ -28,7 +28,7 @@ export async function openMenu(items, anchor) {
     m.appendChild(b);
   }
   const rows = items.reduce((n, it) => n + (it.header ? 0.7 : it.sub ? 1.5 : 1), 0);
-  const h = Math.min(340, Math.round(rows * 38) + 20);
+  const h = Math.min(500, Math.round(rows * 38) + 20);
   const left = anchor ? Math.max(8, Math.min(BAR_W - 270, anchor.getBoundingClientRect().left)) : 12;
   m.style.left = left + "px";
   m.style.bottom = BAR_H + 6 + "px";

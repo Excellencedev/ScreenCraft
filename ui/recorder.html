@@ -33,6 +33,8 @@
   .opt.live > svg { display: none; }
   #hudCam.on { display: block; width: 36px; height: 36px; }
   .opt { position: relative; }
+  #optQuality { max-width: 190px; }
+  .menu { max-height: 500px; }
   .opt .meter { position: absolute; left: 10px; right: 10px; bottom: 2px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.1); overflow: hidden; display: none; }
   .opt.on .meter { display: block; }
   .meter b { display: block; height: 100%; width: 0; border-radius: 2px; background: linear-gradient(90deg, #4ade80 0%, #4ade80 65%, #facc15 80%, #f87171 100%); transition: width .05s linear; }
@@ -89,7 +91,7 @@
     <button class="opt off" id="optMic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span class="t">No microphone</span><i class="meter" id="micMeter"><b></b></i></button>
     <button class="opt off" id="optSys"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 010 6"/></svg><span class="t">No system audio</span><i class="meter" id="sysMeter"><b></b></i></button>
     <div class="sep"></div>
-    <button class="opt" id="optQuality" title="Capture quality"><svg viewBox="0 0 24 24"><path d="M4 18V9M10 18V5M16 18v-7M22 18H2"/></svg><span id="qualLabel">Balanced</span><svg class="chev2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+    <button class="opt" id="optQuality" title="Resolution & frame rate"><svg viewBox="0 0 24 24"><path d="M4 18V9M10 18V5M16 18v-7M22 18H2"/></svg><span id="qualLabel">2560 · 30 fps</span><svg class="chev2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
     <button class="opt" id="optFolder" title="Open projects"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
     <button class="rec" id="btnRec"><span class="dot"></span><span id="recLabel">Record</span></button>
     <div class="hudbox">

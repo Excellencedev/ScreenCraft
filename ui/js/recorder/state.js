@@ -4,11 +4,25 @@ export const $ = (id) => document.getElementById(id);
 export const BAR_W = 1040;
 export const BAR_H = 76;
 
-export const QUALITY = {
-  native: { label: "Retina", sub: "Full native resolution · 60 fps · heaviest", fps: 60 },
-  balanced: { label: "Balanced", sub: "Up to 2560 px · 30 fps · recommended, smooth to edit", fps: 30 },
-  light: { label: "Light", sub: "1× resolution · 30 fps · smoothest on older Macs", fps: 30 },
-};
+/** Resolution choices: cap on the long side in px (0 = the display's native resolution). */
+export const RESOLUTIONS = [
+  { value: 0, label: "Native", short: "Native" },
+  { value: 2560, label: "2560 px", short: "2560" },
+  { value: 1920, label: "1080p class · 1920 px", short: "1080p" },
+  { value: 1600, label: "1600 px", short: "1600" },
+  { value: 1280, label: "720p class · 1280 px", short: "720p" },
+];
+export const FPS_CHOICES = [30, 60];
+
+/** Snap any stored value to the nearest available resolution choice. */
+function snapResolution(v) {
+  if (!v) return 0;
+  return RESOLUTIONS.filter((r) => r.value).reduce((best, r) => (Math.abs(r.value - v) < Math.abs(best - v) ? r.value : best), 2560);
+}
+
+function migrateResolution(q) {
+  return q === "native" ? 0 : q === "light" ? 1440 : 2560;
+}
 
 const prefs = (() => {
   try { return JSON.parse(localStorage.getItem("sc-recorder") || "{}"); } catch { return {}; }
@@ -27,15 +41,16 @@ export const state = {
   micId: prefs.micId || null,
   micName: prefs.micName || "",
   sys: !!prefs.sys,
-  quality: prefs.quality || "balanced",
+  resolution: snapResolution(prefs.resolution ?? migrateResolution(prefs.quality)),
+  fps: prefs.fps ?? (prefs.quality === "native" ? 60 : 30),
   phase: "idle", // idle | countdown | recording | finishing
   sources: null,
 };
 
 export function savePrefs() {
   try {
-    const { mode, camera, cameraId, cameraLabel, mic, micId, micName, sys, quality } = state;
-    localStorage.setItem("sc-recorder", JSON.stringify({ mode, camera, cameraId, cameraLabel, mic, micId, micName, sys, quality }));
+    const { mode, camera, cameraId, cameraLabel, mic, micId, micName, sys, resolution, fps } = state;
+    localStorage.setItem("sc-recorder", JSON.stringify({ mode, camera, cameraId, cameraLabel, mic, micId, micName, sys, resolution, fps }));
   } catch {}
 }
 

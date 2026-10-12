@@ -21,7 +21,7 @@ pub struct StartArgs {
     microphone: bool,
     microphone_id: Option<String>,
     fps: Option<u32>,
-    quality: Option<String>,
+    max_long_side: Option<u32>,
 }
 
 #[derive(Serialize)]
@@ -44,7 +44,7 @@ pub fn start_recording(state: State<AppState>, args: StartArgs) -> CmdResult<Sta
         microphone: args.microphone,
         microphone_id: args.microphone_id,
         fps: args.fps.unwrap_or(60),
-        quality: args.quality,
+        max_long_side: args.max_long_side,
         output_dir: dir.clone(),
     })?;
     *state.recording_dir.lock().unwrap() = Some(dir.clone());
