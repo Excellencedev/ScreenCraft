@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod capture;
+mod compress;
 mod inputlog;
 
 use capture::{Capture, StartOpts};
@@ -356,6 +357,54 @@ fn export_end(state: State<AppState>) {
     *state.export.lock().unwrap() = None;
 }
 
+// ------------------------------------------------------------ compression
+
+#[tauri::command]
+fn probe_video(path: String) -> CmdResult<compress::Probe> {
+    compress::probe(&path)
+}
+
+#[tauri::command]
+async fn compress_video(app: AppHandle, opts: compress::CompressOpts) -> CmdResult<u64> {
+    let out = opts.output.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        compress::compress(&opts, |f| {
+            let _ = app.emit("compress-progress", f);
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    Ok(fs::metadata(out).map(|m| m.len()).unwrap_or(0))
+}
+
+#[tauri::command]
+fn cancel_compress() {
+    compress::CANCEL.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[tauri::command]
+fn estimate_bitrate(width: f64, height: f64, fps: f64, quality: f64, hevc: bool) -> f64 {
+    compress::target_bitrate(width, height, fps, quality, hevc)
+}
+
+#[tauri::command]
+fn show_compressor(app: AppHandle) -> CmdResult<()> {
+    if let Some(w) = app.get_webview_window("compress") {
+        return w.set_focus().map_err(|e| e.to_string());
+    }
+    if let Some(r) = app.get_webview_window("recorder") {
+        let _ = r.hide();
+    }
+    WebviewWindowBuilder::new(&app, "compress", WebviewUrl::App("compress.html".into()))
+        .title("Compress video")
+        .inner_size(760.0, 640.0)
+        .min_inner_size(640.0, 560.0)
+        .center()
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 // ---------------------------------------------------------------- windows
 
 fn main_display_size() -> (f64, f64) {
@@ -372,7 +421,7 @@ fn show_recorder_window(app: &AppHandle) -> tauri::Result<()> {
         return Ok(());
     }
     let (sw, sh) = main_display_size();
-    let (w, h) = (860.0, 76.0);
+    let (w, h) = (920.0, 76.0);
     WebviewWindowBuilder::new(app, "recorder", WebviewUrl::App("recorder.html".into()))
         .title("ScreenCraft")
         .inner_size(w, h)
@@ -465,9 +514,13 @@ fn main() {
         .on_window_event(|window, event| {
             // Bring the recorder back once the last editor window is closed.
             if let tauri::WindowEvent::Destroyed = event {
-                if window.label().starts_with("editor-") {
+                let l = window.label();
+                if l.starts_with("editor-") || l == "compress" {
                     let app = window.app_handle();
-                    let any_editor = app.webview_windows().keys().any(|l| l.starts_with("editor-") && l != window.label());
+                    let any_editor = app
+                        .webview_windows()
+                        .keys()
+                        .any(|k| (k.starts_with("editor-") || k == "compress") && k != window.label());
                     if !any_editor {
                         let _ = show_recorder_window(app);
                     }
@@ -500,19 +553,28 @@ fn main() {
             open_editor,
             open_area_picker,
             reveal_in_finder,
+            probe_video,
+            compress_video,
+            cancel_compress,
+            estimate_bitrate,
+            show_compressor,
         ])
         .setup(move |app| {
             let _ = app.global_shortcut().register(toggle);
             let new_rec = MenuItem::with_id(app, "new", "New Recording", true, Some("CmdOrCtrl+Shift+2"))?;
             let stop = MenuItem::with_id(app, "stop", "Stop Recording", true, None::<&str>)?;
+            let compress = MenuItem::with_id(app, "compress", "Compress Video…", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit ScreenCraft", true, Some("CmdOrCtrl+Q"))?;
-            let menu = Menu::with_items(app, &[&new_rec, &stop, &quit])?;
+            let menu = Menu::with_items(app, &[&new_rec, &compress, &stop, &quit])?;
             TrayIconBuilder::with_id("tray")
                 .icon(app.default_window_icon().cloned().ok_or("no icon")?)
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "new" => {
                         let _ = show_recorder_window(app);
+                    }
+                    "compress" => {
+                        let _ = show_compressor(app.clone());
                     }
                     "stop" => {
                         let _ = app.emit("stop-record", ());

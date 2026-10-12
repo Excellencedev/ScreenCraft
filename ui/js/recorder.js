@@ -2,7 +2,7 @@ import { invoke, listen, currentWindow, LogicalSize, LogicalPosition } from "./t
 
 const $ = (id) => document.getElementById(id);
 const win = currentWindow();
-const BAR_W = 860, BAR_H = 76;
+const BAR_W = 920, BAR_H = 76;
 
 const prefs = (() => {
   try { return JSON.parse(localStorage.getItem("sc-recorder") || "{}"); } catch { return {}; }
@@ -287,6 +287,7 @@ $("optCamera").onclick = cameraMenu;
 $("optMic").onclick = () => { state.mic = !state.mic; save(); render(); };
 $("optSys").onclick = () => { state.sys = !state.sys; save(); render(); };
 $("btnRec").onclick = beginRecording;
+$("optCompress").onclick = () => invoke("show_compressor");
 $("btnStop").onclick = finishRecording;
 $("btnClose").onclick = () => win.hide();
 $("optFolder").onclick = async () => {

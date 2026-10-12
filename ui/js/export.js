@@ -71,19 +71,31 @@ async function renderAudio(project, dir, outDurSec) {
   return off.startRendering();
 }
 
-async function pickCodec(W, H, fps, bitrate) {
-  const tries = ["avc1.640034", "avc1.64002A", "avc1.640028", "avc1.4d0028", "avc1.42001f"];
-  for (const codec of tries) {
-    const cfg = { codec, width: W, height: H, bitrate, framerate: fps };
-    try {
-      const sup = await VideoEncoder.isConfigSupported(cfg);
-      if (sup.supported) return cfg;
-    } catch {}
+async function pickCodec(W, H, fps, bitrate, want) {
+  const hevc = ["hvc1.1.6.L153.B0", "hvc1.1.6.L123.B0", "hvc1.1.6.L93.B0"];
+  const avc = ["avc1.640034", "avc1.64002A", "avc1.640028", "avc1.4d0028", "avc1.42001f"];
+  const groups = want === "hevc" ? [["hevc", hevc], ["avc", avc]] : [["avc", avc]];
+  for (const [kind, list] of groups) {
+    for (const codec of list) {
+      const cfg = { codec, width: W, height: H, bitrate, framerate: fps };
+      try {
+        const sup = await VideoEncoder.isConfigSupported(cfg);
+        if (sup.supported) return { cfg, kind };
+      } catch {}
+    }
   }
-  throw new Error("This system cannot encode H.264 video in the web view.");
+  throw new Error("This system cannot encode video in the web view.");
 }
 
-export async function exportMp4({ project, dir, path, resolution, fps, motionBlur, onProgress, shouldCancel }) {
+/** Bits-per-pixel model shared with the Rust compressor. */
+function qualityBitrate(W, H, fps, quality, hevc) {
+  const q = Math.min(1, Math.max(0, quality / 100));
+  let bpp = 0.015 + q * q * 0.2;
+  if (hevc) bpp *= 0.62;
+  return Math.round(Math.min(100e6, Math.max(250e3, W * H * fps * bpp)));
+}
+
+export async function exportMp4({ project, dir, path, resolution, fps, motionBlur, codec = "avc", quality = 55, onProgress, shouldCancel }) {
   if (typeof VideoEncoder === "undefined") throw new Error("WebCodecs is not available in this web view.");
   const { W, H } = outputSize(project, resolution);
   onProgress(0, "Computing camera path…");
@@ -105,8 +117,8 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     await bgImage.decode().catch(() => {});
   }
 
-  const bitrate = Math.round(Math.min(60e6, Math.max(6e6, W * H * fps * 0.09)));
-  const vcfg = await pickCodec(W, H, fps, bitrate);
+  const bitrate = qualityBitrate(W, H, fps, quality, codec === "hevc");
+  const { cfg: vcfg, kind: vkind } = await pickCodec(W, H, fps, bitrate, codec);
 
   onProgress(0.02, "Preparing audio…");
   const outDurSec = track.durationMs / 1000;
@@ -116,7 +128,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
   const target = new ArrayBufferTarget();
   const muxer = new Muxer({
     target,
-    video: { codec: "avc", width: W, height: H, frameRate: fps },
+    video: { codec: vkind, width: W, height: H, frameRate: fps },
     audio: audio ? { codec: "aac", sampleRate: audio.sampleRate, numberOfChannels: audio.numberOfChannels } : undefined,
     fastStart: "in-memory",
   });

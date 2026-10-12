@@ -8,6 +8,15 @@ camera bubble, trimming/cutting, speed changes and MP4/GIF export.
 
 No AI features — just recording, camera, editing and zoom.
 
+## Compression (HandBrake-style)
+
+The toolbar's compress button (or the menu-bar item *Compress Video…*) opens a
+compressor for any video file: presets (Fast 1080p30, HQ, Super HQ, 720p, 480p,
+HEVC "tiny"), codec (H.264 / H.265), resolution, frame-rate cap, quality slider,
+audio bitrate or removal, and a live size estimate. It runs natively in Rust on
+AVFoundation's hardware encoders. The editor's export dialog also offers codec
+and quality choices.
+
 ## Architecture
 
 | Piece | Where | What it does |

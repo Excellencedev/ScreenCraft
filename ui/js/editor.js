@@ -698,7 +698,7 @@ function showMenu(anchor, items) {
 }
 
 // ------------------------------------------------------------------ export dialog
-const exp = { format: "mp4", res: 1080, fps: 60, blur: 1, running: false, cancel: false };
+const exp = { format: "mp4", res: 1080, fps: 60, blur: 1, codec: "avc", quality: 55, running: false, cancel: false };
 function bindSeg(id, key, conv = (v) => v) {
   const seg = $(id);
   seg.querySelectorAll("button").forEach((b) => {
@@ -727,7 +727,7 @@ async function runExport() {
   try {
     const common = { project: JSON.parse(JSON.stringify(P())), dir, path, resolution: exp.res, onProgress, shouldCancel: () => exp.cancel };
     if (ext === "gif") await exportGif(common);
-    else await exportMp4({ ...common, fps: exp.fps, motionBlur: exp.blur ? 0.8 : 0 });
+    else await exportMp4({ ...common, fps: exp.fps, motionBlur: exp.blur ? 0.8 : 0, codec: exp.codec, quality: exp.quality });
     $("expText").textContent = "Saved! Revealing in Finder…";
     invoke("reveal_in_finder", { path });
     setTimeout(closeExport, 900);
@@ -797,6 +797,8 @@ function bindUI() {
   bindSeg("expRes", "res", (v) => parseInt(v, 10));
   bindSeg("expFps", "fps", (v) => parseInt(v, 10));
   bindSeg("expBlur", "blur", (v) => parseInt(v, 10));
+  bindSeg("expCodec", "codec");
+  bindSeg("expQuality", "quality", (v) => parseInt(v, 10));
 
   // manual zoom target: click on the preview
   $("preview").addEventListener("pointerdown", (e) => {
