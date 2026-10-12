@@ -1,3 +1,4 @@
+import { masterGain, autoGain, makeLimiter } from "./audiolevel.js";
 import { Muxer, ArrayBufferTarget } from "../vendor/mp4-muxer.mjs";
 import { GIFEncoder, quantize, applyPalette } from "../vendor/gifenc.esm.js";
 import { invoke, convertFileSrc } from "./tauri.js";
@@ -55,15 +56,17 @@ async function renderAudio(project, dir, outDurSec) {
   const a = project.config.audio;
   const tracks = [];
   const device = await decodeFile(convertFileSrc(`${dir}/${project.media.screen}`));
-  if (device && device.length) tracks.push({ buf: device, gain: a.deviceVolume ?? 1, offset: 0 });
+  if (device && device.length) tracks.push({ buf: device, gain: a.deviceVolume ?? 1, offset: 0, level: 1 });
   if (project.media.mic) {
     const mic = await decodeFile(convertFileSrc(`${dir}/${project.media.mic}`));
-    if (mic && mic.length) tracks.push({ buf: mic, gain: a.micVolume ?? 1, offset: (project.media.micOffsetMs || 0) / 1000 });
+    if (mic && mic.length) tracks.push({ buf: mic, gain: a.micVolume ?? 1, offset: (project.media.micOffsetMs || 0) / 1000, level: autoGain(mic) });
   }
   if (!tracks.length) return null;
   const sr = 48000;
   const off = new OfflineAudioContext(2, Math.ceil(outDurSec * sr), sr);
-  const master = a.volume ?? 1;
+  const master = masterGain(a.volume);
+  const limiter = makeLimiter(off);
+  limiter.connect(off.destination);
   let at = 0;
   for (const s of project.scene.slices) {
     const srcDur = (s.sourceEndMs - s.sourceStartMs) / 1000;
@@ -74,8 +77,8 @@ async function renderAudio(project, dir, outDurSec) {
       node.buffer = t.buf;
       node.playbackRate.value = s.timeScale;
       const g = off.createGain();
-      g.gain.value = s.volume * master * t.gain;
-      node.connect(g).connect(off.destination);
+      g.gain.value = s.volume * master * t.gain * t.level;
+      node.connect(g).connect(limiter);
       // a mic that started slightly after the screen has a negative offset: delay it instead
       const when = at + Math.max(0, -from) / s.timeScale;
       const bufStart = Math.max(0, from);
@@ -85,6 +88,36 @@ async function renderAudio(project, dir, outDurSec) {
     at += outDur;
   }
   return off.startRendering();
+}
+
+/**
+ * WebKit's AAC encoder hands back a whole MPEG-4 ES descriptor as the codec
+ * description, but the muxer expects just the AudioSpecificConfig. Left alone the
+ * descriptor ends up nested inside itself and QuickTime / AVFoundation see no audio.
+ */
+function fixAudioMeta(meta) {
+  const d = meta?.decoderConfig?.description;
+  if (!d) return meta;
+  const b = d instanceof ArrayBuffer ? new Uint8Array(d) : new Uint8Array(d.buffer, d.byteOffset, d.byteLength);
+  if (b[0] !== 0x03) return meta;
+  let i = 0;
+  while (i < b.length) {
+    const tag = b[i++];
+    let len = 0, k = 0;
+    while (i < b.length) {
+      const x = b[i++];
+      len = (len << 7) | (x & 0x7f);
+      if (!(x & 0x80) || ++k >= 4) break;
+    }
+    if (tag === 0x05) {
+      const asc = b.slice(i, i + len);
+      return { ...meta, decoderConfig: { ...meta.decoderConfig, description: asc } };
+    }
+    if (tag === 0x03) i += 3; // ES_ID + flags
+    else if (tag === 0x04) i += 13; // object type, stream type, buffer size, bitrates
+    else i += len;
+  }
+  return meta;
 }
 
 async function pickCodec(W, H, fps, bitrate, want) {
@@ -194,7 +227,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
   if (audio) {
     onProgress(0.92, "Encoding audio…");
     const aenc = new AudioEncoder({
-      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+      output: (chunk, meta) => muxer.addAudioChunk(chunk, fixAudioMeta(meta)),
       error: (e) => (encError = e),
     });
     aenc.configure({ codec: "mp4a.40.2", sampleRate: audio.sampleRate, numberOfChannels: audio.numberOfChannels, bitrate: 160000 });

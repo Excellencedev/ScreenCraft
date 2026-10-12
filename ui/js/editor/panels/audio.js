@@ -12,6 +12,7 @@ export function panelAudio(p) {
   const apply = () => {
     if (media.screen) refreshSliceAudio();
   };
+  p.append(slider("Master volume", 0, 1, 0.01, () => a.volume, (v) => { a.volume = v; apply(); }, { fmt: (v) => Math.round(v * 100) + "%", track: false }));
   p.append(slider("Microphone", 0, 1, 0.01, () => a.micVolume, (v) => { a.micVolume = v; apply(); }, { fmt: (v) => Math.round(v * 100) + "%", track: false }));
   if (!m.mic) {
     p.append(el('<div class="hint muted">This recording has no separate microphone track (it was recorded before microphones were split out), so the Device slider controls everything.</div>'));

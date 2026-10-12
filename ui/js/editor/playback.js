@@ -4,6 +4,7 @@ import { $, S, P, dir, TRACK_FPS, media, clamp, fmt, hooks } from "./state.js";
 import { outDuration, outToSrc, sliceOutStart } from "./timemap.js";
 import { draw } from "./draw.js";
 import { lookup } from "./scrubcache.js";
+import { masterGain, makeLimiter } from "../audiolevel.js";
 
 // ---- transport UI (throttled)
 let lastTransport = 0;
@@ -111,14 +112,51 @@ export function requestSeek(t, fast = false) {
 export const seekOut = (t) => requestSeek(t, false);
 
 // ---- playback
+// Audio goes through WebAudio so the master volume and the mic's auto-level can exceed
+// the 100% an <audio>/<video> element allows, with a limiter against clipping.
+const bus = { ctx: null, dev: null, mic: null };
+function ensureAudio() {
+  if (bus.ctx) {
+    bus.ctx.resume?.().catch(() => {});
+    return;
+  }
+  try {
+    const ctx = new AudioContext();
+    const limiter = makeLimiter(ctx);
+    limiter.connect(ctx.destination);
+    const wire = (el) => {
+      if (!el) return null;
+      try {
+        const g = ctx.createGain();
+        ctx.createMediaElementSource(el).connect(g);
+        g.connect(limiter);
+        el.volume = 1;
+        return g;
+      } catch {
+        return null;
+      }
+    };
+    bus.dev = wire(media.screen);
+    bus.mic = wire(media.mic);
+    bus.ctx = ctx;
+    ctx.resume?.().catch(() => {});
+  } catch {}
+}
+
+function setLevel(el, node, gain) {
+  if (node) node.gain.value = Math.max(0, gain);
+  else el.volume = clamp(gain, 0, 1);
+}
+
 function applySliceAudio(s) {
   const a = P().config.audio;
+  const m = s.volume * masterGain(a.volume);
   media.screen.playbackRate = clamp(s.timeScale, 0.0625, 16);
-  media.screen.volume = clamp(s.volume * a.volume * a.deviceVolume, 0, 1);
+  setLevel(media.screen, bus.dev, m * a.deviceVolume);
   if (media.camera) media.camera.playbackRate = media.screen.playbackRate;
   if (media.mic) {
     media.mic.playbackRate = media.screen.playbackRate;
-    media.mic.volume = clamp(s.volume * a.volume * a.micVolume, 0, 1);
+    setLevel(media.mic, bus.mic, m * a.micVolume * (media.micLevel || 1));
   }
 }
 export const refreshSliceAudio = () => applySliceAudio(P().scene.slices[S.curSlice]);
@@ -133,6 +171,7 @@ function setPlayIcon(playing) {
 export function play() {
   if (S.playing || !S.track) return;
   S.proxy = null;
+  ensureAudio();
   if (S.tOut >= outDuration() - 30) seekOut(0);
   const m = outToSrc(S.tOut);
   S.curSlice = m.idx;

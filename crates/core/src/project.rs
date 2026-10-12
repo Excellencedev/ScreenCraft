@@ -380,7 +380,7 @@ pub struct AudioConfig {
 
 impl Default for AudioConfig {
     fn default() -> Self {
-        Self { volume: 1.0, mic_volume: 1.0, device_volume: 1.0, mute_microphone: false, mute_system_audio: false }
+        Self { volume: 0.5, mic_volume: 1.0, device_volume: 1.0, mute_microphone: false, mute_system_audio: false }
     }
 }
 

@@ -47,7 +47,14 @@ async function startMic() {
     dest.channelCount = 2;
     dest.channelCountMode = "explicit";
     dest.channelInterpretation = "speakers";
-    src.connect(dest);
+    // laptop mics record very quietly: lift the level, with a limiter against clipping
+    const boost = ctx.createGain();
+    boost.gain.value = 4;
+    const lim = ctx.createDynamicsCompressor();
+    lim.threshold.value = -3;
+    lim.knee.value = 0;
+    lim.ratio.value = 20;
+    src.connect(boost).connect(lim).connect(dest);
     recStream = dest.stream;
   } catch {
     ctx?.close?.().catch?.(() => {});

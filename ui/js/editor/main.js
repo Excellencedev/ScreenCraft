@@ -15,6 +15,7 @@ import { rawMenu } from "./rawfiles.js";
 import { openExport, bindExport } from "./exportDialog.js";
 import { contentRect, camAt } from "../render.js";
 import { buildScrubCache } from "./scrubcache.js";
+import { autoGain } from "../audiolevel.js";
 
 hooks.draw = draw;
 hooks.renderTimeline = renderTimeline;
@@ -148,6 +149,20 @@ function loadVideo(url) {
   });
 }
 
+/** Measure the microphone once so it can be levelled automatically. */
+async function levelMic(url) {
+  try {
+    const bytes = await (await fetch(url)).arrayBuffer();
+    const ctx = new AudioContext();
+    const buf = await ctx.decodeAudioData(bytes);
+    ctx.close?.();
+    media.micLevel = autoGain(buf);
+    refreshSliceAudio();
+  } catch (e) {
+    console.warn("mic level", e);
+  }
+}
+
 async function boot() {
   if (!dir) { $("loading").textContent = "No project specified."; return; }
   try {
@@ -160,12 +175,15 @@ async function boot() {
     if (media.camera) media.camera.muted = true;
     if (P().media.mic) {
       media.mic = await new Promise((res) => {
-        const a = new Audio(convertFileSrc(`${dir}/${P().media.mic}`));
+        const a = new Audio();
+        a.crossOrigin = "anonymous";
+        a.src = convertFileSrc(`${dir}/${P().media.mic}`);
         a.preload = "auto";
         a.onloadeddata = () => res(a);
         a.onerror = () => res(null);
       });
     }
+    if (media.mic) levelMic(convertFileSrc(`${dir}/${P().media.mic}`));
     const v = media.screen;
     // trust the real file over the recorded numbers
     if (v.videoWidth) {
