@@ -215,7 +215,7 @@ impl Default for CameraConfig {
             size_ratio: 0.22,
             position: Point { x: 1.0, y: 1.0 },
             padding_ratio: 0.5,
-            corner_radius_ratio: 0.5,
+            corner_radius_ratio: 0.25,
             zoomed_scale: 0.7,
             shadow: true,
             border: false,
