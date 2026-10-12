@@ -97,3 +97,32 @@ pub fn recent_projects(state: State<AppState>) -> Vec<RecentProject> {
 pub fn projects_dir(state: State<AppState>) -> String {
     state.projects_root().to_string_lossy().into()
 }
+
+/// Rename a project: moves the package folder to `<name>.screencraft` and updates the
+/// stored name. Returns the new folder path.
+#[tauri::command]
+pub fn rename_project(state: State<AppState>, dir: String, name: String) -> CmdResult<String> {
+    let clean: String = name
+        .chars()
+        .map(|c| if matches!(c, '/' | '\\' | ':' | '\0') || c.is_control() { '-' } else { c })
+        .collect();
+    let clean = clean.trim().trim_start_matches('.').trim().to_string();
+    if clean.is_empty() {
+        return Err("Name can't be empty".into());
+    }
+    let old = PathBuf::from(&dir);
+    let parent = old.parent().ok_or("Bad project path")?.to_path_buf();
+    let new = parent.join(format!("{clean}.screencraft"));
+    if new != old {
+        if new.exists() {
+            return Err(format!("A project named “{clean}” already exists"));
+        }
+        fs::rename(&old, &new).map_err(|e| e.to_string())?;
+    }
+    let mut project: Project = serde_json::from_slice(&fs::read(new.join("project.json")).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    project.name = clean;
+    write_project(&new, &project)?;
+    let _ = &state;
+    Ok(new.to_string_lossy().into())
+}

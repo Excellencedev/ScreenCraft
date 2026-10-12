@@ -57,6 +57,7 @@ fn main() {
             commands::recording::mic_chunk,
             commands::projects::load_project,
             commands::projects::save_project,
+            commands::projects::rename_project,
             commands::projects::compute_render_track,
             commands::projects::auto_zoom,
             commands::projects::recent_projects,

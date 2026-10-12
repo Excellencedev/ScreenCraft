@@ -4,7 +4,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 #top { display: flex; align-items: center; gap: 10px; padding: 0 14px; -webkit-app-region: drag; border-bottom: 1px solid #101119; }
 #top button, #top select { -webkit-app-region: no-drag; }
 .traffic-space { width: 0; }
-.title { position: absolute; left: 50%; transform: translateX(-50%); color: #cfd1e0; font-weight: 500; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title { -webkit-app-region: no-drag; cursor: text; padding: 3px 8px; border-radius: 6px; position: absolute; left: 50%; transform: translateX(-50%); color: #cfd1e0; font-weight: 500; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 .icon-btn { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; color: #b6b9cc; }
 .icon-btn:hover { background: #1a1b26; color: #fff; }
@@ -121,3 +121,6 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 .dialog .estimate b { font-variant-numeric: tabular-nums; }
 .dialog .row.check { cursor: pointer; }
 .dialog input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+
+.title:hover { background: rgba(255,255,255,.06); }
+.title.editing { background: rgba(255,255,255,.1); outline: 1px solid var(--accent, #4a8cff); text-overflow: clip; }

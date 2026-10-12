@@ -30,7 +30,40 @@ function syncControls() {
 }
 hooks.syncControls = syncControls;
 
+/** Click the title to rename the project (and its folder). */
+function bindTitle() {
+  const el = $("title");
+  el.title = "Click to rename";
+  el.onclick = () => {
+    if (el.isContentEditable) return;
+    el.contentEditable = "plaintext-only";
+    el.classList.add("editing");
+    el.focus();
+    getSelection().selectAllChildren(el);
+  };
+  el.onkeydown = (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+    else if (e.key === "Escape") { el.textContent = P().name; el.blur(); }
+  };
+  el.onblur = async () => {
+    el.contentEditable = "false";
+    el.classList.remove("editing");
+    const name = el.textContent.trim();
+    if (!name || name === P().name) { el.textContent = P().name; return; }
+    try {
+      await invoke("save_project", { dir, project: P() });
+      const next = await invoke("rename_project", { dir, name });
+      location.replace(`editor.html?dir=${encodeURIComponent(next)}`);
+    } catch (err) {
+      el.textContent = P().name;
+      alert(String(err));
+    }
+  };
+}
+
 function bindUI() {
+  bindTitle();
   $("btnPlay").onclick = () => (S.playing ? pause() : play());
   $("btnStart").onclick = () => { pause(); requestSeek(0); };
   $("btnEnd").onclick = () => { pause(); requestSeek(outDuration()); };
