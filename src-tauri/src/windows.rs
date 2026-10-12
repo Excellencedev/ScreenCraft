@@ -138,17 +138,24 @@ pub fn open_editor(app: AppHandle, dir: String) -> Result<(), String> {
         w.set_focus().map_err(|e| e.to_string())?;
         return Ok(());
     }
+    // open on the screen the recorder bar is on, then zoom to fill it (not fullscreen)
+    let mut origin = (60.0, 60.0);
     if let Some(r) = app.get_webview_window("recorder") {
+        if let Ok(Some(m)) = r.current_monitor() {
+            let sf = m.scale_factor();
+            origin = (m.position().x as f64 / sf + 60.0, m.position().y as f64 / sf + 60.0);
+        }
         let _ = r.hide();
     }
-    WebviewWindowBuilder::new(&app, label, WebviewUrl::App(format!("editor.html?dir={}", url_escape(&dir)).into()))
+    let win = WebviewWindowBuilder::new(&app, label, WebviewUrl::App(format!("editor.html?dir={}", url_escape(&dir)).into()))
         .title("ScreenCraft")
         .accept_first_mouse(true)
         .inner_size(1240.0, 780.0)
         .min_inner_size(960.0, 640.0)
-        .center()
+        .position(origin.0, origin.1)
         .build()
         .map_err(|e| e.to_string())?;
+    let _ = win.maximize();
     Ok(())
 }
 
@@ -322,4 +329,75 @@ pub fn quit_app(app: AppHandle) {
 #[tauri::command]
 pub fn cancel_quit() {
     QUITTING.store(false, std::sync::atomic::Ordering::SeqCst);
+}
+
+// ---------------------------------------------------------------- dropdown menu window
+// Recorder-bar menus live in their own borderless window above the bar, so the bar
+// never has to resize (which flashed) and the menu is always fully opaque and unclipped.
+
+static MENU_STATE: std::sync::Mutex<Option<(serde_json::Value, f64, f64)>> = std::sync::Mutex::new(None);
+
+fn ensure_menu_window(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
+    if let Some(w) = app.get_webview_window("menu") {
+        return Ok(w);
+    }
+    let w = WebviewWindowBuilder::new(app, "menu", WebviewUrl::App("menu.html".into()))
+        .title("ScreenCraft menu")
+        .inner_size(300.0, 100.0)
+        .decorations(false)
+        .transparent(true)
+        .shadow(true)
+        .resizable(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .visible(false)
+        .focused(false)
+        .accept_first_mouse(true)
+        .visible_on_all_workspaces(true)
+        .build()?;
+    with_ns_window(&w, |n| n.setLevel(26));
+    Ok(w)
+}
+
+pub fn prewarm_menu_window(app: &AppHandle) {
+    let _ = ensure_menu_window(app);
+}
+
+/// Stash the items + anchor and tell the menu page to render; the page then calls
+/// `menu_show` with its measured size.
+#[tauri::command]
+pub fn open_menu_window(app: AppHandle, items: serde_json::Value, left: f64) -> Result<(), String> {
+    use tauri::Emitter;
+    let rec = app.get_webview_window("recorder").ok_or("no recorder window")?;
+    let scale = rec.scale_factor().map_err(|e| e.to_string())?;
+    let pos = rec.outer_position().map_err(|e| e.to_string())?;
+    let (px, py) = (pos.x as f64 / scale, pos.y as f64 / scale);
+    *MENU_STATE.lock().unwrap() = Some((items.clone(), px + left, py - 6.0));
+    let w = ensure_menu_window(&app).map_err(|e| e.to_string())?;
+    w.emit("menu-render", items).map_err(|e| e.to_string())
+}
+
+/// The menu page asks for what to draw when it (re)loads.
+#[tauri::command]
+pub fn menu_take_items() -> Option<serde_json::Value> {
+    MENU_STATE.lock().unwrap().as_ref().map(|s| s.0.clone())
+}
+
+/// Size, place (bottom edge just above the bar) and reveal the menu in one go.
+#[tauri::command]
+pub fn menu_show(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
+    let Some((_, x, bottom)) = MENU_STATE.lock().unwrap().clone() else { return Ok(()) };
+    let w = ensure_menu_window(&app).map_err(|e| e.to_string())?;
+    w.set_size(tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
+    w.set_position(tauri::LogicalPosition::new(x, bottom - height)).map_err(|e| e.to_string())?;
+    w.show().map_err(|e| e.to_string())?;
+    w.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn close_menu_window(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("menu") {
+        let _ = w.hide();
+    }
 }

@@ -81,6 +81,10 @@ fn main() {
             commands::projects::save_project,
             windows::cancel_quit,
             windows::resize_bar,
+            windows::open_menu_window,
+            windows::menu_take_items,
+            windows::menu_show,
+            windows::close_menu_window,
             commands::files::read_image_data_url,
             windows::close_area_picker,
             commands::projects::rename_project,
@@ -144,7 +148,7 @@ fn main() {
                     "stop" => {
                         let _ = app.emit("stop-record", ());
                     }
-                    "quit" => app.exit(0),
+                    "quit" => windows::request_quit(app),
                     _ => {}
                 })
                 .build(app)?;
@@ -155,6 +159,7 @@ fn main() {
             } else {
                 windows::show_permissions_window(app.handle())?;
             }
+            windows::prewarm_menu_window(app.handle());
             Ok(())
         })
         .build(tauri::generate_context!())

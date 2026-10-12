@@ -1,47 +1,44 @@
-import { $, BAR_W, BAR_H } from "./state.js";
-import { resizeBar } from "./window.js";
+import { $, BAR_W } from "./state.js";
+import { invoke, listen } from "../tauri.js";
 
 let open = false;
+let handlers = new Map();
+let lastClosed = { at: 0, anchor: null };
+let currentAnchor = null;
 export const isMenuOpen = () => open;
 
+await listen("menu-pick", (e) => {
+  const fn = handlers.get(e.payload?.id);
+  open = false;
+  lastClosed = { at: performance.now(), anchor: currentAnchor };
+  if (fn) fn();
+});
+await listen("menu-closed", () => {
+  if (open) lastClosed = { at: performance.now(), anchor: currentAnchor };
+  open = false;
+});
+
 /**
- * Show a dropdown above the bar, aligned with `anchor`.
+ * Show a dropdown above the bar, aligned with `anchor`, in its own window.
  * items: {header} | {label, sub?, checked?, onPick}
  */
 export async function openMenu(items, anchor) {
-  const m = $("menu");
-  m.innerHTML = "";
-  for (const it of items) {
-    if (it.header) {
-      const h = document.createElement("div");
-      h.className = "hd";
-      h.textContent = it.header;
-      m.appendChild(h);
-      continue;
-    }
-    const b = document.createElement("button");
-    b.innerHTML = `<span class="chk">${it.checked ? "✓" : ""}</span>${it.label}${it.sub ? `<div class="small">${it.sub}</div>` : ""}`;
-    b.onclick = async () => {
-      await closeMenu();
-      it.onPick();
-    };
-    m.appendChild(b);
-  }
-  const rows = items.reduce((n, it) => n + (it.header ? 0.7 : it.sub ? 1.5 : 1), 0);
-  const h = Math.min(500, Math.round(rows * 38) + 20);
-  const left = anchor ? Math.max(8, Math.min(BAR_W - 270, anchor.getBoundingClientRect().left)) : 12;
-  m.style.left = left + "px";
-  m.style.bottom = BAR_H + 6 + "px";
-  m.style.maxHeight = h + "px";
+  // the click that dismissed this very menu also lands on its button: don't reopen
+  if (anchor && lastClosed.anchor === anchor && performance.now() - lastClosed.at < 350) return;
+  handlers = new Map();
+  const payload = items.map((it, i) => {
+    if (it.header) return { header: it.header };
+    handlers.set(i, it.onPick);
+    return { id: i, label: it.label, sub: it.sub || "", checked: !!it.checked };
+  });
+  const left = anchor ? Math.max(8, Math.min(BAR_W - 320, anchor.getBoundingClientRect().left)) : 12;
+  currentAnchor = anchor;
   open = true;
-  // grow the window first, then reveal the menu inside it (no flash at the old size)
-  await resizeBar(BAR_W, BAR_H + h + 14);
-  m.classList.add("show");
+  await invoke("open_menu_window", { items: payload, left });
 }
 
 export async function closeMenu() {
   if (!open) return;
-  $("menu").classList.remove("show");
   open = false;
-  await resizeBar(BAR_W, BAR_H);
+  await invoke("close_menu_window");
 }
