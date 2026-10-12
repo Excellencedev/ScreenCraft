@@ -399,10 +399,13 @@ fn open_editor(app: AppHandle, dir: String) -> CmdResult<()> {
         w.set_focus().map_err(|e| e.to_string())?;
         return Ok(());
     }
+    if let Some(r) = app.get_webview_window("recorder") {
+        let _ = r.hide();
+    }
     let q = dir.replace('%', "%25").replace(' ', "%20").replace('&', "%26").replace('#', "%23");
     WebviewWindowBuilder::new(&app, label, WebviewUrl::App(format!("editor.html?dir={q}").into()))
         .title("ScreenCraft")
-        .inner_size(1280.0, 800.0)
+        .inner_size(1240.0, 780.0)
         .min_inner_size(960.0, 640.0)
         .center()
         .build()
@@ -459,6 +462,18 @@ fn main() {
                 })
                 .build(),
         )
+        .on_window_event(|window, event| {
+            // Bring the recorder back once the last editor window is closed.
+            if let tauri::WindowEvent::Destroyed = event {
+                if window.label().starts_with("editor-") {
+                    let app = window.app_handle();
+                    let any_editor = app.webview_windows().keys().any(|l| l.starts_with("editor-") && l != window.label());
+                    if !any_editor {
+                        let _ = show_recorder_window(app);
+                    }
+                }
+            }
+        })
         .manage(AppState {
             capture: Capture::spawn(),
             recording_dir: Mutex::new(None),
