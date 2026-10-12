@@ -180,8 +180,26 @@ async function startCamera() {
   return { stream, rec, ext: pick[1] };
 }
 
+async function ensurePermissions() {
+  const p = await invoke("permission_status");
+  if (!p.screen) {
+    await invoke("show_permissions");
+    return false;
+  }
+  if (state.camera && (p.camera === "denied" || p.camera === "restricted")) {
+    showError("Camera access is off. Open Permissions from the menu-bar icon to fix it.");
+    return false;
+  }
+  if (state.mic && (p.microphone === "denied" || p.microphone === "restricted")) {
+    showError("Microphone access is off. Open Permissions from the menu-bar icon to fix it.");
+    return false;
+  }
+  return true;
+}
+
 async function beginRecording() {
   if (state.phase !== "idle") return;
+  if (!(await ensurePermissions())) return;
   if (menuOpen) await closeMenu();
   if (state.mode === "window" && !state.windowId) return chooseMode("window");
   if (state.mode === "area" && !state.area) return chooseMode("area");
@@ -308,4 +326,5 @@ addEventListener("keydown", (e) => { if (e.key === "Escape" && menuOpen) closeMe
 
 await initGeometry();
 render();
-refreshSources();
+if ((await invoke("permission_status")).screen) refreshSources();
+else await invoke("show_permissions");

@@ -357,6 +357,90 @@ fn export_end(state: State<AppState>) {
     *state.export.lock().unwrap() = None;
 }
 
+// ------------------------------------------------------------ permissions
+
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGPreflightScreenCaptureAccess() -> bool;
+    fn CGRequestScreenCaptureAccess() -> bool;
+}
+
+fn av_status(media: &str) -> String {
+    use objc2_av_foundation::{AVAuthorizationStatus, AVCaptureDevice};
+    use objc2_foundation::NSString;
+    let st = unsafe { AVCaptureDevice::authorizationStatusForMediaType(&NSString::from_str(media)) };
+    match st {
+        AVAuthorizationStatus::Authorized => "granted",
+        AVAuthorizationStatus::Denied => "denied",
+        AVAuthorizationStatus::Restricted => "restricted",
+        _ => "notDetermined",
+    }
+    .into()
+}
+
+fn screen_granted() -> bool {
+    unsafe { CGPreflightScreenCaptureAccess() }
+}
+
+#[derive(Serialize)]
+struct PermissionStatus {
+    screen: bool,
+    camera: String,
+    microphone: String,
+}
+
+#[tauri::command]
+fn permission_status() -> PermissionStatus {
+    PermissionStatus { screen: screen_granted(), camera: av_status("vide"), microphone: av_status("soun") }
+}
+
+/// Triggers the system prompt the first time; afterwards the user must flip the
+/// switch in System Settings.
+#[tauri::command]
+fn request_screen_access() -> bool {
+    unsafe { CGRequestScreenCaptureAccess() }
+}
+
+#[tauri::command]
+fn open_privacy_pane(kind: String) {
+    let pane = match kind.as_str() {
+        "camera" => "Privacy_Camera",
+        "microphone" => "Privacy_Microphone",
+        _ => "Privacy_ScreenCapture",
+    };
+    let _ = std::process::Command::new("open")
+        .arg(format!("x-apple.systempreferences:com.apple.preference.security?{pane}"))
+        .spawn();
+}
+
+#[tauri::command]
+fn restart_app(app: AppHandle) {
+    app.restart();
+}
+
+fn show_permissions_window(app: &AppHandle) -> tauri::Result<()> {
+    if let Some(r) = app.get_webview_window("recorder") {
+        let _ = r.hide();
+    }
+    if let Some(w) = app.get_webview_window("permissions") {
+        w.show()?;
+        w.set_focus()?;
+        return Ok(());
+    }
+    WebviewWindowBuilder::new(app, "permissions", WebviewUrl::App("permissions.html".into()))
+        .title("ScreenCraft permissions")
+        .inner_size(560.0, 560.0)
+        .resizable(false)
+        .center()
+        .build()?;
+    Ok(())
+}
+
+#[tauri::command]
+fn show_permissions(app: AppHandle) -> CmdResult<()> {
+    show_permissions_window(&app).map_err(|e| e.to_string())
+}
+
 // ------------------------------------------------------------ compression
 
 #[tauri::command]
@@ -515,7 +599,7 @@ fn main() {
             // Bring the recorder back once the last editor window is closed.
             if let tauri::WindowEvent::Destroyed = event {
                 let l = window.label();
-                if l.starts_with("editor-") || l == "compress" {
+                if l.starts_with("editor-") || l == "compress" || (l == "permissions" && screen_granted()) {
                     let app = window.app_handle();
                     let any_editor = app
                         .webview_windows()
@@ -558,20 +642,29 @@ fn main() {
             cancel_compress,
             estimate_bitrate,
             show_compressor,
+            permission_status,
+            request_screen_access,
+            open_privacy_pane,
+            restart_app,
+            show_permissions,
         ])
         .setup(move |app| {
             let _ = app.global_shortcut().register(toggle);
             let new_rec = MenuItem::with_id(app, "new", "New Recording", true, Some("CmdOrCtrl+Shift+2"))?;
             let stop = MenuItem::with_id(app, "stop", "Stop Recording", true, None::<&str>)?;
             let compress = MenuItem::with_id(app, "compress", "Compress Video…", true, None::<&str>)?;
+            let perms = MenuItem::with_id(app, "perms", "Permissions…", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit ScreenCraft", true, Some("CmdOrCtrl+Q"))?;
-            let menu = Menu::with_items(app, &[&new_rec, &compress, &stop, &quit])?;
+            let menu = Menu::with_items(app, &[&new_rec, &compress, &perms, &stop, &quit])?;
             TrayIconBuilder::with_id("tray")
                 .icon(app.default_window_icon().cloned().ok_or("no icon")?)
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "new" => {
                         let _ = show_recorder_window(app);
+                    }
+                    "perms" => {
+                        let _ = show_permissions_window(app);
                     }
                     "compress" => {
                         let _ = show_compressor(app.clone());
@@ -584,7 +677,11 @@ fn main() {
                 })
                 .build(app)?;
             fs::create_dir_all(projects_root()).ok();
-            show_recorder_window(app.handle())?;
+            if screen_granted() {
+                show_recorder_window(app.handle())?;
+            } else {
+                show_permissions_window(app.handle())?;
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

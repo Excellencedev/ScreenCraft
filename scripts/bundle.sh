@@ -46,5 +46,17 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+# Sign with a *stable* designated requirement (bundle identifier only). A plain
+# ad-hoc signature pins the code hash, so every rebuild looks like a brand-new
+# app to macOS and the Screen Recording / Camera / Microphone grants are lost.
+codesign --force --deep --sign - --identifier dev.screencraft.app \
+  --requirements '=designated => identifier "dev.screencraft.app"' "$APP"
+codesign -d -r- "$APP" 2>&1 | grep designated || true
+
+if [ "${1:-}" = "--install" ]; then
+  mkdir -p "$HOME/Applications"
+  rm -rf "$HOME/Applications/ScreenCraft.app"
+  cp -R "$APP" "$HOME/Applications/ScreenCraft.app"
+  echo "Installed ~/Applications/ScreenCraft.app"
+fi
 echo "Built $APP"
