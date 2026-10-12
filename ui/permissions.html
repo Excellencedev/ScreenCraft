@@ -6,33 +6,36 @@
 <link rel="stylesheet" href="theme.css" />
 <style>
   html, body { background: var(--bg); }
-  #wrap { padding: 44px 32px 24px; display: flex; flex-direction: column; gap: 18px; height: 100vh; }
-  h1 { margin: 0; font-size: 22px; }
+  #wrap { padding: 46px 34px 24px; display: flex; flex-direction: column; gap: 10px; height: 100vh; }
+  .head { padding-bottom: 14px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0 0 6px; font-size: 21px; letter-spacing: -.01em; }
   p { margin: 0; color: var(--muted); line-height: 1.5; }
-  .perm { display: grid; grid-template-columns: 40px 1fr auto; gap: 14px; align-items: center; background: var(--panel); border: 1px solid #1a1b26; border-radius: 14px; padding: 14px 16px; }
-  .ico { width: 40px; height: 40px; border-radius: 10px; background: #1b1c2a; display: grid; place-items: center; }
-  .ico svg { width: 22px; height: 22px; fill: none; stroke: #c9cbd8; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .perm { display: grid; grid-template-columns: 36px 1fr auto; gap: 14px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--line-2); border-radius: 8px; padding: 12px 14px; }
+  .perm.ok { border-left-color: var(--ok); }
+  .perm.bad { border-left-color: var(--danger); }
+  .ico { width: 36px; height: 36px; border-radius: 8px; background: var(--panel-2); display: grid; place-items: center; }
+  .ico svg { width: 20px; height: 20px; fill: none; stroke: #b9c4d9; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .name { font-weight: 600; display: flex; gap: 8px; align-items: center; }
-  .tag { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: #2a1d1f; color: #ff9aa6; }
-  .tag.opt { background: #1d2230; color: #9fb0d0; }
+  .tag { font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: rgba(255,85,102,.14); color: #ff9aa6; }
+  .tag.opt { background: rgba(134,147,170,.15); color: #9fb0d0; }
   .desc { color: var(--muted); font-size: 12px; margin-top: 3px; }
-  .state { display: flex; gap: 8px; align-items: center; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: #666; }
-  .ok .dot { background: #3ddc84; }
+  .state { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 2px; background: #56627a; }
+  .ok .dot { background: var(--ok); }
   .bad .dot { background: var(--danger); }
-  button.btn { background: #1c1d2a; border: 1px solid #262836; padding: 8px 12px; border-radius: 9px; }
-  button.btn:hover { background: #242638; }
-  button.primary { background: var(--accent); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 600; }
+  button.btn { background: var(--panel-2); border: 1px solid var(--line-2); padding: 7px 12px; border-radius: 7px; }
+  button.btn:hover { background: var(--raise); }
+  button.primary { background: var(--accent); color: #fff; padding: 9px 18px; border-radius: 7px; font-weight: 600; }
   button.primary:hover { background: var(--accent-2); }
-  button.primary:disabled { background: #2a2c3d; color: #777; }
-  .actions { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-  .note { background: #12202f; border: 1px solid #25476b; border-radius: 12px; padding: 12px 14px; color: #cfe3f7; display: none; }
+  button.primary:disabled { background: var(--line-2); color: #7d89a0; }
+  .actions { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .note { background: rgba(59,130,196,.12); border: 1px solid rgba(59,130,196,.45); border-radius: 8px; padding: 12px 14px; color: #cfe3f7; display: none; }
   .note.show { display: block; }
 </style>
 </head>
 <body>
 <div id="wrap">
-  <div>
+  <div class="head">
     <h1>Let's set up permissions</h1>
     <p>ScreenCraft needs a couple of macOS permissions before it can record. Grant them below — this window checks automatically.</p>
   </div>

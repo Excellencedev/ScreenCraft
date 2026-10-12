@@ -28,7 +28,7 @@ async function updateEstimates() {
   const dur = outDuration() / 1000;
   if (!P() || !dur) return;
   const { W, H } = outputSize(P(), exp.res);
-  const hasAudio = P().media.hasMicrophone || P().media.hasSystemAudio || !!P().media.mic || !!P().scene.music;
+  const hasAudio = P().media.hasMicrophone || P().media.hasSystemAudio || !!P().media.mic || !!(P().scene.musicClips || []).length;
   const audio = hasAudio ? 160_000 : 0;
   const fmt = (b) => fmtMB(b);
   let original;

@@ -36,7 +36,7 @@ pub fn show_recorder_window(app: &AppHandle) -> tauri::Result<()> {
         return Ok(());
     }
     let (sw, sh) = main_display_size();
-    let (w, h) = (1040.0, 76.0);
+    let (w, h) = (1100.0, 76.0);
     WebviewWindowBuilder::new(app, "recorder", WebviewUrl::App("recorder.html".into()))
         .title("ScreenCraft")
         .inner_size(w, h)
@@ -160,6 +160,13 @@ pub fn open_area_picker(app: AppHandle, display_id: Option<u32>) -> Result<(), S
 
 /// Show the recorder again once the last editor/compressor/permissions window closes.
 pub fn on_window_destroyed(app: &AppHandle, label: &str) {
+    if QUITTING.load(std::sync::atomic::Ordering::SeqCst) {
+        let editors_left = app.webview_windows().keys().any(|k| k.starts_with("editor-") && k != label);
+        if !editors_left {
+            exit_now(app);
+        }
+        return;
+    }
     let tracked = |l: &str| l.starts_with("editor-") || l == "compress" || l == "permissions";
     if !tracked(label) {
         return;
@@ -245,9 +252,43 @@ pub fn hide_area_frame(app: AppHandle) {
     }
 }
 
+static QUITTING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Set right before we exit on purpose, so the exit handler lets it through.
+pub static ALLOW_EXIT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn exit_now(app: &AppHandle) {
+    ALLOW_EXIT.store(true, std::sync::atomic::Ordering::SeqCst);
+    app.exit(0);
+}
+
+/// Quit the app, but let open editors ask about unsaved changes first: each editor
+/// is asked to close, and the app exits once the last one is gone.
+pub fn request_quit(app: &AppHandle) {
+    hide_area_frame(app.clone());
+    let editors: Vec<_> = app
+        .webview_windows()
+        .into_iter()
+        .filter(|(k, _)| k.starts_with("editor-"))
+        .map(|(_, w)| w)
+        .collect();
+    if editors.is_empty() {
+        exit_now(app);
+        return;
+    }
+    QUITTING.store(true, std::sync::atomic::Ordering::SeqCst);
+    for w in editors {
+        let _ = w.close();
+    }
+}
+
 /// The X on the recorder ribbon quits the whole app.
 #[tauri::command]
 pub fn quit_app(app: AppHandle) {
-    hide_area_frame(app.clone());
-    app.exit(0);
+    request_quit(&app);
+}
+
+/// An editor declined to close (unsaved changes, user chose Cancel).
+#[tauri::command]
+pub fn cancel_quit() {
+    QUITTING.store(false, std::sync::atomic::Ordering::SeqCst);
 }

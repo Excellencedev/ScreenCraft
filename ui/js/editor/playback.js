@@ -131,7 +131,7 @@ export const seekOut = (t) => requestSeek(t, false);
 // ---- playback
 // Audio goes through WebAudio so the master volume and the mic's auto-level can exceed
 // the 100% an <audio>/<video> element allows, with a limiter against clipping.
-const bus = { ctx: null, dev: null, mic: null, music: null, limiter: null };
+const bus = { ctx: null, dev: null, mic: null, music: {}, limiter: null };
 function ensureAudio() {
   if (bus.ctx) {
     bus.ctx.resume?.().catch(() => {});
@@ -158,7 +158,7 @@ function ensureAudio() {
     };
     bus.dev = wire(media.screen, false);
     bus.mic = wire(media.mic, true);
-    bus.music = wire(media.music, false);
+    for (const [f, el] of Object.entries(media.musicEls)) bus.music[f] = wire(el, false);
     bus.ctx = ctx;
     ctx.resume?.().catch(() => {});
   } catch {}
@@ -183,42 +183,49 @@ function applySliceAudio(s) {
 }
 
 function applyMusicLevel() {
-  if (!media.music) return;
   const a = P().config.audio;
-  if (!bus.music && bus.ctx) {
-    // music added after playback started: wire it now
-    try {
-      const g = bus.ctx.createGain();
-      bus.ctx.createMediaElementSource(media.music).connect(g);
-      g.connect(bus.limiter);
-      media.music.volume = 1;
-      bus.music = g;
-    } catch {}
+  const lvl = masterGain(a.volume) * (a.musicVolume ?? 0.5);
+  for (const [f, el] of Object.entries(media.musicEls)) {
+    if (!bus.music[f] && bus.ctx) {
+      // added after playback started: wire it now
+      try {
+        const g = bus.ctx.createGain();
+        bus.ctx.createMediaElementSource(el).connect(g);
+        g.connect(bus.limiter);
+        el.volume = 1;
+        bus.music[f] = g;
+      } catch {}
+    }
+    setLevel(el, bus.music[f], lvl);
   }
-  setLevel(media.music, bus.music, masterGain(a.volume) * (a.musicVolume ?? 0.5));
 }
 
-/** Music is placed on the output timeline, so it follows tOut rather than source time. */
+/** Music clips sit on the output timeline, so they follow tOut rather than source time. */
 function musicTick() {
-  const mu = media.music, m = P().scene.music;
-  if (!mu || !m) return;
-  const t = S.tOut - m.offsetMs;
-  const inside = t >= 0 && t < m.durationMs - 30;
-  if (!S.playing || !inside) {
-    if (!mu.paused) mu.pause();
-    return;
+  const list = P().scene.musicClips || [];
+  const active = new Map();
+  for (const c of list) {
+    const t = S.tOut - c.offsetMs;
+    if (S.playing && t >= 0 && t < c.durMs - 30 && !active.has(c.file)) active.set(c.file, { c, t });
   }
   applyMusicLevel();
-  if (mu.paused) {
-    mu.currentTime = t / 1000;
-    mu.playbackRate = 1;
-    mu.play().catch(() => {});
-  } else {
-    chase(mu, t, 1);
+  for (const [f, el] of Object.entries(media.musicEls)) {
+    const a = active.get(f);
+    if (!a) {
+      if (!el.paused) el.pause();
+      continue;
+    }
+    const target = a.c.inMs + a.t;
+    if (el.paused) {
+      el.currentTime = target / 1000;
+      el.playbackRate = 1;
+      el.play().catch(() => {});
+    } else {
+      chase(el, target, 1);
+    }
   }
 }
 export const syncMusic = () => {
-  if (media.music && !P().scene.music) { media.music.pause(); media.music = null; }
   applyMusicLevel();
 };
 export const refreshSliceAudio = () => applySliceAudio(P().scene.slices[S.curSlice]);
@@ -255,7 +262,7 @@ export function pause() {
   media.screen.pause();
   media.camera?.pause();
   media.mic?.pause();
-  media.music?.pause();
+  for (const el of Object.values(media.musicEls)) el.pause();
   setPlayIcon(false);
   draw();
 }

@@ -81,6 +81,8 @@
         </select>
       </label>
     </div>
+    <div class="tl-body">
+    <div id="tlLabels"><div>Video</div><div>Zoom</div><div>Music</div></div>
     <div id="tlScroll">
       <div id="tlInner">
         <div id="ruler"></div>
@@ -90,7 +92,21 @@
         <div id="playhead"><div class="head"></div></div>
       </div>
     </div>
+    </div>
   </section>
+</div>
+
+<div id="saveAsk" hidden>
+  <div class="ask-card">
+    <h3>Save changes to “<span id="saveAskName"></span>”?</h3>
+    <p>Your edits will be lost if you don't save them.</p>
+    <div class="ask-btns">
+      <button id="askDiscard" class="btn-line">Don't Save</button>
+      <span class="spacer"></span>
+      <button id="askCancel" class="btn-line">Cancel</button>
+      <button id="askSave" class="btn-line primary">Save</button>
+    </div>
+  </div>
 </div>
 
 <div id="prep" hidden>

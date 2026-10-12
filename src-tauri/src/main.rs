@@ -32,6 +32,28 @@ fn main() {
                 })
                 .build(),
         )
+        .menu(|handle| {
+            use tauri::menu::{Menu, MenuItem, MenuItemKind};
+            let menu = Menu::default(handle)?;
+            // Replace the stock Quit item with our own so open editors can ask about unsaved edits.
+            if let Ok(items) = menu.items() {
+                if let Some(MenuItemKind::Submenu(app_menu)) = items.into_iter().next() {
+                    if let Ok(sub) = app_menu.items() {
+                        if let Some(last) = sub.into_iter().last() {
+                            let _ = app_menu.remove(&last);
+                        }
+                    }
+                    let quit = MenuItem::with_id(handle, "sc-quit", "Quit ScreenCraft", true, Some("CmdOrCtrl+Q"))?;
+                    app_menu.append(&quit)?;
+                }
+            }
+            Ok(menu)
+        })
+        .on_menu_event(|app, event| {
+            if event.id() == "sc-quit" {
+                windows::request_quit(app);
+            }
+        })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 windows::on_window_destroyed(window.app_handle(), window.label());
@@ -57,6 +79,7 @@ fn main() {
             commands::recording::mic_chunk,
             commands::projects::load_project,
             commands::projects::save_project,
+            windows::cancel_quit,
             commands::projects::rename_project,
             commands::projects::compute_render_track,
             commands::projects::auto_zoom,
@@ -131,6 +154,15 @@ fn main() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running ScreenCraft");
+        .build(tauri::generate_context!())
+        .expect("error while building ScreenCraft")
+        .run(|app, event| {
+            // ⌘Q and friends: give open editors the chance to ask about unsaved edits
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                if !windows::ALLOW_EXIT.load(std::sync::atomic::Ordering::SeqCst) {
+                    api.prevent_exit();
+                    windows::request_quit(app);
+                }
+            }
+        });
 }

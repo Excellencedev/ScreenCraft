@@ -1,7 +1,7 @@
 // Shared recorder state + persisted preferences.
 export const $ = (id) => document.getElementById(id);
 
-export const BAR_W = 1040;
+export const BAR_W = 1100;
 export const BAR_H = 76;
 
 /** Resolution choices: cap on the long side in px (0 = the display's native resolution). */

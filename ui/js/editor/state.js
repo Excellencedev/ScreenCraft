@@ -10,6 +10,7 @@ export const S = {
   tOut: 0,
   playing: false,
   scrubbing: false,
+  dirty: false, // edits not yet saved
   proxy: null, // in-memory scrub frames while dragging the playhead
   selected: null, // {type:'zoom'|'slice', id}
   tab: "background",
@@ -22,7 +23,7 @@ export const S = {
 };
 
 /** Decoded media elements and images used by the compositor. */
-export const media = { screen: null, camera: null, mic: null, music: null, bgImage: null, micLevel: 1 };
+export const media = { screen: null, camera: null, mic: null, musicEls: {}, bgImage: null, micLevel: 1 };
 
 export const P = () => S.project;
 export const uid = () => Math.random().toString(36).slice(2, 10);

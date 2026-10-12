@@ -3,7 +3,7 @@
 import { invoke } from "../tauri.js";
 import { $, S, P, dir, uid, clamp, fmt, hooks } from "./state.js";
 import { sliceLen, outDuration, outToSrc, spansOut } from "./timemap.js";
-import { addMusic } from "./music.js";
+import { addMusic, clips as musicClips, drawWave, removeMusicClip } from "./music.js";
 import { change } from "./history.js";
 import { requestSeek, pause, play, updateTransport, setTimelineWidth } from "./playback.js";
 
@@ -68,24 +68,32 @@ export function renderTimeline() {
   }
   zt.replaceChildren(zf);
 
-  // music track
+  // music track: one block per clip, with the file's waveform drawn inside
   const mt = $("trackMusic");
-  const mu = P().scene.music;
-  if (!mu) {
+  const list = musicClips();
+  if (!list.length) {
     const b = document.createElement("button");
     b.className = "add-music";
     b.textContent = "+ Add music";
     b.onclick = addMusic;
     mt.replaceChildren(b);
   } else {
-    const el = document.createElement("div");
-    const len = Math.max(0, Math.min(mu.durationMs, dur - mu.offsetMs));
-    el.className = "block music" + (S.selected?.type === "music" ? " sel" : "");
-    el.style.left = mu.offsetMs * pxPerMs + "px";
-    el.style.width = Math.max(14, len * pxPerMs - 2) + "px";
-    el.innerHTML = `<span>♪ ${mu.name || "Music"}</span><span class="t">${(mu.durationMs / 1000).toFixed(1)}s</span>`;
-    el.onpointerdown = (e) => beginMusicDrag(e, mu, el, pxPerMs);
-    mt.replaceChildren(el);
+    const mf = document.createDocumentFragment();
+    for (const c of list) {
+      const el = document.createElement("div");
+      el.className = "block music" + (S.selected?.type === "music" && S.selected.id === c.id ? " sel" : "");
+      el.style.left = c.offsetMs * pxPerMs + "px";
+      el.style.width = Math.max(14, c.durMs * pxPerMs - 2) + "px";
+      el.dataset.id = c.id;
+      el.innerHTML = `<div class="h l"></div><canvas class="wave"></canvas><span class="mname">♪ ${c.name || "Music"}</span><div class="h r"></div>`;
+      el.onpointerdown = (e) => beginMusicDrag(e, c, el, pxPerMs);
+      mf.appendChild(el);
+    }
+    mt.replaceChildren(mf);
+    for (const el of mt.children) {
+      const c = list.find((x) => x.id === el.dataset.id);
+      if (c) drawWave(el.querySelector("canvas.wave"), c);
+    }
   }
   updateTransport();
 }
@@ -222,31 +230,53 @@ function beginZoomDrag(e, z, el, pxPerMs, a0, b0) {
   };
 }
 
-/** Music block: drag to place it on the timeline. */
-function beginMusicDrag(e, mu, el, pxPerMs) {
+/** Music clip: body moves it freely, the ends trim it. */
+function beginMusicDrag(e, c, el, pxPerMs) {
   e.stopPropagation();
   e.preventDefault();
   el.setPointerCapture(e.pointerId);
-  S.selected = { type: "music" };
+  S.selected = { type: "music", id: c.id };
   S.tab = "audio";
   document.querySelectorAll(".block.sel").forEach((b) => b.classList.remove("sel"));
   el.classList.add("sel");
   hooks.renderPanel();
+
+  const mode = e.target.classList.contains("l") ? "l" : e.target.classList.contains("r") ? "r" : "move";
   const x0 = e.clientX;
-  const a0 = mu.offsetMs;
   const total = outDuration();
-  let na = a0, moved = false;
+  const { offsetMs: o0, inMs: i0, durMs: d0, fileDurMs: fd } = c;
+  const cv = el.querySelector("canvas.wave");
+  let v = { offsetMs: o0, inMs: i0, durMs: d0 };
+  let moved = false;
   el.onpointermove = (ev) => {
     if (!moved && Math.abs(ev.clientX - x0) < 3) return;
     moved = true;
-    na = clamp(a0 + (ev.clientX - x0) / pxPerMs, 0, Math.max(0, total - 500));
-    el.style.left = na * pxPerMs + "px";
+    const d = (ev.clientX - x0) / pxPerMs;
+    if (mode === "move") {
+      v = { offsetMs: clamp(o0 + d, 0, Math.max(0, total - 200)), inMs: i0, durMs: d0 };
+    } else if (mode === "l") {
+      const delta = clamp(d, Math.max(-i0, -o0), d0 - 200);
+      v = { offsetMs: o0 + delta, inMs: i0 + delta, durMs: d0 - delta };
+    } else {
+      v = { offsetMs: o0, inMs: i0, durMs: clamp(d0 + d, 200, Math.max(200, (fd || d0 + i0) - i0)) };
+    }
+    el.style.left = v.offsetMs * pxPerMs + "px";
+    el.style.width = Math.max(14, v.durMs * pxPerMs - 2) + "px";
+    // keep the waveform where it was while an end is being trimmed
+    if (cv) {
+      cv.style.width = d0 * pxPerMs - 2 + "px";
+      cv.style.left = (mode === "l" ? (o0 - v.offsetMs) * pxPerMs : 0) + "px";
+    }
   };
   el.onpointerup = (ev) => {
     el.onpointermove = el.onpointerup = null;
     try { el.releasePointerCapture(ev.pointerId); } catch {}
     if (!moved) return;
-    change(null, () => { P().scene.music.offsetMs = Math.round(na); }, { track: false, timeline: true });
+    change(null, () => {
+      c.offsetMs = Math.round(v.offsetMs);
+      c.inMs = Math.round(v.inMs);
+      c.durMs = Math.round(v.durMs);
+    }, { track: false, timeline: true });
   };
 }
 
@@ -305,10 +335,14 @@ export function splitAtPlayhead() {
       if (src <= s.sourceStartMs + 50 || src >= s.sourceEndMs - 50) clipIdx = -1;
     }
   }
+  const doMusic = !sel || sel.type === "music";
+  const mclips = doMusic
+    ? musicClips().filter((c) => (sel ? c.id === sel.id : true) && S.tOut > c.offsetMs + 50 && S.tOut < c.offsetMs + c.durMs - 50)
+    : [];
   const zooms = doZooms
     ? P().scene.zooms.filter((z) => (sel ? z.id === sel.id : true) && src > z.sourceStartMs + 50 && src < z.sourceEndMs - 50)
     : [];
-  if (clipIdx < 0 && !zooms.length) return;
+  if (clipIdx < 0 && !zooms.length && !mclips.length) return;
 
   change(null, () => {
     if (clipIdx >= 0) {
@@ -317,6 +351,14 @@ export function splitAtPlayhead() {
       s.sourceEndMs = src;
       slices.splice(clipIdx + 1, 0, right);
       if (sel?.type === "slice") S.selected = { type: "slice", id: right.id };
+    }
+    for (const c of mclips) {
+      const cut = S.tOut - c.offsetMs;
+      const right = { ...c, id: uid(), offsetMs: S.tOut, inMs: c.inMs + cut, durMs: c.durMs - cut };
+      c.durMs = cut;
+      const list = musicClips();
+      list.splice(list.indexOf(c) + 1, 0, right);
+      if (sel?.type === "music") S.selected = { type: "music", id: right.id };
     }
     for (const z of zooms) {
       const right = { ...JSON.parse(JSON.stringify(z)), id: uid(), sourceStartMs: src };
@@ -347,7 +389,7 @@ export function deleteSelected() {
   const sel = S.selected;
   if (!sel) return;
   if (sel.type === "music") {
-    change(null, () => { P().scene.music = null; S.selected = null; }, { panel: true, timeline: true, track: false });
+    removeMusicClip(sel.id);
   } else if (sel.type === "zoom") {
     change(null, () => { P().scene.zooms = P().scene.zooms.filter((z) => z.id !== sel.id); S.selected = null; }, { panel: true, timeline: true });
   } else if (P().scene.slices.length > 1) {

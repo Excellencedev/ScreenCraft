@@ -146,8 +146,27 @@ impl Default for ZoomRegion {
 pub struct Scene {
     pub slices: Vec<Slice>,
     pub zooms: Vec<ZoomRegion>,
-    /// Background music laid under the edit (placed on the output timeline).
+    /// Legacy single music track (migrated into `music_clips` when a project opens).
     pub music: Option<MusicTrack>,
+    /// Background music clips laid under the edit, placed on the output timeline.
+    pub music_clips: Vec<MusicClip>,
+}
+
+/// A trimmed piece of an audio file in the project folder.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MusicClip {
+    pub id: String,
+    pub file: String,
+    pub name: String,
+    /// Where this piece starts on the output timeline.
+    pub offset_ms: f64,
+    /// Start within the file.
+    pub in_ms: f64,
+    /// Length of the piece.
+    pub dur_ms: f64,
+    /// Full length of the file.
+    pub file_dur_ms: f64,
 }
 
 /// An audio file in the project folder, positioned on the edited timeline.
@@ -448,7 +467,7 @@ impl Project {
         };
         Self {
             name: name.into(),
-            scene: Scene { slices: vec![slice], zooms: Vec::new(), music: None },
+            scene: Scene { slices: vec![slice], zooms: Vec::new(), music: None, music_clips: Vec::new() },
             media,
             ..Default::default()
         }

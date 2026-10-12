@@ -2,7 +2,7 @@
 import { invoke, convertFileSrc, currentWindow } from "../tauri.js";
 import { $, S, P, dir, hooks, media, clamp } from "./state.js";
 import { outDuration } from "./timemap.js";
-import { change, undo, redo, updateUndo } from "./history.js";
+import { change, undo, redo, updateUndo, saveNow } from "./history.js";
 import { draw, frameIndex, displayedRect } from "./draw.js";
 import { play, pause, requestSeek, scheduleTrack, computeTrack, refreshSliceAudio, syncMusic } from "./playback.js";
 import {
@@ -15,11 +15,17 @@ import { rawMenu } from "./rawfiles.js";
 import { openExport, bindExport } from "./exportDialog.js";
 import { contentRect, camAt } from "../render.js";
 import { buildScrubCache } from "./scrubcache.js";
-import { loadMusicElement } from "./music.js";
+import { loadMusicElements, migrateMusic } from "./music.js";
 import { autoGain } from "../audiolevel.js";
 
+hooks.updateTitle = () => {
+  const t = $("title");
+  if (t.isContentEditable) return;
+  t.textContent = P().name + (S.dirty ? " *" : "");
+  currentWindow().setTitle?.(P().name + (S.dirty ? " *" : "")).catch?.(() => {});
+};
 hooks.draw = draw;
-hooks.syncMusic = syncMusic;
+hooks.syncMusic = () => { loadMusicElements().then(syncMusic); };
 hooks.renderTimeline = renderTimeline;
 hooks.renderPanel = renderPanel;
 hooks.scheduleTrack = scheduleTrack;
@@ -30,9 +36,46 @@ function syncControls() {
   const sel = S.selected?.type === "slice" && P().scene.slices.find((s) => s.id === S.selected.id);
   const s = sel || P().scene.slices[S.curSlice] || P().scene.slices[0];
   $("selSpeed").value = String(s.timeScale);
-  $("title").textContent = P().name;
+  hooks.updateTitle();
 }
 hooks.syncControls = syncControls;
+
+/** Ask Save / Don't Save / Cancel; resolves to "save" | "discard" | "cancel". */
+function askSave() {
+  return new Promise((res) => {
+    const m = $("saveAsk");
+    m.hidden = false;
+    $("saveAskName").textContent = P().name;
+    const done = (v) => { m.hidden = true; res(v); };
+    $("askSave").onclick = () => done("save");
+    $("askDiscard").onclick = () => done("discard");
+    $("askCancel").onclick = () => done("cancel");
+  });
+}
+
+/** Closing the window (or quitting the app) with unsaved edits asks first. */
+function guardClose() {
+  currentWindow().onCloseRequested(async (ev) => {
+    if (!S.dirty) return;
+    ev.preventDefault();
+    const choice = await askSave();
+    if (choice === "cancel") {
+      invoke("cancel_quit").catch(() => {});
+      return;
+    }
+    if (choice === "save") {
+      try {
+        await saveNow();
+      } catch (err) {
+        alert("Could not save: " + err);
+        invoke("cancel_quit").catch(() => {});
+        return;
+      }
+    }
+    S.dirty = false;
+    currentWindow().close();
+  });
+}
 
 /** Click the title to rename the project (and its folder). */
 function bindTitle() {
@@ -40,6 +83,7 @@ function bindTitle() {
   el.title = "Click to rename";
   el.onclick = () => {
     if (el.isContentEditable) return;
+    el.textContent = P().name; // drop the unsaved marker while editing
     el.contentEditable = "plaintext-only";
     el.classList.add("editing");
     el.focus();
@@ -54,13 +98,13 @@ function bindTitle() {
     el.contentEditable = "false";
     el.classList.remove("editing");
     const name = el.textContent.trim();
-    if (!name || name === P().name) { el.textContent = P().name; return; }
+    if (!name || name === P().name) { hooks.updateTitle(); return; }
     try {
       await invoke("save_project", { dir, project: P() });
       const next = await invoke("rename_project", { dir, name });
       location.replace(`editor.html?dir=${encodeURIComponent(next)}`);
     } catch (err) {
-      el.textContent = P().name;
+      hooks.updateTitle();
       alert(String(err));
     }
   };
@@ -79,11 +123,12 @@ function bindUI() {
   $("btnDuplicate").onclick = duplicateSelected;
   $("btnAutoZoom").onclick = autoZoom;
   $("btnFolder").onclick = async (e) => {
+    const anchor = e.currentTarget; // currentTarget is cleared once we await
     const list = await invoke("recent_projects");
     const items = [{ header: "Projects" }];
     for (const pr of list.slice(0, 10)) items.push({ label: pr.name, run: () => invoke("open_editor", { dir: pr.dir }) });
     items.push("-", { label: "Show this project in Finder", run: () => invoke("reveal_in_finder", { path: dir }) });
-    showMenu(e.currentTarget, items);
+    showMenu(anchor, items);
   };
   $("btnCrop").onclick = () => { S.tab = "crop"; renderPanel(); };
   $("btnExport").onclick = openExport;
@@ -128,7 +173,7 @@ function bindUI() {
     else if (e.key === "ArrowRight") { pause(); requestSeek(S.tOut + (e.shiftKey ? 1000 : 1000 / 30)); }
     else if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
     else if (mod && e.key.toLowerCase() === "e") { e.preventDefault(); openExport(); }
-    else if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); invoke("save_project", { dir, project: P() }); }
+    else if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); saveNow().catch((err) => alert("Could not save: " + err)); }
   });
   let rz = null;
   addEventListener("resize", () => {
@@ -202,12 +247,14 @@ async function boot() {
       media.bgImage = new Image();
       media.bgImage.src = bg.image;
     }
+    migrateMusic();
     bindUI();
+    guardClose();
     renderPanel();
     syncControls();
     updateUndo();
     await computeTrack();
-    await loadMusicElement();
+    await loadMusicElements();
     // Pre-render frames into memory behind a spinner so the first scrub is already smooth.
     const prep = $("prep");
     prep.hidden = false;

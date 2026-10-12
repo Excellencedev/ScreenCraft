@@ -7,33 +7,33 @@
 <style>
   html, body { background: var(--bg); overflow: hidden; }
   svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  #wrap { display: grid; grid-template-columns: 230px 1fr; height: 100vh; }
-  #presets { border-right: 1px solid #14151f; padding: 52px 12px 12px; overflow: auto; background: #0a0b10; }
-  #presets h4 { margin: 0 8px 10px; color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: .08em; }
-  .preset { display: block; width: 100%; text-align: left; padding: 9px 10px; border-radius: 9px; color: #cfd1e0; }
+  #wrap { display: grid; grid-template-columns: 1fr 250px; height: 100vh; }
+  #presets { grid-column: 2; grid-row: 1; border-left: 1px solid var(--line); padding: 52px 12px 12px; overflow: auto; background: var(--panel); }
+  #presets h4 { margin: 0 8px 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: .12em; }
+  .preset { display: block; width: 100%; text-align: left; padding: 9px 10px; border-radius: 7px; color: #cdd5e5; border-left: 2px solid transparent; }
   .preset small { display: block; color: var(--muted); margin-top: 2px; }
-  .preset:hover { background: #151620; }
-  .preset.on { background: #1d1f2d; color: #fff; }
-  #main { padding: 52px 24px 20px; overflow: auto; display: flex; flex-direction: column; gap: 16px; }
-  .card { background: var(--panel); border: 1px solid #1a1b26; border-radius: 14px; padding: 16px; }
-  .drop { display: flex; align-items: center; gap: 14px; }
+  .preset:hover { background: var(--panel-2); }
+  .preset.on { background: var(--panel-2); color: #fff; border-left-color: var(--accent-2); }
+  #main { grid-column: 1; grid-row: 1; padding: 52px 26px 20px; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 16px; }
+  .drop { display: flex; align-items: center; gap: 14px; border-left: 3px solid var(--accent); }
   .drop .name { font-weight: 600; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .muted { color: var(--muted); }
-  .btn { background: #181925; border: 1px solid #202233; padding: 8px 14px; border-radius: 9px; }
-  .btn:hover { background: #20222f; }
-  .primary { background: var(--accent); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 600; }
+  .btn { background: var(--panel-2); border: 1px solid var(--line-2); padding: 8px 14px; border-radius: 7px; }
+  .btn:hover { background: var(--raise); }
+  .primary { background: var(--accent); color: #fff; padding: 10px 18px; border-radius: 7px; font-weight: 600; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); }
   .primary:hover { background: var(--accent-2); }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
-  .field label { display: flex; justify-content: space-between; color: #c8cadb; margin-bottom: 7px; }
-  select { width: 100%; background: #151620; border: 1px solid #1f2130; border-radius: 8px; padding: 7px 9px; }
-  input[type=range] { width: 100%; accent-color: var(--accent-2); }
+  .field label { display: flex; justify-content: space-between; color: #c4cde0; margin-bottom: 7px; }
+  select { width: 100%; }
   .full { grid-column: 1 / -1; }
-  .bar { height: 8px; background: #20222f; border-radius: 4px; overflow: hidden; }
+  .bar { height: 6px; background: var(--line-2); border-radius: 3px; overflow: hidden; }
   #fill { height: 100%; width: 0; background: var(--accent-2); transition: width .15s; }
   .est { display: flex; justify-content: space-between; align-items: center; }
-  .big { font-size: 20px; font-weight: 650; }
+  .big { font-size: 20px; font-weight: 650; color: var(--accent-2); }
   .row { display: flex; gap: 10px; align-items: center; }
   .chk { display: flex; gap: 8px; align-items: center; }
+  input[type=checkbox] { accent-color: var(--accent); }
   #drag { position: fixed; inset: 0; background: rgba(59,130,196,.18); border: 2px dashed var(--accent-2); display: none; place-items: center; font-size: 18px; z-index: 9; }
   #drag.on { display: grid; }
   .titlebar { position: fixed; top: 0; left: 0; right: 0; height: 40px; -webkit-app-region: drag; }

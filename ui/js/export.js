@@ -61,24 +61,28 @@ async function renderAudio(project, dir, outDurSec) {
     const mic = await decodeFile(convertFileSrc(`${dir}/${project.media.mic}`));
     if (mic && mic.length) tracks.push({ buf: mic, gain: a.micVolume ?? 1, offset: (project.media.micOffsetMs || 0) / 1000, level: autoGain(mic), mono: true });
   }
-  let music = null;
-  if (project.scene.music) {
-    const buf = await decodeFile(convertFileSrc(`${dir}/${project.scene.music.file}`));
-    if (buf && buf.length) music = { buf, offset: Math.max(0, project.scene.music.offsetMs) / 1000 };
+  const musicClips = [];
+  const decoded = new Map();
+  for (const c of project.scene.musicClips || []) {
+    if (!decoded.has(c.file)) decoded.set(c.file, await decodeFile(convertFileSrc(`${dir}/${c.file}`)));
+    const buf = decoded.get(c.file);
+    if (buf && buf.length) musicClips.push({ c, buf });
   }
-  if (!tracks.length && !music) return null;
+  if (!tracks.length && !musicClips.length) return null;
   const sr = 48000;
   const off = new OfflineAudioContext(2, Math.ceil(outDurSec * sr), sr);
   const master = masterGain(a.volume);
   const limiter = makeLimiter(off);
   limiter.connect(off.destination);
-  if (music && music.offset < outDurSec) {
+  for (const { c, buf } of musicClips) {
+    const when = Math.max(0, c.offsetMs) / 1000;
+    if (when >= outDurSec) continue;
     const g = off.createGain();
     g.gain.value = master * (a.musicVolume ?? 0.5);
     const node = off.createBufferSource();
-    node.buffer = music.buf;
+    node.buffer = buf;
     node.connect(g).connect(limiter);
-    node.start(music.offset, 0, Math.min(music.buf.duration, outDurSec - music.offset));
+    node.start(when, Math.max(0, c.inMs) / 1000, Math.min(c.durMs / 1000, outDurSec - when));
   }
   let at = 0;
   for (const s of project.scene.slices) {

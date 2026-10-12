@@ -9,70 +9,76 @@
   #root { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; }
   .bar {
     -webkit-app-region: drag;
-    height: 76px; display: flex; align-items: center; gap: 2px; padding: 0 10px; overflow: hidden;
-    background: rgba(28, 29, 36, .94); border: 1px solid rgba(255,255,255,.09);
-    border-radius: 16px; backdrop-filter: blur(24px);
+    height: 76px; display: flex; align-items: center; gap: 10px; padding: 0 12px; overflow: hidden;
+    background: rgba(11, 16, 26, .96); border: 1px solid var(--line-2);
+    border-radius: 14px; backdrop-filter: blur(24px); box-shadow: 0 10px 30px rgba(0,0,0,.35);
   }
   .bar > * { -webkit-app-region: no-drag; }
-  .sep { width: 1px; height: 38px; background: rgba(255,255,255,.1); margin: 0 6px; }
+  .sep { width: 1px; height: 40px; background: var(--line-2); margin: 0 2px; flex: none; }
+  .grp { display: flex; flex-direction: column; gap: 5px; flex: none; }
+  .cap { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding-left: 2px; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .segment { display: flex; border: 1px solid var(--line-2); border-radius: 9px; overflow: hidden; }
   .tool {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    width: 58px; padding: 8px 2px 6px; border-radius: 10px; color: #c9cbd8; font-size: 11px;
+    display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px;
+    color: #b9c3d6; font-size: 12.5px; border-right: 1px solid var(--line-2);
   }
-  .tool svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  .tool:hover { background: rgba(255,255,255,.07); }
-  .tool.active { background: rgba(59,130,196,.28); color: #fff; }
-  .opt { display: flex; align-items: center; gap: 8px; padding: 8px 8px; border-radius: 10px; color: #c9cbd8; max-width: 128px; white-space: nowrap; }
-  .opt svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .tool:last-child { border-right: 0; }
+  .tool svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .tool:hover { background: rgba(255,255,255,.05); }
+  .tool.active { background: var(--accent); color: #fff; }
+  .opt { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); color: #b9c3d6; max-width: 108px; white-space: nowrap; position: relative; font-size: 12.5px; }
+  .opt svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
   .opt span { overflow: hidden; text-overflow: ellipsis; }
-  .opt:hover { background: rgba(255,255,255,.07); }
-  .opt.on { color: #fff; }
-  .opt.off { opacity: .6; }
-  #camPreview, #hudCam { display: none; width: 40px; height: 40px; border-radius: 50%; object-fit: cover; transform: scaleX(-1); background: #000; flex: none; }
+  .opt:hover { border-color: var(--line-2); color: #fff; }
+  .opt.on { color: #fff; border-color: rgba(106,174,232,.55); }
+  .opt.off { opacity: .65; }
+  #camPreview, #hudCam { display: none; width: 26px; height: 26px; border-radius: 7px; object-fit: cover; transform: scaleX(-1); background: #000; flex: none; }
   .opt.live #camPreview { display: block; }
   .opt.live > svg { display: none; }
-  #hudCam.on { display: block; width: 36px; height: 36px; }
-  .opt { position: relative; }
-  #optQuality { max-width: 190px; }
+  #hudCam.on { display: block; width: 34px; height: 34px; border-radius: 9px; }
+  #optQuality { max-width: 138px; }
+  #optFolder { padding: 0 9px; }
   .menu { max-height: 500px; }
-  .opt .meter { position: absolute; left: 10px; right: 10px; bottom: 2px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.1); overflow: hidden; display: none; }
+  .opt .meter { position: absolute; left: 8px; right: 8px; bottom: 3px; height: 2px; border-radius: 1px; background: rgba(255,255,255,.1); overflow: hidden; display: none; }
   .opt.on .meter { display: block; }
-  .meter b { display: block; height: 100%; width: 0; border-radius: 2px; background: linear-gradient(90deg, #4ade80 0%, #4ade80 65%, #facc15 80%, #f87171 100%); transition: width .05s linear; }
+  .meter b { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #3ddc97 0%, #3ddc97 65%, #f6c453 80%, #ff6b6b 100%); transition: width .05s linear; }
   .meter.hud { position: static; display: none; width: 34px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; margin-left: 2px; }
   body.hud .meter.hud { display: block; }
   .menu button .chk { display: inline-block; width: 16px; color: var(--accent-2); }
-  .chev2 { width: 12px !important; height: 12px !important; }
+  .chev2 { width: 11px !important; height: 11px !important; }
   body.hud .bar, body.countdown .bar { cursor: grab; }
-  .close { width: 28px; height: 28px; border-radius: 50%; background: #fff; color: #111; display: grid; place-items: center; margin-right: 6px; }
-  .close svg { width: 14px; height: 14px; stroke: #111; stroke-width: 2.4; fill: none; }
+  .close { width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line-2); color: #b9c3d6; display: grid; place-items: center; flex: none; }
+  .close:hover { background: rgba(255,85,102,.15); border-color: var(--danger); color: #ff9aa5; }
+  .close svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; }
   .rec {
-    margin-left: auto; display: flex; align-items: center; gap: 8px;
-    background: var(--accent); color: #fff; border-radius: 12px; padding: 12px 18px; font-weight: 600;
+    margin-left: auto; display: flex; align-items: center; gap: 9px; flex: none; white-space: nowrap;
+    background: var(--accent); color: #fff; border-radius: 10px; padding: 0 16px; height: 46px; font-weight: 600; font-size: 13.5px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
   }
   .rec:hover { background: var(--accent-2); }
-  .rec { white-space: nowrap; flex: none; }
-  .rec .dot { width: 10px; height: 10px; border-radius: 50%; background: #fff; }
+  .rec .dot { width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.28); }
   .menu {
-    position: absolute; bottom: 84px; background: rgba(28,29,36,.97); border: 1px solid rgba(255,255,255,.1);
-    border-radius: 12px; padding: 6px; max-height: 300px; overflow: auto; min-width: 300px; display: none; z-index: 5;
+    position: absolute; bottom: 84px; background: rgba(13,19,30,.98); border: 1px solid var(--line-2);
+    border-radius: 11px; padding: 6px; max-height: 300px; overflow: auto; min-width: 300px; display: none; z-index: 5; box-shadow: 0 14px 40px rgba(0,0,0,.5);
   }
   .menu.show { display: block; }
-  .menu button { white-space: nowrap; display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px; color: #dcdeea; }
-  .menu button:hover { background: rgba(255,255,255,.08); }
+  .menu button { white-space: nowrap; display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 7px; color: #d5dcec; }
+  .menu button:hover { background: rgba(255,255,255,.07); }
   .menu .small { color: var(--muted); font-size: 11px; }
-  .menu .hd { color: var(--muted); font-size: 11px; padding: 6px 10px 2px; }
+  .menu .hd { color: var(--muted); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; padding: 8px 10px 3px; }
   /* HUD while recording */
   body.hud .bar > :not(.hudbox) { display: none !important; }
   .hudbox { display: none; align-items: center; gap: 14px; width: 100%; justify-content: space-between; }
   body.hud .hudbox { display: flex; }
   body.countdown .bar > :not(.hudbox) { display: none !important; }
   body.countdown .hudbox { display: flex; }
-  .pulse { width: 12px; height: 12px; border-radius: 50%; background: var(--danger); animation: pulse 1.2s infinite; }
+  .pulse { width: 11px; height: 11px; border-radius: 3px; background: var(--danger); animation: pulse 1.2s infinite; }
   @keyframes pulse { 50% { opacity: .35; } }
-  .time { font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 600; }
-  .stop { background: var(--danger); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; }
+  .time { font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 600; letter-spacing: .02em; }
+  .stop { background: var(--danger); color: #fff; padding: 0 18px; height: 40px; border-radius: 9px; font-weight: 600; }
   .count { font-size: 30px; font-weight: 700; width: 100%; text-align: center; }
-  .err { position: absolute; top: 0; bottom: 0; left: 0; right: 0; z-index: 20; background: rgba(58,17,23,.97); border: 1px solid #7b2230; padding: 10px 16px; border-radius: 16px; display: none; align-items: center; cursor: pointer; line-height: 1.35; }
+  .err { position: absolute; top: 0; bottom: 0; left: 0; right: 0; z-index: 20; background: rgba(58,17,23,.97); border: 1px solid #7b2230; padding: 10px 16px; border-radius: 14px; display: none; align-items: center; cursor: pointer; line-height: 1.35; }
 </style>
 </head>
 <body>
@@ -83,16 +89,31 @@
   <div class="bar" id="bar">
     <button class="close" id="btnClose" title="Quit ScreenCraft"><svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13"/></svg></button>
     <div class="sep"></div>
-    <button class="tool" data-mode="display"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2.5"/><path d="M3 13h18"/></svg>Display</button>
-    <button class="tool" data-mode="window"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 9h18"/></svg>Window</button>
-    <button class="tool" data-mode="area"><svg viewBox="0 0 24 24"><path stroke-dasharray="3 3" d="M5 5h14v14H5z"/></svg>Area</button>
+    <div class="grp">
+      <div class="cap">Capture</div>
+      <div class="segment">
+        <button class="tool" data-mode="display"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2.5"/><path d="M3 13h18"/></svg>Display</button>
+        <button class="tool" data-mode="window"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 9h18"/></svg>Window</button>
+        <button class="tool" data-mode="area"><svg viewBox="0 0 24 24"><path stroke-dasharray="3 3" d="M5 5h14v14H5z"/></svg>Area</button>
+      </div>
+    </div>
     <div class="sep"></div>
-    <button class="opt off" id="optCamera"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3z"/></svg><canvas id="camPreview" width="80" height="80"></canvas><span class="t">No camera</span></button>
-    <button class="opt off" id="optMic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span class="t">No microphone</span><i class="meter" id="micMeter"><b></b></i></button>
-    <button class="opt off" id="optSys"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 010 6"/></svg><span class="t">No system audio</span><i class="meter" id="sysMeter"><b></b></i></button>
+    <div class="grp">
+      <div class="cap">Inputs</div>
+      <div class="row">
+        <button class="opt off" id="optCamera"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3z"/></svg><canvas id="camPreview" width="80" height="80"></canvas><span class="t">No camera</span></button>
+        <button class="opt off" id="optMic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span class="t">No microphone</span><i class="meter" id="micMeter"><b></b></i></button>
+        <button class="opt off" id="optSys"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 010 6"/></svg><span class="t">No system audio</span><i class="meter" id="sysMeter"><b></b></i></button>
+      </div>
+    </div>
     <div class="sep"></div>
-    <button class="opt" id="optQuality" title="Resolution & frame rate"><svg viewBox="0 0 24 24"><path d="M4 18V9M10 18V5M16 18v-7M22 18H2"/></svg><span id="qualLabel">2560 · 30 fps</span><svg class="chev2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
-    <button class="opt" id="optFolder" title="Open projects"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
+    <div class="grp">
+      <div class="cap">Output</div>
+      <div class="row">
+        <button class="opt" id="optQuality" title="Resolution & frame rate"><svg viewBox="0 0 24 24"><path d="M4 18V9M10 18V5M16 18v-7M22 18H2"/></svg><span id="qualLabel">2560 · 30 fps</span><svg class="chev2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+        <button class="opt" id="optFolder" title="Open projects"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
+      </div>
+    </div>
     <button class="rec" id="btnRec"><span class="dot"></span><span id="recLabel">Record</span></button>
     <div class="hudbox">
       <div id="hudLeft" style="display:flex;align-items:center;gap:10px"><canvas id="hudCam" width="72" height="72"></canvas><div class="pulse"></div><div class="time" id="timer">0:00</div><i class="meter hud" id="hudMic" title="Microphone"><b></b></i><i class="meter hud sys" id="hudSys" title="System audio"><b></b></i></div>

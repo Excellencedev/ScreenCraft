@@ -9,10 +9,16 @@ function restore(json) {
   P().scene = o.scene;
 }
 
-let saveTimer = null;
+/** Edits are kept in memory until saved (⌘S); the title shows * while unsaved. */
 export function scheduleSave() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => invoke("save_project", { dir, project: P() }).catch(console.error), 600);
+  S.dirty = true;
+  hooks.updateTitle?.();
+}
+
+export async function saveNow() {
+  await invoke("save_project", { dir, project: P() });
+  S.dirty = false;
+  hooks.updateTitle?.();
 }
 
 export function updateUndo() {
