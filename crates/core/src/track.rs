@@ -158,8 +158,9 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
         }
 
         // --- camera focus: caret while typing, otherwise the cursor ---
-        let (tx, ty) = if input.typing_at(t_src, 1500.0) {
-            input.caret_at(t_src).unwrap_or((mx, my))
+        // (look ahead too, so the lead-in of a typing zoom already heads for the caret)
+        let (tx, ty) = if input.typing_at(t_src, 1500.0) || input.typing_ahead(t_src, 900.0) {
+            input.caret_near(t_src).unwrap_or((mx, my))
         } else {
             (mx, my)
         };
@@ -284,14 +285,15 @@ mod tests {
     fn typing_moves_focus_to_caret() {
         use crate::input::{CaretEvent, KeyEvent};
         let (p, mut log) = project();
-        // cursor parked top-right, text caret at the left side of the screen
-        log.keys.push(KeyEvent { t: 2000.0, key: "0".into(), down: true });
-        log.carets.push(CaretEvent { t: 2050.0, x: 100.0, y: 250.0, w: 2.0, h: 20.0 });
+        // cursor parked top-right, text caret on the left side of the screen
+        log.keys.push(KeyEvent { t: 3000.0, key: "0".into(), down: true });
+        log.carets.push(CaretEvent { t: 3050.0, x: 100.0, y: 250.0, w: 2.0, h: 20.0 });
         let tr = compute_track(&p, &log, 60.0);
         let f = |ms: f64| (ms * 60.0 / 1000.0) as usize;
-        // before typing the camera is on the cursor (x = 0.8); while typing it moves toward the caret (x ≈ 0.1)
+        // well before typing the camera sits on the cursor (x = 0.8)...
         assert!(tr.cx[f(1900.0)] > 0.6);
-        assert!(tr.cx[f(3000.0)] < tr.cx[f(1900.0)], "camera should pan toward the caret");
+        // ...and while typing it has moved toward the caret (x ≈ 0.1)
+        assert!(tr.cx[f(3800.0)] < tr.cx[f(1900.0)] - 0.2, "camera should pan toward the caret");
     }
 
     #[test]
@@ -334,5 +336,17 @@ mod tests {
         for i in 1..tr.count {
             assert!((tr.cx[i] - tr.cx[i - 1]).abs() < 0.03, "camera snapped at frame {i}");
         }
+    }
+
+    #[test]
+    fn camera_heads_for_the_caret_before_typing_starts() {
+        use crate::input::{CaretEvent, KeyEvent};
+        let (p, mut log) = project();
+        log.keys.push(KeyEvent { t: 2500.0, key: "0".into(), down: true });
+        log.carets.push(CaretEvent { t: 2550.0, x: 100.0, y: 250.0, w: 2.0, h: 20.0 });
+        let tr = compute_track(&p, &log, 60.0);
+        let f = |ms: f64| (ms * 60.0 / 1000.0) as usize;
+        // 800 ms before the first key the camera has already started moving left
+        assert!(tr.cx[f(2450.0)] < tr.cx[f(1500.0)] - 0.01);
     }
 }

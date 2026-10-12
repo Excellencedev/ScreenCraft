@@ -140,6 +140,23 @@ impl InputLog {
         i > 0 && t - self.keys[i - 1].t <= window_ms
     }
 
+    /// True when a key will be pressed within `window_ms` after `t`.
+    pub fn typing_ahead(&self, t: f64, window_ms: f64) -> bool {
+        let i = self.keys.partition_point(|k| k.t <= t);
+        i < self.keys.len() && self.keys[i].t - t <= window_ms
+    }
+
+    /// Caret position to look at around `t`: the latest sample before `t`, or —
+    /// when typing is about to start — the first sample just after it.
+    pub fn caret_near(&self, t: f64) -> Option<(f64, f64)> {
+        if let Some(c) = self.caret_at(t) {
+            return Some(c);
+        }
+        let i = self.carets.partition_point(|c| c.t <= t);
+        let c = self.carets.get(i)?;
+        (c.t - t <= 2500.0).then(|| self.normalize(c.x + c.w * 0.5, c.y + c.h * 0.5))
+    }
+
     /// Normalised caret centre most recently sampled before `t` (within 2.5 s).
     pub fn caret_at(&self, t: f64) -> Option<(f64, f64)> {
         let i = self.carets.partition_point(|c| c.t <= t);

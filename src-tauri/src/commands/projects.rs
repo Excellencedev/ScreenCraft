@@ -56,7 +56,7 @@ pub fn compute_render_track(state: State<AppState>, dir: String, project: Projec
 #[tauri::command]
 pub fn auto_zoom(state: State<AppState>, dir: String, project: Project, zoom: f64) -> CmdResult<Vec<ZoomRegion>> {
     let log = read_input(&state, Path::new(&dir), &project.media.input);
-    let opts = AutoZoomOptions { zoom, ..Default::default() };
+    let opts = AutoZoomOptions::for_ease(zoom, project.config.animations.ease_in_ms);
     Ok(generate(&log, project.media.duration_ms, &opts))
 }
 
