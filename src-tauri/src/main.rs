@@ -88,6 +88,7 @@ fn main() {
             windows::open_area_picker,
             windows::show_area_frame,
             windows::hide_area_frame,
+            windows::quit_app,
         ])
         .setup(move |app| {
             let _ = app.global_shortcut().register(toggle);

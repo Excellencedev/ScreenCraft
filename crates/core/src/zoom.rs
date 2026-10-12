@@ -31,9 +31,9 @@ impl Default for AutoZoomOptions {
     fn default() -> Self {
         Self {
             zoom: 2.0,
-            click_lead_ms: 450.0,
+            click_lead_ms: 650.0,
             click_hold_ms: 2500.0,
-            type_lead_ms: 600.0,
+            type_lead_ms: 800.0,
             type_tail_ms: 700.0,
             type_gap_ms: 1200.0,
             merge_gap_ms: 400.0,

@@ -143,7 +143,10 @@ $("optQuality").onclick = () => toggleMenu(captureMenu);
 $("optFolder").onclick = () => toggleMenu(folderMenu);
 $("btnRec").onclick = beginRecording;
 $("btnStop").onclick = finishRecording;
-$("btnClose").onclick = () => { invoke("hide_area_frame"); win.hide(); };
+$("btnClose").onclick = async () => {
+  if (state.phase === "recording" || state.phase === "countdown") return;
+  await invoke("quit_app");
+};
 
 await listen("area-selected", async (e) => {
   state.area = e.payload;

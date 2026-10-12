@@ -89,6 +89,10 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
     let mut press = Spring::new(1.0);
     let mut alpha = Spring::new(1.0);
     let mut rotation = Spring::new(0.0);
+    // zoom level is eased in log space (constant perceived speed) and then low-passed
+    // so its velocity never jumps at the start or end of a region
+    let mut zoom_s = 1.0f64;
+    let mut zoom_v = 0.0f64;
     let mut last_move_t = 0.0;
     let mut last_raw = (0.0, 0.0);
     let press_cfg = crate::spring::SpringConfig { stiffness: 500.0, damping: 30.0, mass: 1.0, clamp: true, precision: 0.001 };
@@ -131,7 +135,8 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
         );
 
         // --- zoom level: eased envelope over every active region ---
-        let mut zoom = 1.0f64;
+        let mut ln_zoom = 0.0f64;
+        let mut any_instant = false;
         let mut manual_w = 0.0f64;
         let mut manual_pt = (crop_cx, crop_cy);
         for z in p.scene.zooms.iter().filter(|z| !z.is_disabled) {
@@ -147,15 +152,25 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
                 let b = ease((z.source_end_ms - t_src) / eout);
                 a.min(b)
             };
-            let level = 1.0 + (z.zoom.max(1.0) - 1.0) * env;
-            if level > zoom {
-                zoom = level;
+            let level = z.zoom.max(1.0).ln() * env;
+            if level > ln_zoom {
+                ln_zoom = level;
             }
+            any_instant |= z.instant;
             if z.kind == ZoomKind::Manual && env > manual_w {
                 manual_w = env;
                 manual_pt = (z.manual_target_point.x, z.manual_target_point.y);
             }
         }
+
+        let zoom_target = ln_zoom.exp();
+        if !initialised || any_instant {
+            zoom_s = zoom_target;
+            zoom_v = 0.0;
+        } else {
+            zoom_s = smooth_damp(zoom_s, zoom_target, &mut zoom_v, 0.14, dt);
+        }
+        let zoom = zoom_s.max(1.0);
 
         // --- camera focus: caret while typing, otherwise the cursor ---
         // (look ahead too, so the lead-in of a typing zoom already heads for the caret)
@@ -312,13 +327,17 @@ mod tests {
         p.config.animations.ease_in_ms = 400.0;
         let tr = compute_track(&p, &log, 60.0);
         let f = |ms: f64| (ms * 60.0 / 1000.0).round() as usize;
-        // region starts at 1000 ms: halfway through the ease the zoom is about halfway
-        assert!((tr.zoom[f(1000.0)] - 1.0).abs() < 1e-6);
-        assert!((tr.zoom[f(1200.0)] - 1.5).abs() < 0.08, "got {}", tr.zoom[f(1200.0)]);
-        assert!((tr.zoom[f(1400.0)] - 2.0).abs() < 0.01);
-        // never jumps by more than a small step between frames
+        // region starts at 1000 ms: starts from rest, passes through the middle, and settles
+        assert!((tr.zoom[f(1000.0)] - 1.0).abs() < 1e-3);
+        let mid = tr.zoom[f(1250.0)];
+        assert!(mid > 1.1 && mid < 1.9, "mid-ease zoom {mid}");
+        assert!((tr.zoom[f(1900.0)] - 2.0).abs() < 0.02);
+        // monotonic on the way in, no sudden jumps anywhere
+        for i in f(1000.0)..f(1700.0) {
+            assert!(tr.zoom[i + 1] >= tr.zoom[i] - 1e-6, "zoom must not go backwards while easing in");
+        }
         for i in 1..tr.count {
-            assert!((tr.zoom[i] - tr.zoom[i - 1]).abs() < 0.12);
+            assert!((tr.zoom[i] - tr.zoom[i - 1]).abs() < 0.08);
         }
     }
 

@@ -355,8 +355,8 @@ impl Default for Animations {
             motion_blur: 1.0,
             default_zoom: 2.0,
             follow: "center".into(),
-            ease_in_ms: 300.0,
-            ease_out_ms: 300.0,
+            ease_in_ms: 500.0,
+            ease_out_ms: 500.0,
             follow_smooth_ms: 450.0,
             cursor_smooth_ms: 120.0,
         }

@@ -244,3 +244,10 @@ pub fn hide_area_frame(app: AppHandle) {
         }
     }
 }
+
+/// The X on the recorder ribbon quits the whole app.
+#[tauri::command]
+pub fn quit_app(app: AppHandle) {
+    hide_area_frame(app.clone());
+    app.exit(0);
+}
