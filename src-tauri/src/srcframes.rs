@@ -53,6 +53,8 @@ struct Session {
     /// The most recent decoded sample with pts <= the last request, and the one after it.
     cur: Option<(f64, Retained<CMSampleBuffer>)>,
     next: Option<(f64, Retained<CMSampleBuffer>)>,
+    /// Frames just passed, so requests that arrive slightly out of order are still served.
+    recent: std::collections::VecDeque<(f64, Retained<CMSampleBuffer>)>,
     eof: bool,
 }
 
@@ -88,7 +90,7 @@ impl Session {
             let asset = AVURLAsset::URLAssetWithURL_options(&url, None);
             let duration = asset.duration().seconds();
             let (reader, output) = open_at(&asset, start_s, duration)?;
-            Some(Session { asset, reader, output, duration, cur: None, next: None, eof: false })
+            Some(Session { asset, reader, output, duration, cur: None, next: None, recent: Default::default(), eof: false })
         }
     }
 
@@ -99,6 +101,7 @@ impl Session {
                 self.output = o;
                 self.cur = None;
                 self.next = None;
+                self.recent.clear();
                 self.eof = false;
                 true
             }
@@ -120,6 +123,12 @@ impl Session {
 
     /// The decoded frame shown at `t` seconds (the latest one with pts <= t).
     fn frame_at(&mut self, t: f64) -> Option<&Retained<CMSampleBuffer>> {
+        // slightly out of order: serve it from the frames we just passed
+        if self.cur.as_ref().map(|c| t + 1e-4 < c.0).unwrap_or(false) {
+            if let Some(i) = self.recent.iter().rposition(|(p, _)| *p <= t + 1e-4) {
+                return Some(&self.recent[i].1);
+            }
+        }
         // a request before what we already passed, or far ahead: restart there
         let behind = self.cur.as_ref().map(|c| t + 1e-4 < c.0).unwrap_or(false);
         let far = self.cur.as_ref().map(|c| t - c.0 > 4.0).unwrap_or(false);
@@ -135,6 +144,12 @@ impl Session {
         loop {
             match &self.next {
                 Some((pts, _)) if *pts <= t + 1e-4 => {
+                    if let Some(prev) = self.cur.take() {
+                        self.recent.push_back(prev);
+                        if self.recent.len() > 8 {
+                            self.recent.pop_front();
+                        }
+                    }
                     self.cur = self.next.take();
                     self.next = self.pull();
                     if self.next.is_none() {
@@ -154,7 +169,8 @@ impl Session {
     }
 }
 
-fn to_jpeg(sample: &CMSampleBuffer, quality: u8) -> Option<Vec<u8>> {
+/// Copy the sample's pixels out (fast memcpy) so encoding can happen on another thread.
+fn pack(sample: &CMSampleBuffer) -> Option<(Vec<u8>, usize, usize)> {
     unsafe {
         let img = sample.image_buffer()?;
         CVPixelBufferLockBaseAddress(&img, CVPixelBufferLockFlags::ReadOnly);
@@ -168,21 +184,26 @@ fn to_jpeg(sample: &CMSampleBuffer, quality: u8) -> Option<Vec<u8>> {
                 let s = std::slice::from_raw_parts(base.add(row * stride), w * 4);
                 packed[row * w * 4..(row + 1) * w * 4].copy_from_slice(s);
             }
-            let mut buf = Vec::with_capacity(w * h / 6);
-            let mut enc = jpeg_encoder::Encoder::new(&mut buf, quality);
-            enc.set_sampling_factor(jpeg_encoder::SamplingFactor::F_2_2);
-            if enc.encode(&packed, w as u16, h as u16, jpeg_encoder::ColorType::Bgra).is_ok() {
-                out = Some(buf);
-            }
+            out = Some((packed, w, h));
         }
         CVPixelBufferUnlockBaseAddress(&img, CVPixelBufferLockFlags::ReadOnly);
         out
     }
 }
 
+fn jpeg(packed: Vec<u8>, w: usize, h: usize, quality: u8) -> Option<Vec<u8>> {
+    crate::jpegio::encode_bgra(packed, w, h, quality)
+}
+
+/// At most this many frames are JPEG-encoding at once (decode keeps running meanwhile).
+const ENCODERS: usize = 4;
+static INFLIGHT: (std::sync::Mutex<usize>, std::sync::Condvar) = (std::sync::Mutex::new(0), std::sync::Condvar::new());
+
 fn worker(rx: std::sync::mpsc::Receiver<Request>) {
     let mut sessions: HashMap<String, Session> = HashMap::new();
+    let (mut n, mut t_dec, mut t_pack) = (0u32, 0f64, 0f64);
     while let Ok(req) = rx.recv() {
+        let t0 = std::time::Instant::now();
         let file = match req.kind.as_str() {
             "screen" => "screen",
             "camera" => "camera",
@@ -199,9 +220,42 @@ fn worker(rx: std::sync::mpsc::Receiver<Request>) {
             }
             let sess = sessions.get_mut(&key)?;
             let frame = sess.frame_at(req.t_ms / 1000.0)?;
-            to_jpeg(frame, req.quality)
+            t_dec += t0.elapsed().as_secs_f64();
+            let tp = std::time::Instant::now();
+            let r = pack(frame);
+            t_pack += tp.elapsed().as_secs_f64();
+            r
         })();
-        (req.reply)(result);
+        n += 1;
+        if n % 100 == 0 {
+            eprintln!("[srcframes] {} frames: decode {:.1} ms, pack {:.1} ms (avg)", n, t_dec * 10.0, t_pack * 10.0);
+            t_dec = 0.0;
+            t_pack = 0.0;
+        }
+        match result {
+            Some((px, w, h)) => {
+                // encode on a helper thread so the next frame can be decoded right away
+                {
+                    let mut n = INFLIGHT.0.lock().unwrap();
+                    while *n >= ENCODERS {
+                        n = INFLIGHT.1.wait(n).unwrap();
+                    }
+                    *n += 1;
+                }
+                let q = req.quality;
+                let reply = req.reply;
+                std::thread::spawn(move || {
+                    let out = jpeg(px, w, h, q);
+                    {
+                        let mut n = INFLIGHT.0.lock().unwrap();
+                        *n -= 1;
+                        INFLIGHT.1.notify_one();
+                    }
+                    reply(out);
+                });
+            }
+            None => (req.reply)(None),
+        }
     }
 }
 

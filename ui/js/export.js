@@ -6,12 +6,43 @@ import { outputSize, paintFrame, camAt, lerpCam } from "./render.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** A full-resolution source frame decoded natively (see src-tauri/src/srcframes.rs). */
-async function srcFrame(dir, kind, tMs, quality = 90) {
+// A small worker pool fetches + decodes full-resolution source frames (see srcframes.rs).
+let pool = null;
+let nextWorker = 0;
+let nextId = 1;
+const waiting = new Map();
+function getPool() {
+  if (pool) return pool;
+  pool = [];
+  for (let i = 0; i < 3; i++) {
+    const w = new Worker("js/exportWorker.js");
+    w.onmessage = (e) => {
+      const { id, bmp, error } = e.data;
+      const p = waiting.get(id);
+      waiting.delete(id);
+      if (!p) return;
+      if (error) p.reject(new Error(error));
+      else p.resolve(bmp);
+    };
+    pool.push(w);
+  }
+  return pool;
+}
+function endPool() {
+  pool?.forEach((w) => w.terminate());
+  pool = null;
+  waiting.clear();
+}
+
+/** A full-resolution source frame decoded natively and bitmap-decoded in a worker. */
+function srcFrame(dir, kind, tMs, quality = 90) {
   const url = `sc://localhost/src/${kind}?t=${Math.max(0, tMs).toFixed(3)}&d=${encodeURIComponent(dir)}&q=${quality}`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error("could not read a source frame");
-  return createImageBitmap(await r.blob());
+  const id = nextId++;
+  const w = getPool()[nextWorker++ % 3];
+  return new Promise((resolve, reject) => {
+    waiting.set(id, { resolve, reject });
+    w.postMessage({ id, url });
+  });
 }
 
 async function writeFile(path, bytes, onProgress) {
@@ -152,6 +183,7 @@ export function qualityBitrate(W, H, fps, quality, hevc) {
 export async function exportMp4({ project, dir, path, resolution, fps, motionBlur, codec = "avc", quality = 55, onProgress, shouldCancel }) {
   if (typeof VideoEncoder === "undefined") throw new Error("WebCodecs is not available in this web view.");
   const { W, H } = outputSize(project, resolution);
+  endPool();
   onProgress(0, "Computing camera path…");
   const track = await invoke("compute_render_track", { dir, project, fps });
   const hasCam = !!project.media.camera;
@@ -198,7 +230,16 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     screen: await srcFrame(dir, "screen", track.tSrc[ti], 92),
     camera: hasCam ? await srcFrame(dir, "camera", track.tSrc[ti] + project.media.cameraOffsetMs, 88).catch(() => null) : null,
   });
-  let pendingPair = null;
+  // keep a few source frames in flight: native decode and JPEG encode run ahead of painting
+  const AHEAD = 3;
+  const queue = [];
+  const topUp = (i) => {
+    for (let k = queue.length; k < AHEAD; k++) {
+      const next = (queue.length ? queue[queue.length - 1].i : i - 1) + 1;
+      if (next >= total) break;
+      queue.push({ i: next, p: fetchPair(srcRatio(next)) });
+    }
+  };
   const srcRatio = (i) => Math.max(0, Math.min(total - 1, i));
   for (let i = 0; i < total; i++) {
     if (shouldCancel?.()) { venc.close(); throw new Error("cancelled"); }
@@ -208,10 +249,12 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     src.screen?.close?.();
     src.camera?.close?.();
     // frame i+1 is requested as soon as frame i arrives, so native decode/encode overlaps painting
-    const got = await (pendingPair || fetchPair(t));
+    if (!queue.length) topUp(i);
+    const head = queue.shift();
+    const got = await head.p;
+    topUp(i + 1);
     src.screen = got.screen;
     src.camera = got.camera;
-    pendingPair = i + 1 < total ? fetchPair(srcRatio(i + 1)) : null;
     const cam = camAt(track, i);
     const prev = camAt(track, srcRatio(i - 1)), next = camAt(track, srcRatio(i + 1));
     const motion = Math.abs(next.zoom - prev.zoom) * 4 + Math.abs(next.cx - prev.cx) * 12 + Math.abs(next.cy - prev.cy) * 12;
@@ -232,7 +275,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     const frame = new VideoFrame(canvas, { timestamp: Math.round((i * 1e6) / fps), duration: Math.round(1e6 / fps) });
     venc.encode(frame, { keyFrame: i % (fps * 2) === 0 });
     frame.close();
-    while (venc.encodeQueueSize > 6) await sleep(2);
+    while (venc.encodeQueueSize > 12) await sleep(1);
     if (i % 4 === 0) onProgress(0.05 + 0.85 * (i / total), `Rendering frame ${i + 1} of ${total}`);
   }
   await venc.flush();
@@ -266,6 +309,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
   muxer.finalize();
   onProgress(0.95, "Writing file…");
   await writeFile(path, new Uint8Array(target.buffer), (f) => onProgress(0.95 + 0.05 * f, "Writing file…"));
+  endPool();
   onProgress(1, "Done");
 }
 
@@ -273,6 +317,7 @@ export async function exportGif({ project, dir, path, resolution, onProgress, sh
   const fps = 15;
   const res = Math.min(resolution, 540);
   const { W, H } = outputSize(project, res);
+  endPool();
   onProgress(0, "Computing camera path…");
   const track = await invoke("compute_render_track", { dir, project, fps });
   const hasCam = !!project.media.camera;
@@ -306,5 +351,6 @@ export async function exportGif({ project, dir, path, resolution, onProgress, sh
   gif.finish();
   onProgress(0.95, "Writing file…");
   await writeFile(path, gif.bytes());
+  endPool();
   onProgress(1, "Done");
 }

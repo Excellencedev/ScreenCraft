@@ -5,6 +5,7 @@ mod capture;
 mod commands;
 mod compress;
 mod inputlog;
+mod jpegio;
 mod levelmic;
 mod proxy;
 mod srcframes;
