@@ -149,6 +149,22 @@ impl CaretFinder {
                 }
             }
         }
+        // 1b) web content (Chromium / WebKit) exposes the caret as a text-marker range
+        if let Some(mr) = attr(el, "AXSelectedTextMarkerRange") {
+            let key = CFString::new("AXBoundsForTextMarkerRange");
+            let mut out: CFTypeRef = std::ptr::null();
+            let err = AXUIElementCopyParameterizedAttributeValue(el, key.as_concrete_TypeRef(), mr, &mut out);
+            CFRelease(mr);
+            if err == 0 && !out.is_null() {
+                let r = value::<Rect>(out, AX_RECT);
+                CFRelease(out);
+                if let Some(b) = r {
+                    if b.h > 0.0 && b.x.is_finite() && (b.x != 0.0 || b.y != 0.0) {
+                        return Some((b.x, b.y, b.w.min(3.0), b.h));
+                    }
+                }
+            }
+        }
         // 2) fall back to the focused element's frame when it is reasonably small
         let pos = attr(el, "AXPosition").and_then(|v| {
             let r = value::<Pt>(v, AX_POINT);

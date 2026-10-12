@@ -25,10 +25,11 @@ pub fn read_input(state: &AppState, dir: &Path, rel: &str) -> InputLog {
     if let Some(l) = state.inputs.lock().unwrap().get(&key) {
         return l.clone();
     }
-    let log: InputLog = fs::read(dir.join(rel))
+    let mut log: InputLog = fs::read(dir.join(rel))
         .ok()
         .and_then(|b| serde_json::from_slice(&b).ok())
         .unwrap_or_default();
+    log.refine_carets();
     state.inputs.lock().unwrap().insert(key, log.clone());
     log
 }

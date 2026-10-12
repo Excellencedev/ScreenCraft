@@ -186,6 +186,50 @@ impl InputLog {
         Some(self.normalize(c.x + c.w * 0.5, c.y + c.h * 0.5))
     }
 
+    /// Some apps only expose the whole text field, not the caret inside it. For those
+    /// samples (a wide, unchanged rectangle) estimate where the caret really is by
+    /// advancing from the field's left edge one character width per key typed.
+    pub fn refine_carets(&mut self) {
+        const BACKSPACE: &str = "51";
+        const ADVANCE_KEYS_SKIP: [&str; 9] = ["36", "76", "48", "53", "123", "124", "125", "126", "117"];
+        let mut i = 0;
+        while i < self.carets.len() {
+            let c = self.carets[i];
+            if c.w <= 40.0 || c.h > 80.0 {
+                i += 1;
+                continue;
+            }
+            // run of samples sharing this rectangle
+            let mut j = i;
+            while j < self.carets.len() && {
+                let d = self.carets[j];
+                d.x == c.x && d.y == c.y && d.w == c.w && d.h == c.h
+            } {
+                j += 1;
+            }
+            let ch = c.h.clamp(10.0, 24.0);
+            let char_w = (ch * 0.38).max(6.0);
+            let origin = c.t - 1500.0;
+            let mut k = self.keys.partition_point(|key| key.t < origin);
+            let mut chars: f64 = 0.0;
+            for n in i..j {
+                let t = self.carets[n].t;
+                while k < self.keys.len() && self.keys[k].t <= t {
+                    let key = &self.keys[k];
+                    if key.key == BACKSPACE {
+                        chars = (chars - 1.0).max(0.0);
+                    } else if !ADVANCE_KEYS_SKIP.contains(&key.key.as_str()) {
+                        chars += 1.0;
+                    }
+                    k += 1;
+                }
+                let x = (c.x + 6.0 + chars * char_w).min(c.x + c.w - 4.0);
+                self.carets[n] = CaretEvent { t, x, y: c.y, w: 2.0, h: c.h };
+            }
+            i = j;
+        }
+    }
+
     pub fn button_down_at(&self, t: f64) -> bool {
         let mut down = false;
         for c in &self.clicks {
@@ -216,5 +260,28 @@ mod tests {
         };
         let (x, y, _) = log.cursor_at(50.0).unwrap();
         assert!((x - 0.5).abs() < 1e-9 && (y - 0.25).abs() < 1e-9);
+    }
+}
+
+#[cfg(test)]
+mod refine_tests {
+    use super::*;
+
+    #[test]
+    fn wide_field_caret_is_estimated_from_typed_characters() {
+        let mut log = InputLog::default();
+        log.bounds = Rect { x: 0.0, y: 0.0, width: 1000.0, height: 1000.0 };
+        for n in 0..20 {
+            log.keys.push(KeyEvent { t: 1000.0 + n as f64 * 100.0, key: "0".into(), down: true });
+        }
+        for n in 0..10 {
+            log.carets.push(CaretEvent { t: 1050.0 + n as f64 * 200.0, x: 100.0, y: 500.0, w: 700.0, h: 20.0 });
+        }
+        log.refine_carets();
+        let first = log.carets[0].x;
+        let last = log.carets[9].x;
+        assert!(first < 120.0, "first {first}");
+        assert!(last > first + 80.0 && last < 800.0, "last {last}");
+        assert!(log.carets.iter().all(|c| c.w < 5.0));
     }
 }

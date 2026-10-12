@@ -217,7 +217,7 @@ impl Default for CameraConfig {
             hide: false,
             mirror: true,
             aspect_ratio: 1.0,
-            size_ratio: 0.22,
+            size_ratio: 0.30,
             position: Point { x: 1.0, y: 1.0 },
             padding_ratio: 0.5,
             corner_radius_ratio: 0.25,
