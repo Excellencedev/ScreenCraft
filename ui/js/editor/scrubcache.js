@@ -4,7 +4,7 @@
 // because WebKit refuses to autoplay a hidden video without a user gesture.)
 import { S, P } from "./state.js";
 
-const MAX_SLOTS = 240;
+const MAX_SLOTS = 160;
 const SCREEN_W = 480;
 const CAM_W = 240;
 
@@ -51,28 +51,46 @@ function seekTo(v, t) {
   });
 }
 
-async function fill(url, offsetMs, store, width, onFill) {
-  const v = await openVideo(url);
-  if (!v || !v.videoWidth) return v?.remove();
-  const h = Math.round((width * v.videoHeight) / v.videoWidth);
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Walk the slots coarse-to-fine, decoding the screen and then the camera for each one.
+ * Strictly one decoder at a time with a short breather in between, so the page (and
+ * the machine) stays responsive while this runs.
+ */
+async function fillAll(urls, camOffsetMs, onScreen, onCam) {
+  const [vs, vc] = await Promise.all([openVideo(urls.screen), urls.camera ? openVideo(urls.camera) : null]);
+  if (!vs || !vs.videoWidth) return;
+  const hs = Math.round((SCREEN_W * vs.videoHeight) / vs.videoWidth);
+  const hc = vc && vc.videoWidth ? Math.round((CAM_W * vc.videoHeight) / vc.videoWidth) : 0;
   const done = new Set();
   for (const stride of [8, 4, 2, 1]) {
     for (let i = 0; i < cache.slots; i += stride) {
       if (done.has(i)) continue;
       done.add(i);
-      // stay out of the way of playback and scrubbing
-      while (S.playing || S.scrubbing) await new Promise((r) => setTimeout(r, 150));
-      await seekTo(v, Math.max(0.05, i * cache.step + offsetMs) / 1000);
+      while (S.playing || S.scrubbing) await pause(150);
+      await seekTo(vs, Math.max(0.05, i * cache.step) / 1000);
       const c = document.createElement("canvas");
-      c.width = width;
-      c.height = h;
-      c.getContext("2d").drawImage(v, 0, 0, width, h);
-      store[i] = c;
-      onFill?.();
-      await idle();
+      c.width = SCREEN_W;
+      c.height = hs;
+      c.getContext("2d").drawImage(vs, 0, 0, SCREEN_W, hs);
+      cache.screen[i] = c;
+      onScreen();
+      await pause(8);
+      if (vc && hc) {
+        await seekTo(vc, Math.max(0.05, i * cache.step + camOffsetMs) / 1000);
+        const k = document.createElement("canvas");
+        k.width = CAM_W;
+        k.height = hc;
+        k.getContext("2d").drawImage(vc, 0, 0, CAM_W, hc);
+        cache.camera[i] = k;
+        onCam();
+      }
+      await pause(22);
     }
   }
-  v.remove();
+  vs.remove();
+  vc?.remove();
 }
 
 /**
@@ -89,7 +107,6 @@ export function buildScrubCache(urls, onProgress) {
     const b = urls.camera ? cache.camFilled / need : 1;
     onProgress?.(Math.min(1, a, b));
   };
-  fill(urls.screen, 0, cache.screen, SCREEN_W, () => { cache.filled++; report(); }).catch(console.error);
-  if (urls.camera) fill(urls.camera, P().media.cameraOffsetMs || 0, cache.camera, CAM_W, () => { cache.camFilled++; report(); }).catch(console.error);
+  fillAll(urls, P().media.cameraOffsetMs || 0, () => { cache.filled++; report(); }, () => { cache.camFilled++; report(); }).catch(console.error);
   report();
 }

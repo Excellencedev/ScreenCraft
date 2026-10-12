@@ -16,7 +16,7 @@ import { openExport, bindExport } from "./exportDialog.js";
 import { contentRect, camAt } from "../render.js";
 import { buildScrubCache } from "./scrubcache.js";
 import { loadMusicElements, migrateMusic } from "./music.js";
-import { autoGain, bakeMic } from "../audiolevel.js";
+import { autoGainAsync, bakeMic } from "../audiolevel.js";
 
 hooks.updateTitle = () => {
   const t = $("title");
@@ -174,6 +174,7 @@ function bindUI() {
   });
 
   addEventListener("keydown", (e) => {
+    if (!$("prep").hidden) { e.preventDefault(); return; }
     if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
     const mod = e.metaKey || e.ctrlKey;
     if (e.code === "Space") { e.preventDefault(); S.playing ? pause() : play(); }
@@ -215,8 +216,8 @@ async function levelMic(url) {
     const ctx = new AudioContext();
     const buf = await ctx.decodeAudioData(bytes);
     ctx.close?.();
-    media.micLevel = autoGain(buf);
-    const baked = await bakeMic(buf);
+    media.micLevel = await autoGainAsync(buf);
+    const baked = await bakeMic(buf, media.micLevel);
     const a = new Audio(baked);
     a.preload = "auto";
     await new Promise((res) => { a.onloadeddata = res; a.onerror = res; });
@@ -252,7 +253,6 @@ async function boot() {
         a.onerror = () => res(null);
       });
     }
-    if (media.mic) levelMic(convertFileSrc(`${dir}/${P().media.mic}`));
     const v = media.screen;
     // trust the real file over the recorded numbers
     if (v.videoWidth) {
@@ -279,7 +279,16 @@ async function boot() {
     // Pre-render frames into memory behind a spinner so the first scrub is already smooth.
     const prep = $("prep");
     prep.hidden = false;
-    const done = () => { prep.hidden = true; };
+    $("app").inert = true; // nothing is clickable while frames are prepared
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      prep.hidden = true;
+      $("app").inert = false;
+      // the heavier audio work waits until the editor is usable
+      if (media.mic) setTimeout(() => levelMic(convertFileSrc(`${dir}/${P().media.mic}`)), 400);
+    };
     buildScrubCache({
       screen: media.screen.src,
       camera: media.camera ? media.camera.src : null,
