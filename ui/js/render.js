@@ -103,9 +103,10 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
   ctx.fillStyle = "#000";
   ctx.fillRect(r.x, r.y, r.w, r.h);
   const v = src.screen;
-  if (v && v.videoWidth) {
+  const vW = v && (v.videoWidth || v.width), vH = v && (v.videoHeight || v.height);
+  if (v && vW) {
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(v, vx * v.videoWidth, vy * v.videoHeight, vwN * v.videoWidth, vhN * v.videoHeight, r.x, r.y, r.w, r.h);
+    ctx.drawImage(v, vx * vW, vy * vH, vwN * vW, vhN * vH, r.x, r.y, r.w, r.h);
   }
 
   // click effects + cursor live inside the clipped screen
@@ -156,7 +157,8 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
   // camera bubble
   const cc = p.config.camera;
   const cv = src.camera;
-  if (cv && cv.videoWidth && !cc.hide) {
+  const cW = cv && (cv.videoWidth || cv.width), cH = cv && (cv.videoHeight || cv.height);
+  if (cv && cW && !cc.hide) {
     const base = cc.sizeRatio * Math.min(W, H) * camScale(p, cam.zoom);
     const a = cc.aspectRatio || 1;
     const cw = a >= 1 ? base * a : base;
@@ -178,10 +180,10 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
     ctx.save();
     rr(ctx, x, y, cw, ch, cr);
     ctx.clip();
-    const va = cv.videoWidth / cv.videoHeight;
-    let sw = cv.videoWidth, sh = cv.videoHeight;
+    const va = cW / cH;
+    let sw = cW, sh = cH;
     if (va > a) sw = sh * a; else sh = sw / a;
-    const sx = (cv.videoWidth - sw) / 2, sy = (cv.videoHeight - sh) / 2;
+    const sx = (cW - sw) / 2, sy = (cH - sh) / 2;
     if (cc.mirror) {
       ctx.translate(x + cw, y);
       ctx.scale(-1, 1);

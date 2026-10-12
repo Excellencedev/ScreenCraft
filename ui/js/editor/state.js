@@ -10,6 +10,7 @@ export const S = {
   tOut: 0,
   playing: false,
   scrubbing: false,
+  proxy: null, // in-memory scrub frames while dragging the playhead
   selected: null, // {type:'zoom'|'slice', id}
   tab: "background",
   previewRes: 720,

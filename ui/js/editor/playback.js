@@ -3,6 +3,7 @@ import { invoke } from "../tauri.js";
 import { $, S, P, dir, TRACK_FPS, media, clamp, fmt, hooks } from "./state.js";
 import { outDuration, outToSrc, sliceOutStart } from "./timemap.js";
 import { draw } from "./draw.js";
+import { lookup } from "./scrubcache.js";
 
 // ---- transport UI (throttled)
 let lastTransport = 0;
@@ -86,11 +87,24 @@ function pump() {
 }
 
 /** Move the playhead. While dragging pass fast=true for keyframe-only seeks. */
+let proxyRaf = 0;
+let settleTimer = 0;
 export function requestSeek(t, fast = false) {
   S.tOut = clamp(t, 0, outDuration());
   const m = outToSrc(S.tOut);
   S.curSlice = m.idx;
   updateTransport(false);
+  clearTimeout(settleTimer);
+  const hit = fast && !S.playing ? lookup(m.src) : null;
+  if (hit) {
+    // paint straight from the in-memory proxy; settle on the exact frame once the pointer rests
+    S.proxy = hit;
+    pending = null;
+    if (!proxyRaf) proxyRaf = requestAnimationFrame(() => { proxyRaf = 0; draw(); });
+    settleTimer = setTimeout(() => requestSeek(S.tOut, false), 140);
+    return;
+  }
+  S.proxy = null;
   pending = { src: m.src, fast };
   if (!seeking) pump();
 }
@@ -118,6 +132,7 @@ function setPlayIcon(playing) {
 
 export function play() {
   if (S.playing || !S.track) return;
+  S.proxy = null;
   if (S.tOut >= outDuration() - 30) seekOut(0);
   const m = outToSrc(S.tOut);
   S.curSlice = m.idx;

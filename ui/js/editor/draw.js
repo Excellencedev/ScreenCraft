@@ -42,8 +42,8 @@ export function draw() {
   if (!S.track || !P()) return;
   const { W, H } = sizeCanvas();
   const cam = camAt(S.track, frameIndex());
-  drawSrc.screen = media.screen;
-  drawSrc.camera = media.camera;
+  drawSrc.screen = S.proxy ? S.proxy.screen : media.screen;
+  drawSrc.camera = S.proxy ? S.proxy.camera || media.camera : media.camera;
   drawSrc.bgImage = media.bgImage;
   const t0 = performance.now();
   paintFrame(ctx, W, H, P(), cam, S.tOut, S.track.clicks, drawSrc);

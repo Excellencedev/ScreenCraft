@@ -14,6 +14,7 @@ import { showMenu } from "./menus.js";
 import { rawMenu } from "./rawfiles.js";
 import { openExport, bindExport } from "./exportDialog.js";
 import { contentRect, camAt } from "../render.js";
+import { buildScrubCache } from "./scrubcache.js";
 
 hooks.draw = draw;
 hooks.renderTimeline = renderTimeline;
@@ -186,6 +187,10 @@ async function boot() {
     syncControls();
     updateUndo();
     await computeTrack();
+    buildScrubCache({
+      screen: media.screen.src,
+      camera: media.camera ? media.camera.src : null,
+    });
     $("loading").hidden = true;
     requestSeek(0);
   } catch (e) {
