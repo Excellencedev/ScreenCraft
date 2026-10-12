@@ -38,7 +38,7 @@
   .opt.live > svg { display: none; }
   #hudCam.on { display: block; width: 34px; height: 34px; border-radius: 9px; }
   #optQuality { max-width: 138px; }
-  #optFolder { padding: 0 9px; }
+  #optFolder { padding: 0 10px; max-width: none; }
   .menu { max-height: 500px; }
   .opt .meter { position: absolute; left: 8px; right: 8px; bottom: 3px; height: 2px; border-radius: 1px; background: rgba(255,255,255,.1); overflow: hidden; display: none; }
   .opt.on .meter { display: block; }
@@ -111,7 +111,7 @@
       <div class="cap">Output</div>
       <div class="row">
         <button class="opt" id="optQuality" title="Resolution & frame rate"><svg viewBox="0 0 24 24"><path d="M4 18V9M10 18V5M16 18v-7M22 18H2"/></svg><span id="qualLabel">2560 · 30 fps</span><svg class="chev2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
-        <button class="opt" id="optFolder" title="Open projects"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
+        <button class="opt" id="optFolder" title="Open projects"><span class="lbl">Projects</span><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
       </div>
     </div>
     <button class="rec" id="btnRec"><span class="dot"></span><span id="recLabel">Record</span></button>

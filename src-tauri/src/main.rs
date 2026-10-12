@@ -80,6 +80,7 @@ fn main() {
             commands::projects::load_project,
             commands::projects::save_project,
             windows::cancel_quit,
+            windows::close_area_picker,
             commands::projects::rename_project,
             commands::projects::compute_render_track,
             commands::projects::auto_zoom,

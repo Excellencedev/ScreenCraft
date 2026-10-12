@@ -1,6 +1,6 @@
 import { P } from "../state.js";
 import { change } from "../history.js";
-import { h3, el, slider, toggle, segmented } from "../widgets.js";
+import { h3, el, slider, toggle, segmented, colorField } from "../widgets.js";
 
 export function panelCamera(p) {
   const c = P().config.camera;
@@ -25,4 +25,5 @@ export function panelCamera(p) {
   p.append(pos);
   p.append(toggle("Shadow", null, () => c.shadow, (v) => (c.shadow = v)));
   p.append(toggle("Border", null, () => c.border, (v) => (c.border = v)));
+  if (c.border) p.append(colorField("Border color", () => c.borderColor || "#ffffff", (v) => (c.borderColor = v)));
 }

@@ -20,11 +20,7 @@ function render() {
   set("optSys", state.sys, state.sys ? "System audio" : "No system audio");
   const res = RESOLUTIONS.find((r) => r.value === state.resolution) || RESOLUTIONS[0];
   $("qualLabel").textContent = `${res.short} · ${state.fps} fps`;
-  $("recLabel").textContent = {
-    display: "Record display",
-    window: state.windowTitle ? "Record window" : "Choose window",
-    area: state.area ? "Record area" : "Select area",
-  }[state.mode];
+  $("recLabel").textContent = "Record";
   syncPreview();
   syncMeters();
 }
@@ -44,7 +40,11 @@ async function refreshSources() {
 async function chooseMode(mode) {
   if (isMenuOpen()) await closeMenu();
   state.mode = mode;
-  if (mode !== "area") invoke("hide_area_frame");
+  if (mode !== "area") {
+    invoke("hide_area_frame");
+    invoke("close_area_picker"); // abandon a half-finished "draw the area"
+    if (state.mode === "area" && !state.area) state.mode = mode;
+  }
   savePrefs();
   render();
   await refreshSources();
@@ -86,11 +86,11 @@ async function toggleMenu(fn) {
 
 async function folderMenu() {
   const [projects, settings] = await Promise.all([invoke("recent_projects"), invoke("get_settings")]);
-  const items = [{ header: "Recent recordings" }];
+  const items = [{ header: "Recent Projects" }];
   for (const p of projects.slice(0, 8)) {
     items.push({ label: p.name, sub: new Date(p.modified * 1000).toLocaleString(), onPick: () => invoke("open_editor", { dir: p.dir }) });
   }
-  if (items.length === 1) items.push({ label: "No recordings yet", onPick() {} });
+  if (items.length === 1) items.push({ label: "No projects yet", onPick() {} });
   items.push(
     { header: "Raw recordings folder" },
     { label: "Open recordings folder", sub: settings.projectsDir, onPick: () => invoke("reveal_in_finder", { path: settings.projectsDir }) },
@@ -154,6 +154,12 @@ await listen("area-selected", async (e) => {
   savePrefs();
   render();
   try { await invoke("show_area_frame", { rect: e.payload, displayId: state.displayId }); } catch (err) { showError(String(err)); }
+});
+// the area picker closed without a selection: fall back to capturing the display
+await listen("area-cancelled", async () => {
+  if (state.mode !== "area") return;
+  if (!state.area) await chooseMode("display");
+  else invoke("show_area_frame", { rect: state.area, displayId: state.displayId }).catch(() => {});
 });
 await listen("toggle-record", () => (state.phase === "recording" ? finishRecording() : beginRecording()));
 await listen("stop-record", () => finishRecording());

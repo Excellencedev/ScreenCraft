@@ -52,7 +52,7 @@ export function panelAppearance(p) {
   }
   if (bg.kind !== "color") p.append(slider("Background blur", 0, 40, 1, () => bg.blur, (v) => (bg.blur = v), {}));
   p.append(slider("Padding", 0, 0.3, 0.005, () => st.paddingRatio, (v) => (st.paddingRatio = v), { fmt: (v) => Math.round(v * 100) + "%" }));
-  p.append(slider("Screen rounded corners", 0, 60, 1, () => st.cornerRadius, (v) => (st.cornerRadius = v)));
+  p.append(slider("Screen Corners", 0, 60, 1, () => st.cornerRadius, (v) => (st.cornerRadius = v)));
   p.append(slider("Shadow", 0, 1, 0.01, () => st.shadow.intensity, (v) => (st.shadow.intensity = v), { fmt: (v) => Math.round(v * 100) + "%" }));
   p.append(segmented("Shadow style", [[false, "Classic"], [true, "Directional"]], () => st.shadow.directional, (v) => (st.shadow.directional = v), { track: false }));
   p.append(slider("Shadow distance", 0, 80, 1, () => st.shadow.distance, (v) => (st.shadow.distance = v)));

@@ -241,6 +241,8 @@ pub struct CameraConfig {
     pub zoomed_scale: f64,
     pub shadow: bool,
     pub border: bool,
+    /// Border colour (hex) used when `border` is on.
+    pub border_color: String,
 }
 
 impl Default for CameraConfig {
@@ -256,6 +258,7 @@ impl Default for CameraConfig {
             zoomed_scale: 0.7,
             shadow: true,
             border: false,
+            border_color: "#ffffff".into(),
         }
     }
 }

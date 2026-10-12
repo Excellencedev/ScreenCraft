@@ -3,7 +3,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 #app { display: grid; grid-template-rows: 48px minmax(0, 1fr) 262px; height: 100vh; }
 
 /* ---- top bar: project on the left, actions on the right */
-#top { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 78px; -webkit-app-region: drag; border-bottom: 1px solid var(--line); background: var(--panel); }
+#top { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 8px; -webkit-app-region: drag; border-bottom: 1px solid var(--line); background: var(--panel); }
 #top button, #top select, #top .title { -webkit-app-region: no-drag; }
 .traffic-space { width: 0; }
 .top-left { display: flex; align-items: center; }

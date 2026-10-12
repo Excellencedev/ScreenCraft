@@ -22,7 +22,14 @@ addEventListener("mouseup", async () => {
   start = null;
   if (rect && rect.w > 40 && rect.h > 40) {
     await emit("area-selected", { x: ox + rect.x, y: oy + rect.y, width: rect.w, height: rect.h });
+  } else {
+    await emit("area-cancelled", {});
   }
   currentWindow().close();
 });
-addEventListener("keydown", (e) => { if (e.key === "Escape") currentWindow().close(); });
+addEventListener("keydown", async (e) => {
+  if (e.key === "Escape") {
+    await emit("area-cancelled", {});
+    currentWindow().close();
+  }
+});

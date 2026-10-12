@@ -87,7 +87,8 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
     let (mut fvx, mut fvy) = (0.0, 0.0);
     let mut initialised = false;
     let mut press = Spring::new(1.0);
-    let mut alpha = Spring::new(1.0);
+    // cursor opacity fades linearly over half a second (hide / typing / idle)
+    let mut alpha = 1.0f64;
     let mut rotation = Spring::new(0.0);
     // zoom level is eased in log space (constant perceived speed) and then low-passed
     // so its velocity never jumps at the start or end of a region
@@ -96,7 +97,6 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
     let mut last_move_t = 0.0;
     let mut last_raw = (0.0, 0.0);
     let press_cfg = crate::spring::SpringConfig { stiffness: 500.0, damping: 30.0, mass: 1.0, clamp: true, precision: 0.001 };
-    let fade_cfg = crate::spring::SpringConfig { stiffness: 300.0, damping: 34.0, mass: 1.0, clamp: true, precision: 0.001 };
     let rot_cfg = crate::spring::SpringConfig { stiffness: 200.0, damping: 20.0, mass: 1.0, clamp: false, precision: 0.001 };
     let edge = anim.follow == "edge";
 
@@ -110,7 +110,6 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
         // mouse will be then: the eased cursor then lands on the real position.
         let lead = if slice.disable_smooth_mouse { 0.0 } else { anim.cursor_smooth_ms };
         let (rx, ry, kind) = input.cursor_at(t_src + lead).unwrap_or((0.5, 0.5, CursorKind::Arrow));
-        let (rx, ry) = loop_position(p, input, t_src, (rx, ry));
         if !initialised || slice.disable_smooth_mouse {
             mx = rx;
             my = ry;
@@ -129,13 +128,12 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
         let down = input.button_down_at(t_src);
         press.step(if down { 0.78 } else { 1.0 }, dt, &press_cfg);
         let hide_idle = p.config.cursor.hide_not_moving_after_ms.map(|ms| t_out - last_move_t > ms).unwrap_or(false);
-        let want_alpha = if p.config.cursor.hide || slice.hide_cursor || hide_idle { 0.0 } else { 1.0 };
-        alpha.step(want_alpha, dt, &fade_cfg);
-        rotation.step(
-            if p.config.cursor.rotate_with_velocity { mvx.clamp(-3.0, 3.0) * 0.35 } else { 0.0 },
-            dt,
-            &rot_cfg,
-        );
+        // the cursor steps out of the way while typing and returns when typing stops
+        let typing_now = input.typing_at(t_src, 400.0);
+        let want_alpha = if p.config.cursor.hide || slice.hide_cursor || hide_idle || typing_now { 0.0 } else { 1.0 };
+        let step = dt / 0.5;
+        alpha = if want_alpha > alpha { (alpha + step).min(want_alpha) } else { (alpha - step).max(want_alpha) };
+        rotation.step(0.0, dt, &rot_cfg);
 
         // --- zoom level: eased envelope over every active region ---
         let mut ln_zoom = 0.0f64;
@@ -224,7 +222,7 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
         tr.my.push(r4(my));
         tr.cursor_kind.push(kind.index() as u8);
         tr.cursor_scale.push(r4(press.x));
-        tr.cursor_alpha.push(r4(alpha.x));
+        tr.cursor_alpha.push(r4(alpha));
         tr.cursor_rotation.push(r4(rotation.x));
     }
 
@@ -238,6 +236,7 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
     tr
 }
 
+#[allow(dead_code)]
 /// Optional "loop cursor position": near the end the cursor eases back to
 /// where it started so the video loops cleanly.
 fn loop_position(p: &Project, input: &InputLog, t_src: f64, raw: (f64, f64)) -> (f64, f64) {
@@ -413,5 +412,21 @@ mod tests {
             let real = (100.0 + ms / 50.0 * 6.0) / 1000.0;
             assert!((tr.mx[i] - real).abs() < 0.01, "cursor {:.3} vs real {real:.3} at {ms}", tr.mx[i]);
         }
+    }
+
+    #[test]
+    fn cursor_fades_out_while_typing_and_back_in_over_half_a_second() {
+        use crate::input::KeyEvent;
+        let (p, mut log) = project();
+        for i in 0..20 {
+            log.keys.push(KeyEvent { t: 1000.0 + i as f64 * 100.0, key: "0".into(), down: true });
+        }
+        let tr = compute_track(&p, &log, 60.0);
+        let f = |ms: f64| (ms * 60.0 / 1000.0).round() as usize;
+        assert!(tr.cursor_alpha[f(500.0)] > 0.99);
+        assert!(tr.cursor_alpha[f(2000.0)] < 0.01, "hidden while typing");
+        // last key at 2900, hold 400 ms, then 0.5 s ramp back to full
+        assert!(tr.cursor_alpha[f(3600.0)] > 0.2 && tr.cursor_alpha[f(3600.0)] < 0.8);
+        assert!(tr.cursor_alpha[f(4200.0)] > 0.99);
     }
 }

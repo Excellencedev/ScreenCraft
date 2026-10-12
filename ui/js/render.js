@@ -29,6 +29,33 @@ export function contentRect(p, W, H) {
   return { x: (W - w) / 2, y: (H - h) / 2, w, h };
 }
 
+/** Approximate gaussian blur: shrink in halves, then grow back with smoothing. */
+function blurInto(dst, srcCanvas, radius, W, H) {
+  const levels = Math.max(1, Math.min(6, Math.round(Math.log2(Math.max(2, radius * 0.9)))));
+  let cur = srcCanvas;
+  const sizes = [[W, H]];
+  for (let i = 1; i <= levels; i++) sizes.push([Math.max(2, Math.round(W / 2 ** i)), Math.max(2, Math.round(H / 2 ** i))]);
+  for (let i = 1; i <= levels; i++) {
+    const c = document.createElement("canvas");
+    c.width = sizes[i][0];
+    c.height = sizes[i][1];
+    const g = c.getContext("2d");
+    g.imageSmoothingQuality = "high";
+    g.drawImage(cur, 0, 0, c.width, c.height);
+    cur = c;
+  }
+  for (let i = levels - 1; i >= 0; i--) {
+    const c = document.createElement("canvas");
+    c.width = sizes[i][0];
+    c.height = sizes[i][1];
+    const g = c.getContext("2d");
+    g.imageSmoothingQuality = "high";
+    g.drawImage(cur, 0, 0, c.width, c.height);
+    cur = c;
+  }
+  dst.drawImage(cur, 0, 0, W, H);
+}
+
 function rr(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2));
@@ -56,10 +83,16 @@ function staticLayer(p, W, H, src) {
   c.height = H;
   const ctx = c.getContext("2d");
   const s = H / 1080;
-  ctx.save();
-  if (bg.blur > 0 && "filter" in ctx) ctx.filter = `blur(${bg.blur * s}px)`;
-  drawBackground(ctx, W, H, bg, src.bgImage);
-  ctx.restore();
+  if (bg.blur > 0) {
+    // WebKit canvases ignore ctx.filter, so blur by repeated down/up-sampling
+    const tmp = document.createElement("canvas");
+    tmp.width = W;
+    tmp.height = H;
+    drawBackground(tmp.getContext("2d"), W, H, bg, src.bgImage);
+    blurInto(ctx, tmp, bg.blur * s, W, H);
+  } else {
+    drawBackground(ctx, W, H, bg, src.bgImage);
+  }
   if (st.shadow.intensity > 0) {
     const r = contentRect(p, W, H);
     ctx.save();
@@ -145,7 +178,7 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
   }
 
   if (!cfg.hide && cam.calpha > 0.01) {
-    const kind = cfg.alwaysUsePointer ? 0 : cam.kind;
+    const kind = cam.kind;
     drawCursor(ctx, kind, toX(cam.mx), toY(cam.my), cfg.size * ptsToPx, cfg.style, {
       alpha: cam.calpha,
       scale: cam.cscale,
@@ -195,7 +228,7 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
     if (cc.border) {
       ctx.save();
       ctx.lineWidth = 3 * s;
-      ctx.strokeStyle = "rgba(255,255,255,.85)";
+      ctx.strokeStyle = cc.borderColor || "#ffffff";
       rr(ctx, x, y, cw, ch, cr);
       ctx.stroke();
       ctx.restore();

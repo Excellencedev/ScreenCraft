@@ -129,6 +129,14 @@ pub fn open_editor(app: AppHandle, dir: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Close the area picker without a selection (the user chose another capture mode).
+#[tauri::command]
+pub fn close_area_picker(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("area") {
+        let _ = w.close();
+    }
+}
+
 #[tauri::command]
 pub fn open_area_picker(app: AppHandle, display_id: Option<u32>) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("area") {

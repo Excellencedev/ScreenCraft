@@ -23,10 +23,7 @@ export function panelCursor(p) {
     row.querySelector(".seg").appendChild(b);
   }
   p.append(row);
-  p.append(toggle("Always use pointer cursor", "Don't change cursor, even if selecting text, etc.", () => c.alwaysUsePointer, (v) => (c.alwaysUsePointer = v)));
   p.append(toggle("Hide cursor if not moving", null, () => c.hideNotMovingAfterMs != null, (v) => (c.hideNotMovingAfterMs = v ? 2000 : null), { track: true }));
-  p.append(toggle("Loop cursor position", "Near the end of the video, cursor will move back to its initial position.", () => c.loopPositionBeforeEndMs != null, (v) => (c.loopPositionBeforeEndMs = v ? 1200 : null), { track: true }));
-  p.append(toggle("Tilt with movement", "Rotate the cursor slightly in the direction it moves.", () => c.rotateWithVelocity, (v) => (c.rotateWithVelocity = v), { track: true }));
   p.append(toggle("Hide cursor", null, () => c.hide, (v) => (c.hide = v), { track: true }));
   p.append(segmented("Click effect", [["none", "None"], ["circle", "Circle"], ["ripple", "Ripple"]], () => c.clickEffect, (v) => (c.clickEffect = v), { track: false }));
   if (c.clickEffect !== "none") p.append(colorField("Effect color", () => c.clickEffectColor, (v) => (c.clickEffectColor = v)));
