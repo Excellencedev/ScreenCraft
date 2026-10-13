@@ -1,7 +1,7 @@
 import { masterGain, autoGain, makeLimiter, monoMix } from "./audiolevel.js";
 import { Muxer, ArrayBufferTarget } from "../vendor/mp4-muxer.mjs";
 import { GIFEncoder, quantize, applyPalette } from "../vendor/gifenc.esm.js";
-import { invoke, convertFileSrc } from "./tauri.js";
+import { invoke, convertFileSrc, SC_BASE } from "./tauri.js";
 import { outputSize, paintFrame, camAt, lerpCam, contentRect } from "./render.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -37,7 +37,7 @@ function endPool() {
 
 /** A full-resolution source frame decoded natively and bitmap-decoded in a worker. */
 function srcFrame(dir, kind, tMs, quality = 90, maxW = 0) {
-  const url = `sc://localhost/src/${kind}?t=${Math.max(0, tMs).toFixed(3)}&d=${encodeURIComponent(dir)}&q=${quality}${maxW ? `&w=${maxW}` : ""}`;
+  const url = `${SC_BASE}/src/${kind}?t=${Math.max(0, tMs).toFixed(3)}&d=${encodeURIComponent(dir)}&q=${quality}${maxW ? `&w=${maxW}` : ""}`;
   const id = nextId++;
   const w = getPool()[nextWorker++ % WORKERS];
   return new Promise((resolve, reject) => {

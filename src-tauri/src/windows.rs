@@ -1,11 +1,55 @@
 //! Window creation helpers and window-related commands.
 
 use crate::commands::permissions::all_required_granted;
-use screencapturekit::prelude::*;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+
+/// A display's frame in global logical coordinates (points on macOS).
+pub struct DisplayFrame {
+    pub id: u32,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub is_main: bool,
+}
+
+#[cfg(target_os = "macos")]
+pub fn display_frames(_app: &AppHandle) -> Result<Vec<DisplayFrame>, String> {
+    use screencapturekit::prelude::*;
+    let content = SCShareableContent::get().map_err(|e| e.to_string())?;
+    Ok(content
+        .displays()
+        .iter()
+        .map(|d| {
+            let f = d.frame();
+            DisplayFrame {
+                id: d.display_id(),
+                x: f.origin.x,
+                y: f.origin.y,
+                width: f.size.width,
+                height: f.size.height,
+                is_main: f.origin.x == 0.0 && f.origin.y == 0.0,
+            }
+        })
+        .collect())
+}
+
+/// Displays from the Win32 list (primary first, ids are list positions), in logical
+/// pixels; see `monitors.rs`.
+#[cfg(windows)]
+pub fn display_frames(_app: &AppHandle) -> Result<Vec<DisplayFrame>, String> {
+    Ok(crate::monitors::displays()
+        .iter()
+        .map(|d| {
+            let (x, y, width, height) = d.logical();
+            DisplayFrame { id: d.id, x, y, width, height, is_main: d.is_primary }
+        })
+        .collect())
+}
 
 /// Native window level / colour tweaks (AppKit) that Tauri doesn't expose.
 /// AppKit objects may only be touched from the main thread, so hop there first.
+#[cfg(target_os = "macos")]
 fn with_ns_window(win: &tauri::WebviewWindow, f: impl FnOnce(&objc2_app_kit::NSWindow) + Send + 'static) {
     let Ok(ptr) = win.ns_window() else { return };
     if ptr.is_null() {
@@ -19,6 +63,7 @@ fn with_ns_window(win: &tauri::WebviewWindow, f: impl FnOnce(&objc2_app_kit::NSW
 
 /// Resize the recorder bar in one native call, keeping its bottom-centre fixed
 /// (AppKit's origin is bottom-left, so the bottom edge simply stays put).
+#[cfg(target_os = "macos")]
 #[tauri::command]
 pub fn resize_bar(app: AppHandle, w: f64, h: f64) -> Result<(), String> {
     let win = app.get_webview_window("recorder").ok_or("no recorder window")?;
@@ -40,15 +85,48 @@ pub fn resize_bar(app: AppHandle, w: f64, h: f64) -> Result<(), String> {
     Ok(())
 }
 
-/// Keep the toolbar / HUD above the dimmed surround of an area recording.
-pub fn raise_above_frame(win: &tauri::WebviewWindow) {
-    with_ns_window(win, |w| w.setLevel(25));
+/// Resize the recorder bar, keeping its bottom-centre fixed.
+#[cfg(windows)]
+#[tauri::command]
+pub fn resize_bar(app: AppHandle, w: f64, h: f64) -> Result<(), String> {
+    let win = app.get_webview_window("recorder").ok_or("no recorder window")?;
+    let sf = win.scale_factor().map_err(|e| e.to_string())?;
+    let pos = win.outer_position().map_err(|e| e.to_string())?.to_logical::<f64>(sf);
+    let size = win.outer_size().map_err(|e| e.to_string())?.to_logical::<f64>(sf);
+    let (cx, bottom) = (pos.x + size.width / 2.0, pos.y + size.height);
+    win.set_size(tauri::LogicalSize::new(w, h)).map_err(|e| e.to_string())?;
+    win.set_position(tauri::LogicalPosition::new(cx - w / 2.0, bottom - h)).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
-fn main_display_size() -> (f64, f64) {
-    SCShareableContent::get()
+/// Keep our own windows (toolbar, menus, area outline) out of screen recordings.
+/// ScreenCaptureKit excludes them by filter; on Windows the window asks for it.
+#[cfg(windows)]
+fn exclude_from_capture(win: &tauri::WebviewWindow) {
+    use ::windows::Win32::UI::WindowsAndMessaging::{SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE};
+    if let Ok(hwnd) = win.hwnd() {
+        unsafe {
+            let _ = SetWindowDisplayAffinity(::windows::Win32::Foundation::HWND(hwnd.0), WDA_EXCLUDEFROMCAPTURE);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn exclude_from_capture(_win: &tauri::WebviewWindow) {}
+
+/// Keep the toolbar / HUD above the dimmed surround of an area recording.
+pub fn raise_above_frame(win: &tauri::WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    with_ns_window(win, |w| w.setLevel(25));
+    // Windows: both are topmost; re-asserting it puts the toolbar above the newer frame
+    #[cfg(windows)]
+    let _ = win.set_always_on_top(true);
+}
+
+fn main_display_size(app: &AppHandle) -> (f64, f64) {
+    display_frames(app)
         .ok()
-        .and_then(|c| c.displays().first().map(|d| (d.frame().size.width, d.frame().size.height)))
+        .and_then(|d| d.first().map(|d| (d.width, d.height)))
         .unwrap_or((1440.0, 900.0))
 }
 
@@ -58,9 +136,19 @@ pub fn show_recorder_window(app: &AppHandle) -> tauri::Result<()> {
         w.set_focus()?;
         return Ok(());
     }
-    let (sw, sh) = main_display_size();
+    let (sw, sh) = main_display_size(app);
     let (w, h) = (1100.0, 76.0);
-    WebviewWindowBuilder::new(app, "recorder", WebviewUrl::App("recorder.html".into()))
+    let builder = WebviewWindowBuilder::new(app, "recorder", WebviewUrl::App("recorder.html".into()));
+    // WebView2 would ask before the camera bubble / microphone; the page is our own
+    #[cfg(windows)]
+    let builder = builder.on_permission_request(|_, kind| {
+        use tauri::webview::{PermissionKind, PermissionResponse};
+        match kind {
+            PermissionKind::Camera | PermissionKind::Microphone => PermissionResponse::Allow,
+            _ => PermissionResponse::Default,
+        }
+    });
+    builder
         .title("ScreenCraft")
         .inner_size(w, h)
         .position((sw - w) / 2.0, sh - h - 90.0)
@@ -74,6 +162,7 @@ pub fn show_recorder_window(app: &AppHandle) -> tauri::Result<()> {
         .build()?;
     if let Some(w) = app.get_webview_window("recorder") {
         raise_above_frame(&w);
+        exclude_from_capture(&w);
     }
     Ok(())
 }
@@ -101,18 +190,25 @@ fn url_escape(s: &str) -> String {
     s.replace('%', "%25").replace(' ', "%20").replace('&', "%26").replace('#', "%23")
 }
 
+// Commands that create windows are async: creating a webview from a synchronous
+// command (which runs on the main thread) deadlocks on Windows / WebView2.
+
 #[tauri::command]
-pub fn show_recorder(app: AppHandle) -> Result<(), String> {
+pub async fn show_recorder(app: AppHandle) -> Result<(), String> {
     show_recorder_window(&app).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn show_permissions(app: AppHandle) -> Result<(), String> {
+pub async fn show_permissions(app: AppHandle) -> Result<(), String> {
     show_permissions_window(&app).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn show_compressor(app: AppHandle, input: Option<String>) -> Result<(), String> {
+pub async fn show_compressor(app: AppHandle, input: Option<String>) -> Result<(), String> {
+    show_compressor_window(&app, input)
+}
+
+pub fn show_compressor_window(app: &AppHandle, input: Option<String>) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("compress") {
         let _ = w.close();
     }
@@ -120,7 +216,7 @@ pub fn show_compressor(app: AppHandle, input: Option<String>) -> Result<(), Stri
         Some(p) => format!("compress.html?input={}", url_escape(&p)),
         None => "compress.html".into(),
     };
-    WebviewWindowBuilder::new(&app, "compress", WebviewUrl::App(url.into()))
+    WebviewWindowBuilder::new(app, "compress", WebviewUrl::App(url.into()))
         .title("Compress video")
         .inner_size(780.0, 700.0)
         .min_inner_size(660.0, 600.0)
@@ -132,7 +228,7 @@ pub fn show_compressor(app: AppHandle, input: Option<String>) -> Result<(), Stri
 }
 
 #[tauri::command]
-pub fn open_editor(app: AppHandle, dir: String) -> Result<(), String> {
+pub async fn open_editor(app: AppHandle, dir: String) -> Result<(), String> {
     let label = format!("editor-{}", dir.bytes().fold(5381u64, |h, b| h.wrapping_mul(33) ^ b as u64));
     if let Some(w) = app.get_webview_window(&label) {
         w.set_focus().map_err(|e| e.to_string())?;
@@ -168,22 +264,20 @@ pub fn close_area_picker(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn open_area_picker(app: AppHandle, display_id: Option<u32>) -> Result<(), String> {
+pub async fn open_area_picker(app: AppHandle, display_id: Option<u32>) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("area") {
         let _ = w.close();
     }
-    let content = SCShareableContent::get().map_err(|e| e.to_string())?;
-    let displays = content.displays();
+    let displays = display_frames(&app)?;
     let d = match display_id {
-        Some(id) => displays.iter().find(|d| d.display_id() == id),
+        Some(id) => displays.iter().find(|d| d.id == id),
         None => displays.first(),
     }
     .ok_or("display not found")?;
-    let f = d.frame();
-    WebviewWindowBuilder::new(&app, "area", WebviewUrl::App(format!("area.html?x={}&y={}", f.origin.x, f.origin.y).into()))
+    WebviewWindowBuilder::new(&app, "area", WebviewUrl::App(format!("area.html?x={}&y={}", d.x, d.y).into()))
         .title("Select area")
-        .position(f.origin.x, f.origin.y)
-        .inner_size(f.size.width, f.size.height)
+        .position(d.x, d.y)
+        .inner_size(d.width, d.height)
         .decorations(false)
         .transparent(true)
         .shadow(false)
@@ -233,24 +327,21 @@ pub struct FrameRect {
 /// surround and one transparent window draws the outline. They are our own
 /// windows, so ScreenCaptureKit excludes them from the recording.
 #[tauri::command]
-pub fn show_area_frame(app: AppHandle, rect: FrameRect, display_id: Option<u32>) -> Result<(), String> {
+pub async fn show_area_frame(app: AppHandle, rect: FrameRect, display_id: Option<u32>) -> Result<(), String> {
     hide_area_frame(app.clone());
 
-    let content = SCShareableContent::get().map_err(|e| e.to_string())?;
-    let displays = content.displays();
+    let displays = display_frames(&app)?;
     let d = displays
         .iter()
-        .find(|d| Some(d.display_id()) == display_id)
+        .find(|d| Some(d.id) == display_id)
         .or_else(|| {
-            displays.iter().find(|d| {
-                let f = d.frame();
-                rect.x >= f.origin.x && rect.x < f.origin.x + f.size.width && rect.y >= f.origin.y && rect.y < f.origin.y + f.size.height
-            })
+            displays
+                .iter()
+                .find(|d| rect.x >= d.x && rect.x < d.x + d.width && rect.y >= d.y && rect.y < d.y + d.height)
         })
         .or_else(|| displays.first())
         .ok_or("display not found")?;
-    let f = d.frame();
-    let (dx, dy, dw, dh) = (f.origin.x, f.origin.y, f.size.width, f.size.height);
+    let (dx, dy, dw, dh) = (d.x, d.y, d.width, d.height);
     let (ax, ay, aw, ah) = (rect.x, rect.y, rect.width, rect.height);
 
     // One transparent, click-through window covering the display. The page draws
@@ -273,6 +364,7 @@ pub fn show_area_frame(app: AppHandle, rect: FrameRect, display_id: Option<u32>)
         .build()
         .map_err(|e| e.to_string())?;
     let _ = win.set_ignore_cursor_events(true);
+    exclude_from_capture(&win);
 
     // keep the toolbar above the dimmed surround
     if let Some(r) = app.get_webview_window("recorder") {
@@ -355,7 +447,9 @@ fn ensure_menu_window(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
         .accept_first_mouse(true)
         .visible_on_all_workspaces(true)
         .build()?;
+    #[cfg(target_os = "macos")]
     with_ns_window(&w, |n| n.setLevel(26));
+    exclude_from_capture(&w);
     Ok(w)
 }
 
@@ -366,7 +460,7 @@ pub fn prewarm_menu_window(app: &AppHandle) {
 /// Stash the items + anchor and tell the menu page to render; the page then calls
 /// `menu_show` with its measured size.
 #[tauri::command]
-pub fn open_menu_window(app: AppHandle, items: serde_json::Value, left: f64) -> Result<(), String> {
+pub async fn open_menu_window(app: AppHandle, items: serde_json::Value, left: f64) -> Result<(), String> {
     use tauri::Emitter;
     let rec = app.get_webview_window("recorder").ok_or("no recorder window")?;
     let scale = rec.scale_factor().map_err(|e| e.to_string())?;
@@ -385,7 +479,7 @@ pub fn menu_take_items() -> Option<serde_json::Value> {
 
 /// Size, place (bottom edge just above the bar) and reveal the menu in one go.
 #[tauri::command]
-pub fn menu_show(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
+pub async fn menu_show(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
     let Some((_, x, bottom)) = MENU_STATE.lock().unwrap().clone() else { return Ok(()) };
     let w = ensure_menu_window(&app).map_err(|e| e.to_string())?;
     w.set_size(tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;

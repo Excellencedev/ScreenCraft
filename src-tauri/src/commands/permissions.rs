@@ -1,6 +1,11 @@
+//! macOS asks for Screen Recording, Accessibility and Input Monitoring up front. Windows
+//! has no such gates for desktop apps (camera and microphone are handled by the web
+//! view), so everything reports as granted there.
+
 use serde::Serialize;
 use tauri::AppHandle;
 
+#[cfg(target_os = "macos")]
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
     fn CGPreflightScreenCaptureAccess() -> bool;
@@ -9,6 +14,7 @@ extern "C" {
     fn CGRequestListenEventAccess() -> bool;
 }
 
+#[cfg(target_os = "macos")]
 fn av_status(media: &str) -> String {
     use objc2_av_foundation::{AVAuthorizationStatus, AVCaptureDevice};
     use objc2_foundation::NSString;
@@ -22,17 +28,25 @@ fn av_status(media: &str) -> String {
     .into()
 }
 
+#[cfg(target_os = "macos")]
 pub fn screen_granted() -> bool {
     unsafe { CGPreflightScreenCaptureAccess() }
 }
 
+#[cfg(target_os = "macos")]
 pub fn input_monitoring_granted() -> bool {
     unsafe { CGPreflightListenEventAccess() }
 }
 
 /// Everything required before the recorder is usable.
+#[cfg(target_os = "macos")]
 pub fn all_required_granted() -> bool {
     screen_granted() && crate::ax::trusted() && input_monitoring_granted()
+}
+
+#[cfg(windows)]
+pub fn all_required_granted() -> bool {
+    true
 }
 
 #[derive(Serialize)]
@@ -47,6 +61,7 @@ pub struct PermissionStatus {
     input_ready: bool,
 }
 
+#[cfg(target_os = "macos")]
 fn tap_ready() -> bool {
     use core_graphics::event::{CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType, CallbackResult};
     CGEventTap::new(
@@ -59,6 +74,7 @@ fn tap_ready() -> bool {
     .is_ok()
 }
 
+#[cfg(target_os = "macos")]
 #[tauri::command]
 pub fn permission_status() -> PermissionStatus {
     let screen = screen_granted();
@@ -74,18 +90,50 @@ pub fn permission_status() -> PermissionStatus {
     }
 }
 
+#[cfg(windows)]
+#[tauri::command]
+pub fn permission_status() -> PermissionStatus {
+    PermissionStatus {
+        screen: true,
+        camera: "granted".into(),
+        microphone: "granted".into(),
+        accessibility: true,
+        input_monitoring: true,
+        screen_ready: true,
+        input_ready: true,
+    }
+}
+
 /// Triggers the system prompt the first time; afterwards the user must flip the
 /// switch in System Settings.
 #[tauri::command]
 pub fn request_screen_access() -> bool {
-    unsafe { CGRequestScreenCaptureAccess() }
+    #[cfg(target_os = "macos")]
+    return unsafe { CGRequestScreenCaptureAccess() };
+    #[cfg(windows)]
+    return true;
 }
 
 #[tauri::command]
 pub fn request_input_monitoring() -> bool {
-    unsafe { CGRequestListenEventAccess() }
+    #[cfg(target_os = "macos")]
+    return unsafe { CGRequestListenEventAccess() };
+    #[cfg(windows)]
+    return true;
 }
 
+#[cfg(windows)]
+#[tauri::command]
+pub fn open_privacy_pane(kind: String) {
+    let page = match kind.as_str() {
+        "camera" => "privacy-webcam",
+        "microphone" => "privacy-microphone",
+        _ => "privacy",
+    };
+    let _ = std::process::Command::new("explorer").arg(format!("ms-settings:{page}")).spawn();
+}
+
+#[cfg(target_os = "macos")]
 #[tauri::command]
 pub fn open_privacy_pane(kind: String) {
     let pane = match kind.as_str() {

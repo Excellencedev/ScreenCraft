@@ -13,42 +13,9 @@ use objc2_av_foundation::{
 };
 use objc2_core_media::CMTime;
 use objc2_foundation::{NSDictionary, NSNumber, NSString, NSURL};
-use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
+use super::{target_bitrate, CompressOpts, Probe, CANCEL};
+use std::sync::atomic::Ordering;
 use std::time::Duration;
-
-pub static CANCEL: AtomicBool = AtomicBool::new(false);
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Probe {
-    pub width: u32,
-    pub height: u32,
-    pub fps: f64,
-    pub duration_s: f64,
-    pub video_kbps: f64,
-    pub has_audio: bool,
-    pub file_size: u64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CompressOpts {
-    pub input: String,
-    pub output: String,
-    /// "h264" | "hevc"
-    pub codec: String,
-    /// 0..=100, higher = better quality / bigger file.
-    pub quality: f64,
-    /// Downscale to this height (never upscales).
-    pub height: Option<u32>,
-    /// Limit the frame rate (never increases it).
-    pub fps: Option<f64>,
-    /// "keep" | "aac160" | "aac128" | "aac96" | "aac64" | "none"
-    pub audio: String,
-    #[serde(default)]
-    pub optimize_for_web: bool,
-}
 
 fn obj<T: objc2::Message>(r: Retained<T>) -> Retained<AnyObject> {
     unsafe { Retained::cast_unchecked(r) }
@@ -102,14 +69,6 @@ pub fn probe(path: &str) -> Result<Probe, String> {
 fn even(v: f64) -> i64 {
     let n = v.round().max(2.0) as i64;
     n - (n % 2)
-}
-
-/// Target video bitrate from the quality slider (bits per pixel per frame).
-pub fn target_bitrate(width: f64, height: f64, fps: f64, quality: f64, hevc: bool) -> f64 {
-    let q = (quality / 100.0).clamp(0.0, 1.0);
-    let bpp = 0.015 + q * q * 0.2;
-    let bpp = if hevc { bpp * 0.62 } else { bpp };
-    (width * height * fps * bpp).clamp(250_000.0, 100_000_000.0)
 }
 
 pub fn compress(opts: &CompressOpts, mut progress: impl FnMut(f64)) -> Result<(), String> {

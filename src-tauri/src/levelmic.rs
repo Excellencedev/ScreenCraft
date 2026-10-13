@@ -142,7 +142,11 @@ pub fn level(dir: &Path, rel: &str) -> Result<String, String> {
             return Ok(OUT_NAME.into());
         }
     }
-    let (mono, rate) = decode_mono(&src)?;
+    let decoded = decode_mono(&src);
+    // Chromium's (WebView2) MP4 audio has an AAC config symphonia rejects; MF reads it
+    #[cfg(windows)]
+    let decoded = decoded.or_else(|e| crate::mf::decode_audio_mono(&src.to_string_lossy()).map_err(|_| e));
+    let (mono, rate) = decoded?;
     let gain = auto_gain(&mono, rate);
     // x2: headroom so the 100% master position is louder than 50%; the editor scales it back
     let leveled: Vec<f32> = mono.iter().map(|&x| soft_limit(x * gain)).collect();

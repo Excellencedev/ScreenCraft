@@ -1,5 +1,4 @@
 use crate::state::CmdResult;
-use screencapturekit::prelude::*;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -32,8 +31,10 @@ pub struct Sources {
     windows: Vec<WindowInfo>,
 }
 
+#[cfg(target_os = "macos")]
 #[tauri::command]
 pub fn list_sources() -> CmdResult<Sources> {
+    use screencapturekit::prelude::*;
     let content = SCShareableContent::get().map_err(|e| format!("{e} (Screen Recording permission needed)"))?;
     let me = std::process::id() as i32;
     let displays = content
@@ -76,6 +77,38 @@ pub fn list_sources() -> CmdResult<Sources> {
                 width: f.size.width,
                 height: f.size.height,
             })
+        })
+        .collect();
+    Ok(Sources { displays, windows })
+}
+
+/// Displays and windows from `monitors.rs`, in logical pixels. Window ids are HWNDs.
+#[cfg(windows)]
+#[tauri::command]
+pub fn list_sources(app: tauri::AppHandle) -> CmdResult<Sources> {
+    let displays = crate::windows::display_frames(&app)?
+        .into_iter()
+        .enumerate()
+        .map(|(i, d)| DisplayInfo {
+            id: d.id,
+            name: if d.is_main { "Main Display".into() } else { format!("Display {}", i + 1) },
+            x: d.x,
+            y: d.y,
+            width: d.width,
+            height: d.height,
+            is_main: d.is_main,
+        })
+        .collect();
+    let windows = crate::monitors::windows()
+        .into_iter()
+        .filter_map(|w| {
+            let d = crate::monitors::display_of_window(w.hwnd)?;
+            let (x, y) = d.to_logical(w.phys.0 as f64, w.phys.1 as f64);
+            let (width, height) = (w.phys.2 as f64 / d.scale, w.phys.3 as f64 / d.scale);
+            if width < 120.0 || height < 80.0 {
+                return None;
+            }
+            Some(WindowInfo { id: w.hwnd.0 as usize as u32, title: w.title, app: w.app, x, y, width, height })
         })
         .collect();
     Ok(Sources { displays, windows })

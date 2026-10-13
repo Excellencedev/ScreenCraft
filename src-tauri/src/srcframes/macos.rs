@@ -7,6 +7,7 @@
 
 #![allow(deprecated)]
 
+use super::Request;
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2::AnyThread;
@@ -20,17 +21,6 @@ use objc2_foundation::{NSDictionary, NSNumber, NSString, NSURL};
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::OnceLock;
-
-pub struct Request {
-    pub dir: String,
-    pub kind: String,
-    pub t_ms: f64,
-    pub quality: u8,
-    /// Scale the frame down to this width first (0 = native). Export asks for no more
-    /// resolution than the output needs, which makes JPEG encode/decode much cheaper.
-    pub max_w: u32,
-    pub reply: Box<dyn FnOnce(Option<Vec<u8>>) + Send>,
-}
 
 static TX: OnceLock<Sender<Request>> = OnceLock::new();
 
