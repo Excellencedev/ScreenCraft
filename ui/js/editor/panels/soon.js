@@ -4,16 +4,10 @@ import { h3, el } from "../widgets.js";
 
 const GROUPS = [
   {
-    title: "Sound & captions",
-    items: [
-      ["Subtitles", "Type or import SRT captions with styles and burn them into the video."],
-    ],
-  },
-  {
     title: "Editing",
     items: [
-      ["Cross-dissolve", "Blend two clips into each other, with overlapping clips on the timeline."],
       ["Keyframes", "Animate the camera bubble and annotations over time."],
+      ["Colour adjustments", "Brightness, contrast, saturation and looks for the screen layer."],
     ],
   },
   {

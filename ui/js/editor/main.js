@@ -166,7 +166,7 @@ function bindSplitters() {
     if (tl != null) root.style.setProperty("--tl-h", clampV("tl", tl) + "px");
     if (side != null) root.style.setProperty("--side-w", clampV("side", side) + "px");
   };
-  apply(load("sc-tl-h", 318), load("sc-side-w", 340));
+  apply(load("sc-tl-h", 350), load("sc-side-w", 340));
   let raf = 0;
   const relayout = () => {
     cancelAnimationFrame(raf);
@@ -199,16 +199,16 @@ function bindSplitters() {
     });
     // double-click resets
     el.addEventListener("dblclick", () => {
-      if (axis === "y") apply(318, null);
+      if (axis === "y") apply(350, null);
       else apply(null, 340);
-      save("sc-tl-h", 318);
+      save("sc-tl-h", 350);
       save("sc-side-w", 340);
       relayout();
     });
   };
   drag($("splitV"), "y");
   drag($("splitH"), "x");
-  addEventListener("resize", () => apply(load("sc-tl-h", 318), load("sc-side-w", 340)));
+  addEventListener("resize", () => apply(load("sc-tl-h", 350), load("sc-side-w", 340)));
 }
 
 function bindUI() {

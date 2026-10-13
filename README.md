@@ -54,7 +54,7 @@ meters, resolution and frame rate, and the project list.
 - **Zoom:** automatic zoom regions generated from your clicks and typing, with
   adjustable ease in / ease out, plus manual zooms you can place anywhere. The camera
   keeps the cursor near the centre and, while you type, follows the text caret.
-- **Timeline:** video, zoom and music tracks. Split, trim, reorder, duplicate and
+- **Timeline:** video, zoom, camera, notes, captions and music tracks. Split, trim, reorder, duplicate and
   delete clips; change speed per clip; drag zoom regions and music clips freely. Zoom
   the timeline itself in and out (slider, **Fit**, or ⌘/Ctrl + scroll) to work on a long
   recording, and shift-click several zoom blocks to edit their settings together.
@@ -67,9 +67,12 @@ meters, resolution and frame rate, and the project list.
   them (recordings made with this version or newer).
 - **Camera layouts:** a Camera track changes how the camera is shown over time: large
   bubble, camera only, side by side (either side) or camera off, eased between.
+- **Captions:** type them or import an SRT; the default is TikTok-style (heavy white text with
+  a black outline in the middle of the bottom third), with red, highlight, classic and
+  minimal looks; export your captions back to SRT.
 - **Pace:** speed up idle stretches (found from clicks, typing, cursor motion and, if you
   like, when you talk), ease speed changes into smooth ramps, freeze a frame for a
-  moment, and add cut transitions (fade, flash, blur, slide, zoom).
+  moment, and add cut transitions (true cross-dissolve, fade, flash, blur, slide, zoom).
 - **Look:** wallpapers, gradients, solid colours or your own image (with blur),
   padding, corner radius, shadow, aspect ratio, crop.
 - **Cursor:** several styles, click effects, hide-when-idle, hides while you type.

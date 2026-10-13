@@ -135,6 +135,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::sources::list_sources,
             commands::pace::find_idle,
+            commands::files::read_text_file,
             commands::recording::start_recording,
             commands::recording::stop_recording,
             commands::recording::camera_begin,

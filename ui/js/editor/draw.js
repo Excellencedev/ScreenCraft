@@ -81,6 +81,21 @@ export function draw() {
     st.camera.want(i, dirn);
     drawSrc.camera = st.camera.peek(i);
   }
+  // cross-dissolve: the other clip's picture, only while one is being blended in
+  drawSrc.screen2 = null;
+  drawSrc.camera2 = null;
+  if (cam.otherAlpha > 0.003) {
+    if (st.screen) {
+      const j = st.screen.index(cam.otherT);
+      st.screen.want(j, dirn);
+      drawSrc.screen2 = st.screen.peek(j);
+    }
+    if (st.camera) {
+      const j = st.camera.index(cam.otherT + P().media.cameraOffsetMs);
+      st.camera.want(j, dirn);
+      drawSrc.camera2 = st.camera.peek(j);
+    }
+  }
   drawSrc.bgImage = media.bgImage;
   if (!drawSrc.screen) return;
   drawSrc.combos = S.track.combos || [];

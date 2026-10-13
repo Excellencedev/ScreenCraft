@@ -178,6 +178,64 @@ impl Default for Annotation {
     }
 }
 
+/// One caption line, shown over a stretch of the recording (source time).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Subtitle {
+    pub id: String,
+    pub source_start_ms: f64,
+    pub source_end_ms: f64,
+    pub text: String,
+}
+
+impl Default for Subtitle {
+    fn default() -> Self {
+        Self { id: String::new(), source_start_ms: 0.0, source_end_ms: 0.0, text: String::new() }
+    }
+}
+
+/// How captions look. `style` is a preset name (tiktok | tiktok-red | classic | minimal) that
+/// the UI expands into the explicit fields below when picked.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SubtitleStyle {
+    pub style: String,
+    /// Text size in px at 1080p.
+    pub size: f64,
+    pub color: String,
+    pub outline_color: String,
+    /// Outline width in px at 1080p (0 = none).
+    pub outline_width: f64,
+    /// Box behind the text; empty for none.
+    pub background: String,
+    pub uppercase: bool,
+    /// Vertical centre as a fraction of the frame height. 0.833 is the middle of the bottom third.
+    pub y: f64,
+    /// Text block width as a fraction of the frame width (one third by default).
+    pub width: f64,
+    /// Pop the caption in with a small scale bounce.
+    pub pop: bool,
+}
+
+impl Default for SubtitleStyle {
+    fn default() -> Self {
+        // TikTok's classic caption: heavy white text with a thick black outline, centred in the
+        // middle cell of the bottom row of a 3x3 grid.
+        Self {
+            style: "tiktok".into(),
+            size: 56.0,
+            color: "#ffffff".into(),
+            outline_color: "#000000".into(),
+            outline_width: 9.0,
+            background: String::new(),
+            uppercase: false,
+            y: 0.833,
+            width: 0.34,
+            pop: true,
+        }
+    }
+}
+
 /// What the camera looks like for a stretch of the recording.
 /// `layout`: bubble | hidden | large | camera | side-right | side-left.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -248,6 +306,7 @@ pub struct Scene {
     pub music_clips: Vec<MusicClip>,
     pub annotations: Vec<Annotation>,
     pub camera_layouts: Vec<CameraLayoutRegion>,
+    pub subtitles: Vec<Subtitle>,
 }
 
 /// A trimmed piece of an audio file in the project folder.
@@ -584,6 +643,7 @@ pub struct Config {
     pub animations: Animations,
     pub audio: AudioConfig,
     pub keystrokes: KeystrokeConfig,
+    pub subtitles: SubtitleStyle,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

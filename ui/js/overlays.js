@@ -233,13 +233,63 @@ export function drawKeys(ctx, W, H, cfg, combos, tOutMs, s) {
   ctx.restore();
 }
 
+/** Captions in the project's style (TikTok-like by default), centred in the bottom third. */
+export function drawSubtitles(ctx, W, H, p, tSrc, s) {
+  const list = p.scene.subtitles;
+  if (!list || !list.length) return;
+  const cap = list.find((c) => tSrc >= c.sourceStartMs && tSrc < c.sourceEndMs && (c.text || "").trim());
+  if (!cap) return;
+  const st = p.config.subtitles || {};
+  const fs = (st.size || 56) * s;
+  const text = st.uppercase ? cap.text.toUpperCase() : cap.text;
+  ctx.save();
+  ctx.font = `800 ${fs}px "Proxima Nova", -apple-system, "SF Pro Display", "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  ctx.miterLimit = 2;
+  const maxW = Math.max(fs * 4, W * (st.width || 0.34));
+  const lines = wrapLines(ctx, text, maxW);
+  const lh = fs * 1.16;
+  const blockH = lines.length * lh;
+  const cx = W / 2, cy = H * (st.y ?? 0.833);
+  // pop in: a quick overshoot from 80% to 100%
+  let k = 1;
+  if (st.pop) {
+    const t = clamp01((tSrc - cap.sourceStartMs) / 150);
+    k = 0.8 + 0.2 * (1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2));
+    ctx.globalAlpha = Math.min(1, t * 3);
+  }
+  ctx.translate(cx, cy);
+  ctx.scale(k, k);
+  if (st.background) {
+    const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+    ctx.fillStyle = st.background;
+    rr(ctx, -tw / 2 - fs * 0.45, -blockH / 2 - fs * 0.2, tw + fs * 0.9, blockH + fs * 0.4, fs * 0.3);
+    ctx.fill();
+  }
+  const ow = (st.outlineWidth || 0) * s;
+  lines.forEach((l, i) => {
+    const y = -blockH / 2 + lh * (i + 0.5);
+    if (ow > 0) {
+      ctx.strokeStyle = st.outlineColor || "#000";
+      ctx.lineWidth = ow * 2;
+      ctx.strokeText(l, 0, y);
+    }
+    ctx.fillStyle = st.color || "#fff";
+    ctx.fillText(l, 0, y);
+  });
+  ctx.restore();
+}
+
 /**
  * Cut transition drawn over the finished frame. `kind` 1 fade, 2 flash, 3 blur, 4 slide,
  * 5 zoom; `p` is signed (+ before the cut, - after). Needs scratch space in `cache`.
  */
 export function applyTransition(ctx, W, H, kind, p, cache, drawBackground) {
   const k = ease(clamp01(Math.abs(p)));
-  if (!kind || k <= 0.002) return;
+  if (!kind || kind === 6 || k <= 0.002) return; // 6 = cross-dissolve, blended in the compositor
+  if (k <= 0.002) return;
   if (kind === 1) {
     ctx.save();
     ctx.globalAlpha = k;

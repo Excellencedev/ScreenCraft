@@ -6,7 +6,7 @@ import { findIdle, applyIdle, easeSpeedChanges, freezeAtPlayhead } from "../pace
 const opt = { minIdle: 2.5, speed: 4, keepSpeech: true, ramp: 0.4, hold: 1.5, status: "" };
 
 const KINDS = [
-  [null, "None"], ["fade", "Fade"], ["flash", "Flash"], ["blur", "Blur"], ["slide", "Slide"], ["zoom", "Zoom"],
+  [null, "None"], ["dissolve", "Dissolve"], ["fade", "Fade"], ["flash", "Flash"], ["blur", "Blur"], ["slide", "Slide"], ["zoom", "Zoom"],
 ];
 
 export function panelPace(p) {
@@ -69,6 +69,6 @@ export function panelPace(p) {
   }, { track: true, timeline: true }));
   if (s.transition) {
     p.append(slider("Length", 0.2, 1.5, 0.1, () => s.transition.durationMs / 1000, (v) => (s.transition.durationMs = Math.round(v * 1000)), { fmt: (v) => v.toFixed(1) + " s", track: true, key: "trans-len-" + s.id }));
-    p.append(el('<div class="hint muted">Fade dips to black, Flash to white, Blur softens the cut, Slide pushes the picture away and Zoom punches in.</div>'));
+    p.append(el('<div class="hint muted">Dissolve blends the two clips into each other. Fade dips to black, Flash to white, Blur softens the cut, Slide pushes the picture away and Zoom punches in.</div>'));
   }
 }

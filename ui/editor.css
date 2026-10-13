@@ -1,6 +1,6 @@
 html, body { background: var(--bg); overflow: hidden; }
 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-#app { display: grid; grid-template-rows: 48px minmax(0, 1fr) var(--tl-h, 318px); height: 100vh; }
+#app { display: grid; grid-template-rows: 48px minmax(0, 1fr) var(--tl-h, 350px); height: 100vh; }
 
 /* ---- top bar: project on the left, actions on the right */
 #top { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 8px; -webkit-app-region: drag; border-bottom: 1px solid var(--line); background: var(--panel); }
@@ -216,3 +216,6 @@ body.resizing { user-select: none; }
 body.resizing * { cursor: inherit !important; }
 .block.tiny .h, .block.tiny span { display: none; }
 .block.tiny { border-width: 0; }
+.btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 4px; }
+.btn-row .btn-line { flex: 1; min-width: 90px; }
+.block.caption { background: #1f8f87; color: #fff; }

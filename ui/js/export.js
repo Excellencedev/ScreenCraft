@@ -274,10 +274,20 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     const need = Math.ceil((rect.w * z * 1.05) / cropW / 16) * 16;
     return need < project.media.width * 0.9 ? need : 0;
   };
-  const fetchPair = async (ti) => ({
-    screen: await srcFrame(dir, "screen", track.tSrc[ti], 92, wantW(ti)),
-    camera: hasCam ? await srcFrame(dir, "camera", track.tSrc[ti] + project.media.cameraOffsetMs, 88).catch(() => null) : null,
-  });
+  const fetchPair = async (ti) => {
+    const out = {
+      screen: await srcFrame(dir, "screen", track.tSrc[ti], 92, wantW(ti)),
+      camera: hasCam ? await srcFrame(dir, "camera", track.tSrc[ti] + project.media.cameraOffsetMs, 88).catch(() => null) : null,
+      screen2: null,
+      camera2: null,
+    };
+    // cross-dissolve: the other clip's picture, only for the frames that blend it
+    if (track.otherAlpha && track.otherAlpha[ti] > 0.003) {
+      out.screen2 = await srcFrame(dir, "screen", track.otherTSrc[ti], 88, wantW(ti)).catch(() => null);
+      if (hasCam) out.camera2 = await srcFrame(dir, "camera", track.otherTSrc[ti] + project.media.cameraOffsetMs, 85).catch(() => null);
+    }
+    return out;
+  };
   // keep a few source frames in flight: native decode and JPEG encode run ahead of painting
   const tStart = performance.now();
   const prof = { wait: 0, paint: 0, enc: 0 };
@@ -298,6 +308,8 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     const tOut = (i * 1000) / fps;
     src.screen?.close?.();
     src.camera?.close?.();
+    src.screen2?.close?.();
+    src.camera2?.close?.();
     // frame i+1 is requested as soon as frame i arrives, so native decode/encode overlaps painting
     if (!queue.length) topUp(i);
     const tw = performance.now();
@@ -308,6 +320,8 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     topUp(i + 1);
     src.screen = got.screen;
     src.camera = got.camera;
+    src.screen2 = got.screen2;
+    src.camera2 = got.camera2;
     const cam = camAt(track, i);
     const prev = camAt(track, srcRatio(i - 1)), next = camAt(track, srcRatio(i + 1));
     const motion = Math.abs(next.zoom - prev.zoom) * 4 + Math.abs(next.cx - prev.cx) * 12 + Math.abs(next.cy - prev.cy) * 12;

@@ -1,6 +1,6 @@
 import { drawBackground } from "./wallpapers.js";
 import { drawCursor } from "./cursors.js";
-import { drawAnnotations, drawKeys, applyTransition } from "./overlays.js";
+import { drawAnnotations, drawKeys, drawSubtitles, applyTransition } from "./overlays.js";
 
 export const ASPECTS = {
   "16:9": 16 / 9, "9:16": 9 / 16, "1:1": 1, "4:3": 4 / 3, "3:4": 3 / 4, "4:5": 4 / 5, "21:9": 21 / 9,
@@ -220,11 +220,21 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
       const x0 = Math.max(0, sx), y0 = Math.max(0, sy);
       const x1 = Math.min(vW, sx + sw), y1 = Math.min(vH, sy + sh);
       if (x1 - x0 > 0.5 && y1 - y0 > 0.5) {
-        ctx.drawImage(
-          v, x0, y0, x1 - x0, y1 - y0,
-          sr.x + ((x0 - sx) / sw) * sr.w, sr.y + ((y0 - sy) / sh) * sr.h,
-          ((x1 - x0) / sw) * sr.w, ((y1 - y0) / sh) * sr.h,
-        );
+        const dx = sr.x + ((x0 - sx) / sw) * sr.w, dy = sr.y + ((y0 - sy) / sh) * sr.h;
+        const dw = ((x1 - x0) / sw) * sr.w, dh = ((y1 - y0) / sh) * sr.h;
+        ctx.drawImage(v, x0, y0, x1 - x0, y1 - y0, dx, dy, dw, dh);
+        // cross-dissolve: the other clip's picture, with the same camera, blended on top
+        const v2 = src.screen2;
+        const a2 = cam.otherAlpha || 0;
+        if (v2 && a2 > 0.003) {
+          const w2 = v2.videoWidth || v2.width, h2 = v2.videoHeight || v2.height;
+          if (w2 && h2) {
+            ctx.save();
+            ctx.globalAlpha *= Math.min(1, a2);
+            ctx.drawImage(v2, vx * w2, vy * h2, vwN * w2, vhN * h2, sr.x, sr.y, sr.w, sr.h);
+            ctx.restore();
+          }
+        }
       }
     }
 
@@ -299,17 +309,26 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
     rr(ctx, x, y, cw, ch, geo.rad);
     ctx.clip();
     const a = cw / ch;
-    const va = cW / cH;
-    let sw = cW, sh = cH;
-    if (va > a) sw = sh * a; else sh = sw / a;
-    const sx = (cW - sw) / 2, sy = (cH - sh) / 2;
-    if (cc.mirror) {
-      ctx.translate(x + cw, y);
-      ctx.scale(-1, 1);
-      ctx.drawImage(cv, sx, sy, sw, sh, 0, 0, cw, ch);
-    } else {
-      ctx.drawImage(cv, sx, sy, sw, sh, x, y, cw, ch);
-    }
+    const cv2 = src.camera2;
+    const ca2 = cam.otherAlpha || 0;
+    const blend2 = cv2 && ca2 > 0.003 && (cv2.videoWidth || cv2.width);
+    const drawCam = (img, iw, ih, alpha) => {
+      const vaI = iw / ih;
+      let w = iw, h = ih;
+      if (vaI > a) w = h * a; else h = w / a;
+      ctx.save();
+      ctx.globalAlpha *= alpha;
+      if (cc.mirror) {
+        ctx.translate(x + cw, y);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, (iw - w) / 2, (ih - h) / 2, w, h, 0, 0, cw, ch);
+      } else {
+        ctx.drawImage(img, (iw - w) / 2, (ih - h) / 2, w, h, x, y, cw, ch);
+      }
+      ctx.restore();
+    };
+    drawCam(cv, cW, cH, 1);
+    if (blend2) drawCam(cv2, cv2.videoWidth || cv2.width, cv2.videoHeight || cv2.height, Math.min(1, ca2));
     ctx.restore();
     if (cc.border) {
       ctx.save();
@@ -325,6 +344,7 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
   // titles / callouts fixed on the frame, then shortcuts, then the cut transition
   drawAnnotations(ctx, { p, tSrc: cam.tSrc ?? 0, W, H, s, zoomK: 1, bounds: src.bounds }, "screen");
   drawKeys(ctx, W, H, p.config.keystrokes, src.combos, tOutMs, s);
+  drawSubtitles(ctx, W, H, p, cam.tSrc ?? 0, s);
   if (cam.transKind) {
     applyTransition(ctx, W, H, cam.transKind, cam.transP, (src.cache ??= {}), () =>
       ctx.drawImage(staticLayer(p, W, H, src, gCur.sr === r ? null : gCur.sr), 0, 0));
@@ -338,6 +358,8 @@ export function camAt(track, fi) {
     zoom: track.zoom[i], cx: track.cx[i], cy: track.cy[i], mx: track.mx[i], my: track.my[i],
     kind: track.cursorKind[i], cscale: track.cursorScale[i], calpha: track.cursorAlpha[i], crot: track.cursorRotation[i],
     tSrc: track.tSrc[i],
+    otherT: track.otherTSrc ? track.otherTSrc[i] : 0,
+    otherAlpha: track.otherAlpha ? track.otherAlpha[i] : 0,
     transKind: track.transKind ? track.transKind[i] : 0,
     transP: track.transP ? track.transP[i] : 0,
     layCur: track.layoutCur ? track.layoutCur[i] : 0,

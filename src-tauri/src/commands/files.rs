@@ -70,6 +70,18 @@ pub fn test_export_path() -> Option<String> {
     std::env::var("SCREENCRAFT_TEST_EXPORT_PATH").ok().filter(|p| !p.is_empty())
 }
 
+/// Read a small text file (SRT / VTT captions). Refuses anything large or that is not UTF-8.
+#[tauri::command]
+pub fn read_text_file(path: String) -> CmdResult<String> {
+    let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
+    if meta.len() > 5 * 1024 * 1024 {
+        return Err("That file is larger than 5 MB".into());
+    }
+    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    let text = String::from_utf8_lossy(&bytes).into_owned();
+    Ok(text.trim_start_matches('\u{feff}').to_string())
+}
+
 /// Read an image file as a `data:` URL (used for custom backgrounds).
 #[tauri::command]
 pub fn read_image_data_url(path: String) -> CmdResult<String> {

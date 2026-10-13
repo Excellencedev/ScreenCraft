@@ -45,7 +45,7 @@ pub fn layout_id(name: &str) -> u8 {
     }
 }
 
-/// Transition ids shared with the UI: 0 none, 1 fade, 2 flash, 3 blur, 4 slide, 5 zoom.
+/// Transition ids shared with the UI: 0 none, 1 fade, 2 flash, 3 blur, 4 slide, 5 zoom, 6 dissolve.
 pub fn transition_id(name: &str) -> u8 {
     match name {
         "fade" => 1,
@@ -53,6 +53,7 @@ pub fn transition_id(name: &str) -> u8 {
         "blur" => 3,
         "slide" => 4,
         "zoom" => 5,
+        "dissolve" => 6,
         _ => 0,
     }
 }
@@ -87,6 +88,9 @@ pub struct RenderTrack {
     /// Transition at each frame: id, and strength (1 at the cut; positive before the cut, negative after).
     pub trans_kind: Vec<u8>,
     pub trans_p: Vec<f64>,
+    /// Cross-dissolve: source time of the *other* clip's picture and how much of it shows (0 = none).
+    pub other_t_src: Vec<f64>,
+    pub other_alpha: Vec<f64>,
     /// Camera layout at each frame, the one before it and how far the change has progressed (0..1).
     pub layout_cur: Vec<u8>,
     pub layout_prev: Vec<u8>,
@@ -287,6 +291,8 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
         // --- transition across a cut (centred on the start of a slice) ---
         let mut tk = 0u8;
         let mut tp = 0.0f64;
+        let mut o_t = t_src;
+        let mut o_a = 0.0f64;
         for (si, sl) in slices.iter().enumerate().skip(1) {
             if let Some(t) = &sl.transition {
                 let half = (t.duration_ms * 0.5).max(1.0);
@@ -296,12 +302,31 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
                     // positive before the cut (outgoing picture), negative after it (incoming)
                     let k = 1.0 - d / half;
                     tp = if t_out < starts[si] { k } else { -k };
+                    if tk == 6 {
+                        // Both clips are on screen across the cut. The incoming one is shown
+                        // from the footage before its start (or the outgoing one from after
+                        // its end), so nothing on the timeline overlaps.
+                        let dur = (t.duration_ms).max(1.0);
+                        let w = ((t_out - (starts[si] - half)) / dur).clamp(0.0, 1.0);
+                        let w = w * w * (3.0 - 2.0 * w);
+                        if t_out < starts[si] {
+                            let b = &slices[si];
+                            o_t = (b.source_start_ms + (t_out - starts[si]) * b.time_scale.max(1e-3)).max(0.0);
+                            o_a = w;
+                        } else {
+                            let a = &slices[si - 1];
+                            o_t = (a.source_end_ms + (t_out - starts[si]) * a.time_scale.max(1e-3)).min(p.media.duration_ms);
+                            o_a = 1.0 - w;
+                        }
+                    }
                     break;
                 }
             }
         }
         tr.trans_kind.push(tk);
         tr.trans_p.push(r4(tp));
+        tr.other_t_src.push(r4(o_t));
+        tr.other_alpha.push(r4(o_a));
 
         // --- camera layout ---
         let want = p
@@ -580,6 +605,38 @@ mod tests {
         assert!(tr.trans_p[f(3000.0)].abs() > 0.9);
         assert!(tr.trans_p[f(2900.0)] > 0.0 && tr.trans_p[f(3100.0)] < 0.0);
         assert_eq!(tr.trans_kind[f(1000.0)], 0);
+    }
+
+    #[test]
+    fn dissolve_shows_the_other_clip_across_the_cut() {
+        use crate::project::Transition;
+        let (mut p, log) = project();
+        p.media.duration_ms = 6000.0;
+        // clip b starts at source 4000 but is played right after a (0..2000): a cut with footage
+        // on both sides of it in the source
+        p.scene.slices = vec![
+            Slice { id: "a".into(), source_start_ms: 0.0, source_end_ms: 2000.0, ..Default::default() },
+            Slice {
+                id: "b".into(),
+                source_start_ms: 4000.0,
+                source_end_ms: 6000.0,
+                transition: Some(Transition { kind: "dissolve".into(), duration_ms: 600.0 }),
+                ..Default::default()
+            },
+        ];
+        let tr = compute_track(&p, &log, 60.0);
+        let f = |ms: f64| (ms * 60.0 / 1000.0).round() as usize;
+        // 200 ms before the cut: outgoing clip a, with b's pre-roll (source < 4000) fading in
+        let i = f(1800.0);
+        assert_eq!(tr.trans_kind[i], 6);
+        assert!(tr.other_t_src[i] < 4000.0 && tr.other_t_src[i] > 3000.0, "{}", tr.other_t_src[i]);
+        assert!(tr.other_alpha[i] > 0.0 && tr.other_alpha[i] < 0.5);
+        // 200 ms after: incoming clip b, a's tail (source > 2000) still showing
+        let j = f(2200.0);
+        assert!(tr.other_t_src[j] > 2000.0);
+        assert!(tr.other_alpha[j] > 0.0 && tr.other_alpha[j] < 0.5);
+        // away from the cut nothing is blended
+        assert_eq!(tr.other_alpha[f(500.0)], 0.0);
     }
 
     #[test]

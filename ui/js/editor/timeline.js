@@ -128,6 +128,7 @@ export function renderTimeline() {
       el.className = "block zoom" + (z.isDisabled ? " disabled" : "") + (isZoomSel(z.id) ? " sel" : "");
       el.style.left = a * pxPerMs + "px";
       el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
+      el.dataset.zid = z.id;
       el.innerHTML = `<div class="h l"></div><span>Zoom</span><span class="t">${z.zoom.toFixed(1)}× · ${z.kind === "manual" ? "Manual" : "Auto"}</span><div class="h r"></div>`;
       el.onpointerdown = (e) => beginZoomDrag(e, z, el, pxPerMs, a, b);
       zf.appendChild(el);
@@ -186,9 +187,30 @@ export function renderTimeline() {
   nt.replaceChildren(nf);
   nt.style.height = Math.max(38, 8 + Math.max(1, lanes.length) * 32) + "px";
   if (!items.length) nt.innerHTML = '<div class="track-hint">Text, arrows, blur and spotlight appear here: add them from the Annotate tab.</div>';
+  // captions
+  const kt = $("trackCaptions");
+  const kf = document.createDocumentFragment();
+  let capCount = 0;
+  for (const c of P().scene.subtitles || []) {
+    for (const [a, b] of spansOut(c.sourceStartMs, c.sourceEndMs)) {
+      if (b - a < 1) continue;
+      capCount++;
+      const el = document.createElement("div");
+      el.className = "block caption" + (S.selected?.type === "caption" && S.selected.id === c.id ? " sel" : "");
+      el.style.left = a * pxPerMs + "px";
+      el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
+      const label = (c.text || "").replace(/\s+/g, " ").slice(0, 40) || "(empty)";
+      el.innerHTML = `<div class="h l"></div><span></span><div class="h r"></div>`;
+      el.querySelector("span").textContent = label;
+      el.onpointerdown = (e) => beginRegionDrag(e, c, "caption", el, pxPerMs, a, b);
+      kf.appendChild(el);
+    }
+  }
+  kt.replaceChildren(kf);
+  if (!capCount) kt.innerHTML = '<div class="track-hint">Captions go here: add them from the Captions tab, or import an SRT.</div>';
   // keep the labels column aligned with the (variable height) tracks
   const labs = $("tlLabels").children;
-  ["trackClip", "trackZoom", "trackCamera", "trackNotes", "trackMusic"].forEach((id, i) => {
+  ["trackClip", "trackZoom", "trackCamera", "trackNotes", "trackCaptions", "trackMusic"].forEach((id, i) => {
     if (labs[i]) labs[i].style.height = $(id).offsetHeight + "px";
   });
 
@@ -237,7 +259,7 @@ function beginRegionDrag(e, item, type, el, pxPerMs, a0, b0) {
   e.preventDefault();
   S.selected = { type, id: item.id };
   S.multi = null;
-  S.tab = type === "layout" ? "camera" : "annotate";
+  S.tab = type === "layout" ? "camera" : type === "caption" ? "captions" : "annotate";
   document.querySelectorAll(".block.sel").forEach((b) => b.classList.remove("sel"));
   el.classList.add("sel");
   el.setPointerCapture(e.pointerId);
@@ -399,10 +421,35 @@ function beginZoomDrag(e, z, el, pxPerMs, a0, b0) {
     na = a; nb = b;
     el.style.left = a * pxPerMs + "px";
     el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
+    // the rest of the selection follows the drag
+    if (wasInGroup && mode === "move") {
+      const shift = (a - a0) * pxPerMs;
+      for (const id of S.multi || []) {
+        if (id === z.id) continue;
+        document.querySelectorAll(`#trackZoom .block[data-zid="${id}"]`).forEach((b2) => (b2.style.transform = `translateX(${shift}px)`));
+      }
+    }
   };
   el.onpointerup = (ev) => {
     el.onpointermove = el.onpointerup = null;
     try { el.releasePointerCapture(ev.pointerId); } catch {}
+    if (moved && wasInGroup && mode === "move") {
+      // move every selected region by the same amount of recording time
+      const delta = outToSrc(na).src - outToSrc(a0).src;
+      const ids = (S.multi || []).slice();
+      const total = P().media.durationMs;
+      change("zoom-group-" + z.id, () => {
+        for (const id of ids) {
+          const r = P().scene.zooms.find((x) => x.id === id);
+          if (!r) continue;
+          const len = r.sourceEndMs - r.sourceStartMs;
+          const start = Math.min(Math.max(0, r.sourceStartMs + delta), Math.max(0, total - len));
+          r.sourceStartMs = start;
+          r.sourceEndMs = start + len;
+        }
+      }, { timeline: true });
+      return;
+    }
     if (!moved) {
       if (wasInGroup) {
         S.selected = { type: "zoom", id: z.id };
@@ -528,8 +575,8 @@ export function bindScrub() {
 export function splitAtPlayhead() {
   const sel = S.selected;
   const { src, idx } = outToSrc(S.tOut);
-  if (sel?.type === "layout" || sel?.type === "annot") {
-    const list = sel.type === "layout" ? P().scene.cameraLayouts : P().scene.annotations;
+  if (sel?.type === "layout" || sel?.type === "annot" || sel?.type === "caption") {
+    const list = regionList(sel.type);
     const it = list.find((x) => x.id === sel.id);
     if (!it || src <= it.sourceStartMs + 50 || src >= it.sourceEndMs - 50) return;
     change(null, () => {
@@ -600,6 +647,19 @@ export function splitAtPlayhead() {
   }, { panel: true, timeline: true });
 }
 
+const REGION_KEYS = { layout: "cameraLayouts", annot: "annotations", caption: "subtitles" };
+const regionList = (type) => (P().scene[REGION_KEYS[type]] ??= []);
+
+export function addCaptionAtPlayhead() {
+  const { start, end } = regionAtPlayhead(2500);
+  const c = { id: uid(), sourceStartMs: start, sourceEndMs: end, text: "Your caption" };
+  change(null, () => {
+    regionList("caption").push(c);
+    S.selected = { type: "caption", id: c.id };
+    S.tab = "captions";
+  }, { panel: true, timeline: true, track: false });
+}
+
 export function duplicateSelected() {
   const sel = S.selected;
   if (sel?.type === "annot") {
@@ -627,8 +687,8 @@ export function deleteSelected() {
   if (!sel) return;
   if (sel.type === "music") {
     removeMusicClip(sel.id);
-  } else if (sel.type === "layout" || sel.type === "annot") {
-    const key = sel.type === "layout" ? "cameraLayouts" : "annotations";
+  } else if (sel.type === "layout" || sel.type === "annot" || sel.type === "caption") {
+    const key = REGION_KEYS[sel.type];
     change(null, () => { P().scene[key] = P().scene[key].filter((x) => x.id !== sel.id); S.selected = null; }, { panel: true, timeline: true });
   } else if (sel.type === "zoom") {
     const ids = selectedZoomIds();
