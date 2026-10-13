@@ -107,15 +107,31 @@ permissions setup is needed. Capture uses Windows.Graphics.Capture, decoding and
 encoding go through Media Foundation (hardware H.264 where available), system audio
 comes from a WASAPI loopback, and the recording shortcut is **Ctrl+Shift+2**.
 
-A ready-made `.exe` installer is not in the repository yet. Build and run it from
-source on a Windows PC with [Rust](https://rustup.rs) (MSVC toolchain) and the
-WebView2 runtime (preinstalled on Windows 11):
+There is no prebuilt `.exe` in the repository yet; build the installer yourself on a
+Windows PC (a few minutes the first time). You need:
+
+- [Rust](https://rustup.rs) with the MSVC toolchain, which in turn needs the
+  *Desktop development with C++* workload from the
+  [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/)
+- [NSIS](https://nsis.sourceforge.io) to pack the installer: `winget install NSIS.NSIS`
+- the WebView2 runtime (preinstalled on Windows 11; the installer fetches it from
+  Microsoft if it is missing)
+
+Then, in PowerShell, from the repository root:
 
 ```powershell
 git clone https://github.com/MarshallNickolauson/ScreenCraft.git
 cd ScreenCraft
-cargo run --release -p screencraft
+powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1
 ```
+
+This builds a release binary, writes `ScreenCraft-Setup.exe` in the repository root and
+prints its SHA-256. Run it to install per user (no administrator rights) into
+`%LOCALAPPDATA%\Programs\ScreenCraft` with Start Menu and Desktop shortcuts and an
+entry in *Settings → Apps*. The installer is unsigned, so SmartScreen may ask you to
+choose *More info → Run anyway*.
+
+To run from source without installing, use `cargo run --release -p screencraft`.
 
 The standalone compressor (and compress-after-export) is not available on Windows yet,
 and typing focus follows the text caret only in apps that expose a classic Win32 caret;
@@ -192,7 +208,7 @@ MIT, see [LICENSE](LICENSE).
 ## Known limitations
 
 - macOS and Windows only. The two ports share the UI and `screencraft-core`; native capture, decoding and encoding are separate per-platform modules (see below).
-- Windows: no standalone compressor yet, and no `.exe` installer checked in.
+- Windows: no standalone compressor yet, and the `.exe` installer has to be built locally (`scripts\build-windows.ps1`); the installer is unsigned.
 - Preview proxies are large (roughly 2–3 MB per second of recording); delete the
   `proxy-*` files in a project folder to reclaim space.
 - Export is not real-time; long 60 fps projects take a while.
