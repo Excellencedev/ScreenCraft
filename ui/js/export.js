@@ -2,11 +2,12 @@ import { masterGain, autoGain, makeLimiter, monoMix } from "./audiolevel.js";
 import { Muxer, ArrayBufferTarget } from "../vendor/mp4-muxer.mjs";
 import { GIFEncoder, quantize, applyPalette } from "../vendor/gifenc.esm.js";
 import { invoke, convertFileSrc, SC_BASE } from "./tauri.js";
-import { outputSize, paintFrame, camAt, lerpCam } from "./render.js";
+import { outputSize, paintFrame, camAt, lerpCam, contentRect } from "./render.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // A small worker pool fetches + decodes full-resolution source frames (see srcframes.rs).
+const WORKERS = 6;
 let pool = null;
 let nextWorker = 0;
 let nextId = 1;
@@ -14,7 +15,7 @@ const waiting = new Map();
 function getPool() {
   if (pool) return pool;
   pool = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < WORKERS; i++) {
     const w = new Worker("js/exportWorker.js");
     w.onmessage = (e) => {
       const { id, bmp, error } = e.data;
@@ -35,10 +36,10 @@ function endPool() {
 }
 
 /** A full-resolution source frame decoded natively and bitmap-decoded in a worker. */
-function srcFrame(dir, kind, tMs, quality = 90) {
-  const url = `${SC_BASE}/src/${kind}?t=${Math.max(0, tMs).toFixed(3)}&d=${encodeURIComponent(dir)}&q=${quality}`;
+function srcFrame(dir, kind, tMs, quality = 90, maxW = 0) {
+  const url = `${SC_BASE}/src/${kind}?t=${Math.max(0, tMs).toFixed(3)}&d=${encodeURIComponent(dir)}&q=${quality}${maxW ? `&w=${maxW}` : ""}`;
   const id = nextId++;
-  const w = getPool()[nextWorker++ % 4];
+  const w = getPool()[nextWorker++ % WORKERS];
   return new Promise((resolve, reject) => {
     waiting.set(id, { resolve, reject });
     w.postMessage({ id, url });
@@ -226,13 +227,23 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
 
   const total = track.count;
   const src = { screen: null, camera: null, bgImage, cache: {} };
+  // Only ask for as many source pixels as this frame can show: at 1x zoom a retina
+  // capture is far larger than a 1080p canvas, and zoomed frames need more.
+  const rect = contentRect(project, W, H);
+  const cropW = project.config.crop.width;
+  const wantW = (ti) => {
+    const z = Math.max(track.zoom[Math.max(0, ti - 1)], track.zoom[ti], track.zoom[Math.min(total - 1, ti + 1)]);
+    const need = Math.ceil((rect.w * z * 1.05) / cropW / 16) * 16;
+    return need < project.media.width * 0.9 ? need : 0;
+  };
   const fetchPair = async (ti) => ({
-    screen: await srcFrame(dir, "screen", track.tSrc[ti], 92),
+    screen: await srcFrame(dir, "screen", track.tSrc[ti], 92, wantW(ti)),
     camera: hasCam ? await srcFrame(dir, "camera", track.tSrc[ti] + project.media.cameraOffsetMs, 88).catch(() => null) : null,
   });
   // keep a few source frames in flight: native decode and JPEG encode run ahead of painting
+  const tStart = performance.now();
   const prof = { wait: 0, paint: 0, enc: 0 };
-  const AHEAD = 6;
+  const AHEAD = 12;
   const queue = [];
   const topUp = (i) => {
     for (let k = queue.length; k < AHEAD; k++) {
@@ -291,6 +302,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
   }
   await venc.flush();
   venc.close();
+  invoke("dbg_log", { msg: `export: ${total} frames in ${((performance.now() - tStart) / 1000).toFixed(1)} s = ${(total / ((performance.now() - tStart) / 1000)).toFixed(1)} fps` }).catch(() => {});
 
   if (audio) {
     onProgress(0.92, "Encoding audio…");

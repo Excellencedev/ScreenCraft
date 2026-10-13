@@ -39,7 +39,7 @@ struct Session {
 }
 
 /// Full-resolution frames are large, so fewer are kept than on macOS.
-const RECENT: usize = 4;
+const RECENT: usize = 6;
 
 impl Session {
     fn open(path: &str) -> Option<Session> {
@@ -174,10 +174,10 @@ fn worker(rx: std::sync::mpsc::Receiver<Request>) {
                     }
                     *n += 1;
                 }
-                let q = req.quality;
+                let (q, max_w) = (req.quality, req.max_w as usize);
                 let reply = req.reply;
                 std::thread::spawn(move || {
-                    let out = crate::jpegio::encode_bgra(frame.bgra.clone(), frame.w, frame.h, q);
+                    let out = crate::jpegio::encode_bgra_max_w(&frame.bgra, frame.w, frame.h, max_w, q);
                     {
                         let mut n = INFLIGHT.0.lock().unwrap();
                         *n -= 1;

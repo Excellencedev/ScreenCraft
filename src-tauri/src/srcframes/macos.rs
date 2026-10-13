@@ -164,7 +164,7 @@ impl Session {
                 Some((pts, _)) if *pts <= t + 1e-4 => {
                     if let Some(prev) = self.cur.take() {
                         self.recent.push_back(prev);
-                        if self.recent.len() > 8 {
+                        if self.recent.len() > 12 {
                             self.recent.pop_front();
                         }
                     }
@@ -187,8 +187,27 @@ impl Session {
     }
 }
 
-/// Copy the sample's pixels out (fast memcpy) so encoding can happen on another thread.
-fn pack(sample: &CMSampleBuffer) -> Option<(Vec<u8>, usize, usize)> {
+#[repr(C)]
+struct VImageBuffer {
+    data: *mut std::ffi::c_void,
+    height: usize,
+    width: usize,
+    row_bytes: usize,
+}
+
+#[link(name = "Accelerate", kind = "framework")]
+extern "C" {
+    fn vImageScale_ARGB8888(
+        src: *const VImageBuffer,
+        dest: *const VImageBuffer,
+        temp: *mut std::ffi::c_void,
+        flags: u32,
+    ) -> isize;
+}
+
+/// Copy the sample's pixels out so encoding can happen on another thread, scaling to
+/// `max_w` pixels wide (Lanczos, via vImage) when that is clearly smaller than native.
+fn pack(sample: &CMSampleBuffer, max_w: usize) -> Option<(Vec<u8>, usize, usize)> {
     unsafe {
         let img = sample.image_buffer()?;
         CVPixelBufferLockBaseAddress(&img, CVPixelBufferLockFlags::ReadOnly);
@@ -197,12 +216,25 @@ fn pack(sample: &CMSampleBuffer) -> Option<(Vec<u8>, usize, usize)> {
         let base = CVPixelBufferGetBaseAddress(&img) as *const u8;
         let mut out = None;
         if !base.is_null() && w > 0 && h > 0 {
-            let mut packed = vec![0u8; w * h * 4];
-            for row in 0..h {
-                let s = std::slice::from_raw_parts(base.add(row * stride), w * 4);
-                packed[row * w * 4..(row + 1) * w * 4].copy_from_slice(s);
+            if max_w >= 64 && (max_w as f64) < w as f64 * 0.9 {
+                let tw = max_w & !1;
+                let th = (((h as f64 * tw as f64 / w as f64).round() as usize) & !1).max(2);
+                let mut scaled = vec![0u8; tw * th * 4];
+                let src = VImageBuffer { data: base as *mut _, height: h, width: w, row_bytes: stride };
+                let dst = VImageBuffer { data: scaled.as_mut_ptr() as *mut _, height: th, width: tw, row_bytes: tw * 4 };
+                // kvImageHighQualityResampling = 32
+                if vImageScale_ARGB8888(&src, &dst, std::ptr::null_mut(), 32) == 0 {
+                    out = Some((scaled, tw, th));
+                }
             }
-            out = Some((packed, w, h));
+            if out.is_none() {
+                let mut packed = vec![0u8; w * h * 4];
+                for row in 0..h {
+                    let s = std::slice::from_raw_parts(base.add(row * stride), w * 4);
+                    packed[row * w * 4..(row + 1) * w * 4].copy_from_slice(s);
+                }
+                out = Some((packed, w, h));
+            }
         }
         CVPixelBufferUnlockBaseAddress(&img, CVPixelBufferLockFlags::ReadOnly);
         out
@@ -242,7 +274,7 @@ fn worker(rx: std::sync::mpsc::Receiver<Request>) {
             let frame = sess.frame_at(req.t_ms / 1000.0)?;
             t_dec += t0.elapsed().as_secs_f64();
             let tp = std::time::Instant::now();
-            let r = pack(frame);
+            let r = pack(frame, req.max_w as usize);
             t_pack += tp.elapsed().as_secs_f64();
             r
         })();

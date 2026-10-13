@@ -16,5 +16,8 @@ pub struct Request {
     pub kind: String,
     pub t_ms: f64,
     pub quality: u8,
+    /// Scale the frame down to this width first (0 = native). Export asks for no more
+    /// resolution than the output needs, which makes JPEG encode/decode much cheaper.
+    pub max_w: u32,
     pub reply: Box<dyn FnOnce(Option<Vec<u8>>) + Send>,
 }

@@ -8,4 +8,4 @@ pub use macos::encode_bgra;
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
-pub use windows::encode_bgra;
+pub use windows::{encode_bgra, encode_bgra_max_w};

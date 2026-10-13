@@ -15,12 +15,38 @@ thread_local! {
 
 /// `bgra` is tightly packed 32-bit BGRA (alpha ignored), `quality` 1..=100.
 pub fn encode_bgra(bgra: Vec<u8>, w: usize, h: usize, quality: u8) -> Option<Vec<u8>> {
-    FACTORY.with(|f| encode(f.as_ref()?, &bgra, w, h, quality).ok())
+    FACTORY.with(|f| encode(f.as_ref()?, &bgra, w, h, (w, h), quality).ok())
 }
 
-fn encode(factory: &IWICImagingFactory, bgra: &[u8], w: usize, h: usize, quality: u8) -> ::windows::core::Result<Vec<u8>> {
+/// Like `encode_bgra`, scaled down to `max_w` pixels wide first (high-quality cubic)
+/// when that is clearly smaller than the frame; 0 keeps the native size.
+pub fn encode_bgra_max_w(bgra: &[u8], w: usize, h: usize, max_w: usize, quality: u8) -> Option<Vec<u8>> {
+    let out = if max_w >= 64 && (max_w as f64) < w as f64 * 0.9 {
+        let tw = max_w & !1;
+        (tw, (((h as f64 * tw as f64 / w as f64).round() as usize) & !1).max(2))
+    } else {
+        (w, h)
+    };
+    FACTORY.with(|f| encode(f.as_ref()?, bgra, w, h, out, quality).ok())
+}
+
+fn encode(
+    factory: &IWICImagingFactory,
+    bgra: &[u8],
+    w: usize,
+    h: usize,
+    out_size: (usize, usize),
+    quality: u8,
+) -> ::windows::core::Result<Vec<u8>> {
     unsafe {
         let bitmap = factory.CreateBitmapFromMemory(w as u32, h as u32, &GUID_WICPixelFormat32bppBGR, (w * 4) as u32, bgra)?;
+        let source: IWICBitmapSource = if out_size != (w, h) {
+            let scaler = factory.CreateBitmapScaler()?;
+            scaler.Initialize(&bitmap, out_size.0 as u32, out_size.1 as u32, WICBitmapInterpolationModeHighQualityCubic)?;
+            scaler.cast()?
+        } else {
+            bitmap.cast()?
+        };
         let stream: IStream = CreateStreamOnHGlobal(Default::default(), true)?;
         let encoder = factory.CreateEncoder(&GUID_ContainerFormatJpeg, std::ptr::null())?;
         encoder.Initialize(&stream, WICBitmapEncoderNoCache)?;
@@ -33,8 +59,8 @@ fn encode(factory: &IWICImagingFactory, bgra: &[u8], w: usize, h: usize, quality
             let _ = props.Write(1, &name, &VARIANT::from(quality.clamp(1, 100) as f32 / 100.0));
         }
         frame.Initialize(props.as_ref())?;
-        frame.SetSize(w as u32, h as u32)?;
-        frame.WriteSource(&bitmap.cast::<IWICBitmapSource>()?, std::ptr::null())?;
+        frame.SetSize(out_size.0 as u32, out_size.1 as u32)?;
+        frame.WriteSource(&source, std::ptr::null())?;
         frame.Commit()?;
         encoder.Commit()?;
 
