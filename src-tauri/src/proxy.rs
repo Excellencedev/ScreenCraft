@@ -28,7 +28,7 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
 pub const FPS: f64 = 30.0;
-const VERSION: u32 = 4;
+const VERSION: u32 = 5;
 
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct StripMeta {
@@ -43,6 +43,27 @@ pub struct ProxyMeta {
     pub version: u32,
     pub screen: Option<StripMeta>,
     pub camera: Option<StripMeta>,
+}
+
+/// Presentation time in seconds with 32-bit timestamp wrap-around undone.
+///
+/// Browser-recorded fragmented MP4s sometimes carry negative composition offsets stored
+/// as unsigned numbers, which AVFoundation reads as 2^32 ticks too late (about 7,158,278 s
+/// at a 600 Hz timescale). Everything after that point then looked "in the far future" and
+/// the facecam froze. Fold such values back by whole multiples of 2^32 ticks.
+pub fn unwrapped_seconds(t: objc2_core_media::CMTime) -> f64 {
+    let (v, ts) = (t.value, t.timescale as f64);
+    if ts <= 0.0 {
+        return unsafe { t.seconds() };
+    }
+    const WRAP: i64 = 1 << 32;
+    let v = if v >= WRAP / 2 { v - WRAP * ((v + WRAP / 2) / WRAP) } else { v };
+    v as f64 / ts
+}
+
+/// The raw (still wrapped) time to ask AVAssetReader for when a sample was seen at `t`.
+pub fn raw_seconds(t: objc2_core_media::CMTime) -> f64 {
+    unsafe { t.seconds() }
 }
 
 fn obj<T: objc2::Message>(r: Retained<T>) -> Retained<AnyObject> {
@@ -166,14 +187,16 @@ fn build_strip(
         let mut slot = 0usize; // next slot to emit (slot k is the frame shown at k / FPS)
         let mut shift = 0.0f64; // timestamp discontinuity compensation
         let mut last_raw = 0.0f64;
+        let mut last_file_time = 0.0f64;
         let mut resumes = 0;
         'read: loop {
         while let Some(sample) = vout.copyNextSampleBuffer() {
-            let raw_pts = sample.presentation_time_stamp().seconds();
+            let raw_pts = unwrapped_seconds(sample.presentation_time_stamp());
             if !raw_pts.is_finite() {
                 continue;
             }
             last_raw = raw_pts;
+            last_file_time = raw_seconds(sample.presentation_time_stamp());
             let Some(img) = sample.image_buffer() else { continue };
             let mut pts = raw_pts - shift;
             let want_t = slot as f64 * step;
@@ -231,7 +254,7 @@ fn build_strip(
         // pick the file up again just past the last frame instead of freezing the strip
         if duration.is_finite() && duration < 86_400.0 && last_raw < duration - 1.5 && resumes < 40 {
             resumes += 1;
-            match open_reader(last_raw + 0.05) {
+            match open_reader(last_file_time + 0.05) {
                 Ok((r, o)) => {
                     reader = r;
                     vout = o;

@@ -58,6 +58,8 @@ struct Session {
     eof: bool,
     /// Time of the last forced reopen after the reader ran dry early.
     last_retry: f64,
+    /// Always restart from 0 (small files whose timestamps can't be addressed by range).
+    from_start: bool,
 }
 
 fn obj<T: objc2::Message>(r: Retained<T>) -> Retained<AnyObject> {
@@ -92,11 +94,14 @@ impl Session {
             let asset = AVURLAsset::URLAssetWithURL_options(&url, None);
             let duration = asset.duration().seconds();
             let (reader, output) = open_at(&asset, start_s, duration)?;
-            Some(Session { asset, reader, output, duration, cur: None, next: None, recent: Default::default(), eof: false, last_retry: -10.0 })
+            Some(Session { asset, reader, output, duration, cur: None, next: None, recent: Default::default(), eof: false, last_retry: -10.0, from_start: false })
         }
     }
 
     fn reopen(&mut self, start_s: f64) -> bool {
+        // a time range is expressed in the file's raw timestamps, which can be offset by a
+        // 32-bit wrap for some recordings: reading from the start is always correct
+        let start_s = if self.from_start { 0.0 } else { start_s };
         match open_at(&self.asset, start_s, self.duration) {
             Some((r, o)) => {
                 self.reader = r;
@@ -115,7 +120,7 @@ impl Session {
         unsafe {
             loop {
                 let s = self.output.copyNextSampleBuffer()?;
-                let pts = s.presentation_time_stamp().seconds();
+                let pts = crate::proxy::unwrapped_seconds(s.presentation_time_stamp());
                 if s.image_buffer().is_some() {
                     return Some((pts, s));
                 }
@@ -236,7 +241,9 @@ fn worker(rx: std::sync::mpsc::Receiver<Request>) {
             let path = project_file(&req.dir, file)?;
             let key = format!("{}|{}", req.dir, req.kind);
             if !sessions.contains_key(&key) {
-                sessions.insert(key.clone(), Session::open(&path, (req.t_ms / 1000.0 - 0.25).max(0.0))?);
+                let mut sess = Session::open(&path, 0.0)?;
+                sess.from_start = req.kind == "camera";
+                sessions.insert(key.clone(), sess);
             }
             let sess = sessions.get_mut(&key)?;
             let frame = sess.frame_at(req.t_ms / 1000.0)?;
