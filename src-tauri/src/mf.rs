@@ -176,3 +176,41 @@ impl Reader {
         Some(out)
     }
 }
+
+/// Decode the first audio track of `path` to mono f32 (channels averaged).
+pub fn decode_audio_mono(path: &str) -> Result<(Vec<f32>, u32), String> {
+    init_thread();
+    let e = |what: &'static str| move |err: ::windows::core::Error| format!("{what}: {err}");
+    const AUDIO: u32 = MF_SOURCE_READER_FIRST_AUDIO_STREAM.0 as u32;
+    unsafe {
+        let reader = MFCreateSourceReaderFromURL(&HSTRING::from(path), None).map_err(e("open audio"))?;
+        reader.SetStreamSelection(MF_SOURCE_READER_ALL_STREAMS.0 as u32, false).map_err(e("select"))?;
+        reader.SetStreamSelection(AUDIO, true).map_err(|_| "no audio track".to_string())?;
+        let out = MFCreateMediaType().map_err(e("media type"))?;
+        out.SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Audio).map_err(e("media type"))?;
+        out.SetGUID(&MF_MT_SUBTYPE, &MFAudioFormat_Float).map_err(e("media type"))?;
+        reader.SetCurrentMediaType(AUDIO, None, &out).map_err(e("decoder"))?;
+        let cur = reader.GetCurrentMediaType(AUDIO).map_err(e("decoder"))?;
+        let rate = cur.GetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND).map_err(e("sample rate"))?;
+        let ch = cur.GetUINT32(&MF_MT_AUDIO_NUM_CHANNELS).map_err(e("channels"))?.max(1) as usize;
+        let mut mono = Vec::new();
+        loop {
+            let mut flags = 0u32;
+            let mut sample = None;
+            reader.ReadSample(AUDIO, 0, None, Some(&mut flags), None, Some(&mut sample)).map_err(e("decode audio"))?;
+            if let Some(sample) = sample {
+                let buf = sample.ConvertToContiguousBuffer().map_err(e("audio buffer"))?;
+                let mut ptr = std::ptr::null_mut();
+                let mut len = 0u32;
+                buf.Lock(&mut ptr, None, Some(&mut len)).map_err(e("audio buffer"))?;
+                let data = std::slice::from_raw_parts(ptr as *const f32, len as usize / 4);
+                mono.extend(data.chunks_exact(ch).map(|f| f.iter().sum::<f32>() / ch as f32));
+                let _ = buf.Unlock();
+            }
+            if flags & (MF_SOURCE_READERF_ENDOFSTREAM.0 as u32 | MF_SOURCE_READERF_ERROR.0 as u32) != 0 {
+                break;
+            }
+        }
+        Ok((mono, rate))
+    }
+}

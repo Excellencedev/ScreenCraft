@@ -34,27 +34,15 @@ pub fn display_frames(_app: &AppHandle) -> Result<Vec<DisplayFrame>, String> {
         .collect())
 }
 
-/// Monitors in Tauri's order, the primary one first so it is the default. Ids are
-/// the position in that list.
+/// Displays from the Win32 list (primary first, ids are list positions), in logical
+/// pixels; see `monitors.rs`.
 #[cfg(windows)]
-pub fn display_frames(app: &AppHandle) -> Result<Vec<DisplayFrame>, String> {
-    let primary = app.primary_monitor().ok().flatten().map(|m| *m.position());
-    let mut monitors = app.available_monitors().map_err(|e| e.to_string())?;
-    monitors.sort_by_key(|m| Some(*m.position()) != primary);
-    Ok(monitors
+pub fn display_frames(_app: &AppHandle) -> Result<Vec<DisplayFrame>, String> {
+    Ok(crate::monitors::displays()
         .iter()
-        .enumerate()
-        .map(|(i, m)| {
-            let sf = m.scale_factor();
-            let (p, s) = (m.position(), m.size());
-            DisplayFrame {
-                id: i as u32,
-                x: p.x as f64 / sf,
-                y: p.y as f64 / sf,
-                width: s.width as f64 / sf,
-                height: s.height as f64 / sf,
-                is_main: Some(*p) == primary,
-            }
+        .map(|d| {
+            let (x, y, width, height) = d.logical();
+            DisplayFrame { id: d.id, x, y, width, height, is_main: d.is_primary }
         })
         .collect())
 }
@@ -111,6 +99,21 @@ pub fn resize_bar(app: AppHandle, w: f64, h: f64) -> Result<(), String> {
     Ok(())
 }
 
+/// Keep our own windows (toolbar, menus, area outline) out of screen recordings.
+/// ScreenCaptureKit excludes them by filter; on Windows the window asks for it.
+#[cfg(windows)]
+fn exclude_from_capture(win: &tauri::WebviewWindow) {
+    use ::windows::Win32::UI::WindowsAndMessaging::{SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE};
+    if let Ok(hwnd) = win.hwnd() {
+        unsafe {
+            let _ = SetWindowDisplayAffinity(::windows::Win32::Foundation::HWND(hwnd.0), WDA_EXCLUDEFROMCAPTURE);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn exclude_from_capture(_win: &tauri::WebviewWindow) {}
+
 /// Keep the toolbar / HUD above the dimmed surround of an area recording.
 pub fn raise_above_frame(win: &tauri::WebviewWindow) {
     #[cfg(target_os = "macos")]
@@ -135,7 +138,17 @@ pub fn show_recorder_window(app: &AppHandle) -> tauri::Result<()> {
     }
     let (sw, sh) = main_display_size(app);
     let (w, h) = (1100.0, 76.0);
-    WebviewWindowBuilder::new(app, "recorder", WebviewUrl::App("recorder.html".into()))
+    let builder = WebviewWindowBuilder::new(app, "recorder", WebviewUrl::App("recorder.html".into()));
+    // WebView2 would ask before the camera bubble / microphone; the page is our own
+    #[cfg(windows)]
+    let builder = builder.on_permission_request(|_, kind| {
+        use tauri::webview::{PermissionKind, PermissionResponse};
+        match kind {
+            PermissionKind::Camera | PermissionKind::Microphone => PermissionResponse::Allow,
+            _ => PermissionResponse::Default,
+        }
+    });
+    builder
         .title("ScreenCraft")
         .inner_size(w, h)
         .position((sw - w) / 2.0, sh - h - 90.0)
@@ -149,6 +162,7 @@ pub fn show_recorder_window(app: &AppHandle) -> tauri::Result<()> {
         .build()?;
     if let Some(w) = app.get_webview_window("recorder") {
         raise_above_frame(&w);
+        exclude_from_capture(&w);
     }
     Ok(())
 }
@@ -350,6 +364,7 @@ pub async fn show_area_frame(app: AppHandle, rect: FrameRect, display_id: Option
         .build()
         .map_err(|e| e.to_string())?;
     let _ = win.set_ignore_cursor_events(true);
+    exclude_from_capture(&win);
 
     // keep the toolbar above the dimmed surround
     if let Some(r) = app.get_webview_window("recorder") {
@@ -434,6 +449,7 @@ fn ensure_menu_window(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
         .build()?;
     #[cfg(target_os = "macos")]
     with_ns_window(&w, |n| n.setLevel(26));
+    exclude_from_capture(&w);
     Ok(w)
 }
 

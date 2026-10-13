@@ -11,9 +11,9 @@ mod macos;
 pub use macos::Capture;
 
 #[cfg(windows)]
-mod windows;
+mod win;
 #[cfg(windows)]
-pub use windows::Capture;
+pub use win::Capture;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

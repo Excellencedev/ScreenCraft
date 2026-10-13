@@ -5,12 +5,15 @@ mod ax;
 mod capture;
 mod commands;
 mod compress;
-#[cfg(target_os = "macos")]
 mod inputlog;
 mod jpegio;
 mod levelmic;
 #[cfg(windows)]
 mod mf;
+#[cfg(windows)]
+mod monitors;
+#[cfg(windows)]
+mod wasapi;
 mod proxy;
 mod srcframes;
 mod meter;

@@ -82,8 +82,7 @@ pub fn list_sources() -> CmdResult<Sources> {
     Ok(Sources { displays, windows })
 }
 
-/// Displays come from Tauri's monitor list (in logical pixels, like the macOS points);
-/// window capture is not implemented on Windows yet, so no windows are offered.
+/// Displays and windows from `monitors.rs`, in logical pixels. Window ids are HWNDs.
 #[cfg(windows)]
 #[tauri::command]
 pub fn list_sources(app: tauri::AppHandle) -> CmdResult<Sources> {
@@ -100,5 +99,17 @@ pub fn list_sources(app: tauri::AppHandle) -> CmdResult<Sources> {
             is_main: d.is_main,
         })
         .collect();
-    Ok(Sources { displays, windows: Vec::new() })
+    let windows = crate::monitors::windows()
+        .into_iter()
+        .filter_map(|w| {
+            let d = crate::monitors::display_of_window(w.hwnd)?;
+            let (x, y) = d.to_logical(w.phys.0 as f64, w.phys.1 as f64);
+            let (width, height) = (w.phys.2 as f64 / d.scale, w.phys.3 as f64 / d.scale);
+            if width < 120.0 || height < 80.0 {
+                return None;
+            }
+            Some(WindowInfo { id: w.hwnd.0 as usize as u32, title: w.title, app: w.app, x, y, width, height })
+        })
+        .collect();
+    Ok(Sources { displays, windows })
 }

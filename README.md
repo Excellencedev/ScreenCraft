@@ -109,12 +109,16 @@ permissions persist across rebuilds.
 
 ### Windows (work in progress)
 
-A Windows port is under way on the `windows-port` branch. Opening, editing and
-exporting projects works: video is decoded with Media Foundation and JPEG frames are
-encoded with WIC, so no ffmpeg is needed there either. Recording, the standalone
-compressor, device lists and the system-audio meter are not implemented yet and
-report "not available on Windows yet". Needs [Rust](https://rustup.rs) with the MSVC
-toolchain and the WebView2 runtime (preinstalled on Windows 11).
+A Windows port is under way on the `windows-port` branch. Recording (display,
+window or area, with camera, microphone and system audio), editing and exporting
+work. Capture uses Windows.Graphics.Capture, encoding and decoding go through Media
+Foundation (hardware H.264 where available), system audio comes from a WASAPI
+loopback, and the camera and microphone are recorded by the web view as on macOS.
+No permissions setup is needed. Not done yet: the standalone compressor (and
+compress-after-export). Typing focus follows the text caret only in apps that use
+the classic Win32 caret; elsewhere it is estimated from keystrokes. Needs
+[Rust](https://rustup.rs) with the MSVC toolchain and the WebView2 runtime
+(preinstalled on Windows 11).
 
 ```powershell
 cargo run -p screencraft
