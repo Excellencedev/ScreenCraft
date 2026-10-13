@@ -65,4 +65,15 @@ export function showError(msg) {
 }
 
 /** Hooks registered by main.js so modules can trigger a re-render without importing each other. */
-export const hooks = { render: () => {} };
+export const hooks = { render: () => {}, loading: () => {} };
+
+/** Inputs that are enabled but still starting up (camera stream, mic stream, system meter). */
+const pending = { camera: false, mic: false, sys: false };
+export function setLoading(key, on) {
+  if (pending[key] === on) return;
+  pending[key] = on;
+  hooks.loading();
+}
+/** Is this input enabled and still loading? */
+export const isLoading = (key) => pending[key] && !!state[key];
+export const anyLoading = () => ["camera", "mic", "sys"].some(isLoading);

@@ -1,9 +1,10 @@
 // Live input level meters: microphone (WebAudio) and system audio (Rust).
 import { invoke, listen } from "../tauri.js";
-import { $, state } from "./state.js";
+import { $, state, setLoading } from "./state.js";
 
 let micStream = null, micCtx = null, analyser = null, micBuf = null, micLoop = 0;
 let micLevel = 0, sysLevel = 0;
+let micOpening = false, sysOpening = false;
 
 /** Map a linear peak (0..1) to a pleasant 0..1 bar position (−60..0 dBFS). */
 const toBar = (v) => Math.max(0, Math.min(1, (20 * Math.log10(Math.max(v, 1e-5)) + 60) / 60));
@@ -27,7 +28,9 @@ function pollMic(id) {
 }
 
 export async function startMicMeter() {
-  if (micStream || !state.mic || document.hidden) return;
+  if (micStream || micOpening || !state.mic || document.hidden) return;
+  micOpening = true;
+  setLoading("mic", true);
   try {
     // match the chosen device by name (WebKit device ids differ from AVFoundation ids)
     let deviceId;
@@ -48,6 +51,12 @@ export async function startMicMeter() {
     pollMic(++micLoop);
   } catch {
     stopMicMeter();
+  } finally {
+    micOpening = false;
+    setLoading("mic", false);
+    // the toggle may have changed while the stream was opening
+    if (micStream && !state.mic) stopMicMeter();
+    document.querySelector("#optMic")?.classList.toggle("listening", !!micStream);
   }
 }
 
@@ -64,11 +73,17 @@ export function stopMicMeter() {
 
 let sysRunning = false;
 export async function startSysMeter() {
-  if (sysRunning || !state.sys) return;
+  if (sysRunning || sysOpening || !state.sys) return;
+  sysOpening = true;
+  setLoading("sys", true);
   try {
     await invoke("meter_start");
     sysRunning = true;
-  } catch {}
+  } catch {
+  } finally {
+    sysOpening = false;
+    setLoading("sys", false);
+  }
 }
 export async function stopSysMeter() {
   if (!sysRunning) return;

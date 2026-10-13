@@ -56,7 +56,30 @@
     background: var(--accent); color: #fff; border-radius: 10px; padding: 0 16px; height: 46px; font-weight: 600; font-size: 13.5px;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
   }
-  .rec:hover { background: var(--accent-2); }
+  .rec { position: relative; }
+  .rec:hover:not(:disabled) { background: var(--accent-2); }
+  .rec:disabled { opacity: .5; cursor: not-allowed; }
+  /* the logo's four corner marks */
+  .rec::before {
+    content: ""; position: absolute; inset: 5px; pointer-events: none;
+    --c: rgba(255,255,255,.75); --l: 9px; --t: 2px;
+    background:
+      linear-gradient(var(--c), var(--c)) left top / var(--l) var(--t),
+      linear-gradient(var(--c), var(--c)) left top / var(--t) var(--l),
+      linear-gradient(var(--c), var(--c)) right top / var(--l) var(--t),
+      linear-gradient(var(--c), var(--c)) right top / var(--t) var(--l),
+      linear-gradient(var(--c), var(--c)) left bottom / var(--l) var(--t),
+      linear-gradient(var(--c), var(--c)) left bottom / var(--t) var(--l),
+      linear-gradient(var(--c), var(--c)) right bottom / var(--l) var(--t),
+      linear-gradient(var(--c), var(--c)) right bottom / var(--t) var(--l);
+    background-repeat: no-repeat;
+  }
+  /* inputs that are still starting show only a spinner */
+  .spin { display: none; position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; border: 2px solid rgba(255,255,255,.18); border-top-color: var(--accent-2); animation: spin .7s linear infinite; }
+  .opt.loading { pointer-events: none; }
+  .opt.loading > :not(.spin) { visibility: hidden; }
+  .opt.loading .spin { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .rec .dot { width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.28); }
   .menu {
     position: absolute; bottom: 84px; background: rgba(13,19,30,.98); border: 1px solid var(--line-2);
@@ -101,9 +124,9 @@
     <div class="grp">
       <div class="cap">Inputs</div>
       <div class="row">
-        <button class="opt off" id="optCamera"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3z"/></svg><canvas id="camPreview" width="80" height="80"></canvas><span class="t">No camera</span></button>
-        <button class="opt off" id="optMic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span class="t">No microphone</span><i class="meter" id="micMeter"><b></b></i></button>
-        <button class="opt off" id="optSys"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 010 6"/></svg><span class="t">No system audio</span><i class="meter" id="sysMeter"><b></b></i></button>
+        <button class="opt off" id="optCamera"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3z"/></svg><canvas id="camPreview" width="80" height="80"></canvas><span class="t">No camera</span><i class="spin"></i></button>
+        <button class="opt off" id="optMic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span class="t">No microphone</span><i class="meter" id="micMeter"><b></b></i><i class="spin"></i></button>
+        <button class="opt off" id="optSys"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 010 6"/></svg><span class="t">No system audio</span><i class="meter" id="sysMeter"><b></b></i><i class="spin"></i></button>
       </div>
     </div>
     <div class="sep"></div>

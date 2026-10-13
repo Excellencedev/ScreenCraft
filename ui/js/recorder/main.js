@@ -1,5 +1,5 @@
 import { invoke, listen } from "../tauri.js";
-import { $, state, RESOLUTIONS, FPS_CHOICES, savePrefs, showError, hooks } from "./state.js";
+import { $, state, RESOLUTIONS, FPS_CHOICES, savePrefs, showError, hooks, isLoading, anyLoading } from "./state.js";
 import { win, showBar, enableDragging } from "./window.js";
 import { openMenu, closeMenu, isMenuOpen } from "./menu.js";
 import { syncPreview } from "./preview.js";
@@ -23,8 +23,18 @@ function render() {
   $("recLabel").textContent = "Record";
   syncPreview();
   syncMeters();
+  updateLoading();
 }
 hooks.render = render;
+
+/** Inputs that are still starting show a spinner; Record stays disabled until all are ready. */
+function updateLoading() {
+  for (const [id, key] of [["optCamera", "camera"], ["optMic", "mic"], ["optSys", "sys"]]) {
+    $(id).classList.toggle("loading", isLoading(key));
+  }
+  $("btnRec").disabled = anyLoading();
+}
+hooks.loading = updateLoading;
 
 async function refreshSources() {
   try {
@@ -161,9 +171,13 @@ await listen("area-cancelled", async () => {
   if (!state.area) await chooseMode("display");
   else invoke("show_area_frame", { rect: state.area, displayId: state.displayId }).catch(() => {});
 });
-await listen("toggle-record", () => (state.phase === "recording" ? finishRecording() : beginRecording()));
+await listen("toggle-record", () => (state.phase === "recording" || state.phase === "countdown" ? finishRecording() : beginRecording()));
 await listen("stop-record", () => finishRecording());
-addEventListener("keydown", (e) => { if (e.key === "Escape" && isMenuOpen()) closeMenu(); });
+addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (state.phase === "countdown") finishRecording();
+  else if (isMenuOpen()) closeMenu();
+});
 
 enableDragging();
 render();

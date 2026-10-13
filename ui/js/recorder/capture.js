@@ -1,6 +1,6 @@
 // Start / stop recording (screen via Rust, camera via MediaRecorder).
 import { invoke } from "../tauri.js";
-import { $, state, showError, hooks } from "./state.js";
+import { $, state, showError, hooks, anyLoading } from "./state.js";
 import { showBar, resizeBar } from "./window.js";
 import { closeMenu, isMenuOpen } from "./menu.js";
 import { getPreview, openCameraStream, startDrawLoop, syncPreview } from "./preview.js";
@@ -122,6 +122,7 @@ async function ensurePermissions() {
 
 export async function beginRecording() {
   if (state.phase !== "idle") return;
+  if (anyLoading()) return; // inputs are still starting up
   if (!(await ensurePermissions())) return;
   if (isMenuOpen()) await closeMenu();
   if (state.mode === "window" && !state.windowId) return hooks.chooseMode("window");
@@ -147,21 +148,29 @@ export async function beginRecording() {
   }
 
   state.phase = "countdown";
+  const run = ++countdownRun;
   document.body.classList.add("countdown");
   $("hudLeft").style.display = "none";
-  $("btnStop").style.display = "none";
+  // during the countdown the Stop button becomes Cancel (Escape does the same)
+  $("btnStop").textContent = "Cancel";
+  $("btnStop").style.display = "block";
   $("count").style.display = "block";
-  await resizeBar(220, 60);
+  $("count").style.width = "auto";
+  $("count").style.flex = "1";
+  await resizeBar(240, 60);
+  const cancelled = () => run !== countdownRun || state.phase !== "countdown";
   for (let i = 3; i > 0; i--) {
     $("count").textContent = String(i);
-    await new Promise((r) => setTimeout(r, 1000));
-    if (state.phase !== "countdown") {
+    for (let w = 0; w < 10 && !cancelled(); w++) await new Promise((r) => setTimeout(r, 100));
+    if (cancelled()) {
       if (cam && !cam.shared) cam.stream.getTracks().forEach((t) => t.stop());
       mic?.stream.getTracks().forEach((t) => t.stop());
       return;
     }
   }
   $("count").style.display = "none";
+  $("btnStop").textContent = "Stop";
+  $("btnStop").style.display = "none";
 
   try {
     await invoke("start_recording", {
@@ -228,9 +237,16 @@ export async function beginRecording() {
   }, 250);
 }
 
+let countdownRun = 0;
+
 export async function finishRecording() {
   if (state.phase === "countdown") {
+    // cancel before anything was started
+    countdownRun++;
     state.phase = "idle";
+    $("btnStop").textContent = "Stop";
+    $("count").style.flex = "";
+    $("count").style.width = "";
     return resetUI();
   }
   if (state.phase !== "recording") return;

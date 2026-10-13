@@ -1,8 +1,9 @@
 // Live camera preview inside the toolbar (and a thumbnail in the HUD).
-import { $, state, showError } from "./state.js";
+import { $, state, showError, setLoading } from "./state.js";
 
 let preview = null;
 let drawLoop = 0;
+let opening = false;
 
 const withTimeout = (p, ms, what) =>
   Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what + " timed out")), ms))]);
@@ -63,7 +64,9 @@ export async function syncPreview() {
     if (state.phase === "idle") stopPreview();
     return;
   }
-  if (preview) return;
+  if (preview || opening) return;
+  opening = true;
+  setLoading("camera", true);
   try {
     const s = await openCameraStream();
     if (!(state.camera && state.phase === "idle" && !document.hidden) || preview) {
@@ -79,6 +82,9 @@ export async function syncPreview() {
   } catch (e) {
     stopPreview();
     showError("Camera preview unavailable: " + (e?.message || e));
+  } finally {
+    opening = false;
+    setLoading("camera", false);
   }
 }
 
