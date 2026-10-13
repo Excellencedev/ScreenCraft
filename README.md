@@ -157,6 +157,10 @@ cargo check -p screencraft         # type-check the app
 ./scripts/bundle.sh --install      # rebuild and reinstall
 ```
 
+## License
+
+MIT, see [LICENSE](LICENSE).
+
 ## Known limitations
 
 - macOS only (it depends on ScreenCaptureKit and AVFoundation).
