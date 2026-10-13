@@ -9,7 +9,9 @@
   of the bottom third) plus TikTok red, highlight, classic and minimal presets; export SRT.
 - Shortcut display: pops up recorded shortcuts and special keys (only those are stored).
 - Camera layouts track: large bubble, camera only, side by side (either side), camera off.
-  Nine anchor points for the bubble and a flush-to-edge option.
+  Every block can have its own camera settings (size, position, shape, mirror, border, shadow,
+  flush-to-edge) and the camera eases smoothly between blocks. Nine anchor points for the
+  bubble and a flush-to-edge option.
 - Pace: speed up idle stretches, speed ramps, freeze frame and cut transitions (cross-dissolve,
   fade, flash, blur, slide, zoom).
 - Music fades and ducking under speech; built-in click and typing sound effects.

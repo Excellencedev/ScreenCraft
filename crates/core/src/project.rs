@@ -245,11 +245,14 @@ pub struct CameraLayoutRegion {
     pub source_start_ms: f64,
     pub source_end_ms: f64,
     pub layout: String,
+    /// Camera settings used only while this block is active (size, position, shape, mirror ...).
+    /// `None` follows the project's camera settings. Everything eases between blocks.
+    pub settings: Option<CameraConfig>,
 }
 
 impl Default for CameraLayoutRegion {
     fn default() -> Self {
-        Self { id: String::new(), source_start_ms: 0.0, source_end_ms: 0.0, layout: "bubble".into() }
+        Self { id: String::new(), source_start_ms: 0.0, source_end_ms: 0.0, layout: "bubble".into(), settings: None }
     }
 }
 

@@ -95,6 +95,10 @@ pub struct RenderTrack {
     pub layout_cur: Vec<u8>,
     pub layout_prev: Vec<u8>,
     pub layout_mix: Vec<f64>,
+    /// Index of the active / previous camera layout block in `scene.camera_layouts` (-1 = none),
+    /// so per-block camera settings can be eased between.
+    pub layout_cur_idx: Vec<i32>,
+    pub layout_prev_idx: Vec<i32>,
 }
 
 fn r4(v: f64) -> f64 {
@@ -135,6 +139,8 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
     // camera layout state: eased over ~0.35 s whenever the layout changes
     let mut lay_cur = 0u8;
     let mut lay_prev = 0u8;
+    let mut lay_cur_idx = -1i32;
+    let mut lay_prev_idx = -1i32;
     let mut lay_mix = 1.0f64;
     let mut lay_init = false;
     let starts = crate::timeline::slice_output_starts(slices);
@@ -329,27 +335,36 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
         tr.other_alpha.push(r4(o_a));
 
         // --- camera layout ---
-        let want = p
+        let want_idx = p
             .scene
             .camera_layouts
             .iter()
+            .enumerate()
             .rev()
-            .find(|r| t_src >= r.source_start_ms && t_src < r.source_end_ms)
-            .map(|r| layout_id(&r.layout))
-            .unwrap_or(0);
+            .find(|(_, r)| t_src >= r.source_start_ms && t_src < r.source_end_ms)
+            .map(|(i, _)| i as i32)
+            .unwrap_or(-1);
+        let want = if want_idx >= 0 { layout_id(&p.scene.camera_layouts[want_idx as usize].layout) } else { 0 };
         if !lay_init {
             lay_cur = want;
             lay_prev = want;
+            lay_cur_idx = want_idx;
+            lay_prev_idx = want_idx;
             lay_init = true;
-        } else if want != lay_cur {
+        } else if want_idx != lay_cur_idx {
+            // a different block (even with the same layout, its settings may differ): ease over
             lay_prev = lay_cur;
+            lay_prev_idx = lay_cur_idx;
             lay_cur = want;
+            lay_cur_idx = want_idx;
             lay_mix = 0.0;
         } else {
-            lay_mix = (lay_mix + dt / 0.35).min(1.0);
+            lay_mix = (lay_mix + dt / 0.5).min(1.0);
         }
         tr.layout_cur.push(lay_cur);
         tr.layout_prev.push(lay_prev);
+        tr.layout_cur_idx.push(lay_cur_idx);
+        tr.layout_prev_idx.push(lay_prev_idx);
         tr.layout_mix.push(r4(lay_mix));
     }
 
@@ -583,6 +598,7 @@ mod tests {
             source_start_ms: 2000.0,
             source_end_ms: 4000.0,
             layout: "side-right".into(),
+            settings: None,
         });
         // cut the recording in two at 3000 ms with a fade across the join
         p.scene.slices = vec![
@@ -637,6 +653,27 @@ mod tests {
         assert!(tr.other_alpha[j] > 0.0 && tr.other_alpha[j] < 0.5);
         // away from the cut nothing is blended
         assert_eq!(tr.other_alpha[f(500.0)], 0.0);
+    }
+
+    #[test]
+    fn neighbouring_blocks_with_different_settings_ease_between() {
+        use crate::project::{CameraConfig, CameraLayoutRegion};
+        let (mut p, log) = project();
+        let big = CameraConfig { size_ratio: 0.5, ..Default::default() };
+        p.scene.camera_layouts = vec![
+            CameraLayoutRegion { id: "a".into(), source_start_ms: 0.0, source_end_ms: 2000.0, layout: "bubble".into(), settings: None },
+            CameraLayoutRegion { id: "b".into(), source_start_ms: 2000.0, source_end_ms: 4000.0, layout: "bubble".into(), settings: Some(big) },
+        ];
+        let tr = compute_track(&p, &log, 60.0);
+        let f = |ms: f64| (ms * 60.0 / 1000.0).round() as usize;
+        assert_eq!(tr.layout_cur_idx[f(1000.0)], 0);
+        assert_eq!(tr.layout_cur_idx[f(3000.0)], 1);
+        // right after the boundary: block b is current, a is previous, mix still running
+        let j = f(2100.0);
+        assert_eq!(tr.layout_cur_idx[j], 1);
+        assert_eq!(tr.layout_prev_idx[j], 0);
+        assert!(tr.layout_mix[j] > 0.0 && tr.layout_mix[j] < 1.0);
+        assert_eq!(tr.layout_mix[f(3000.0)], 1.0);
     }
 
     #[test]

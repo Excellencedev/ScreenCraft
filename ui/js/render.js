@@ -62,11 +62,18 @@ function rr(ctx, x, y, w, h, r) {
   ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2));
 }
 
-function camScale(p, zoom) {
+/** The camera settings in force for layout block `idx` (-1 = none): its own, else the project's. */
+export function camSettings(p, idx) {
+  const base = p.config.camera;
+  const r = idx >= 0 ? (p.scene.cameraLayouts || [])[idx] : null;
+  return r && r.settings ? { ...base, ...r.settings, position: { ...base.position, ...(r.settings.position || {}) } } : base;
+}
+
+function camScale(cc, p, zoom) {
   const maxZ = Math.max(1.0001, ...p.scene.zooms.filter((z) => !z.isDisabled).map((z) => z.zoom));
   const t = Math.min(1, Math.max(0, (zoom - 1) / (maxZ - 1)));
   const f = t * t * (3 - 2 * t); // smooth, follows the eased zoom so the bubble shrinks gradually
-  return 1 + (p.config.camera.zoomedScale - 1) * f;
+  return 1 + (cc.zoomedScale - 1) * f;
 }
 
 /**
@@ -117,12 +124,11 @@ function staticLayer(p, W, H, src, shadowRect) {
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeK = (t) => t * t * (3 - 2 * t);
 
-/** The camera bubble's box for the project's camera settings (`mul` scales its size). */
-function bubbleBox(p, W, H, r, zoom, mul = 1) {
-  const cc = p.config.camera;
+/** The camera bubble's box for camera settings `cc` (`mul` scales its size). */
+function bubbleBox(p, cc, W, H, zoom, mul = 1) {
   const s = H / 1080;
   const a = cc.aspectRatio || 1;
-  let base = cc.sizeRatio * Math.min(W, H) * camScale(p, zoom) * mul;
+  let base = cc.sizeRatio * Math.min(W, H) * camScale(cc, p, zoom) * mul;
   base = Math.min(base, Math.min(W, H) * 0.8);
   const w = a >= 1 ? base * a : base;
   const h = a >= 1 ? base : base / a;
@@ -137,21 +143,23 @@ function bubbleBox(p, W, H, r, zoom, mul = 1) {
 }
 
 /**
- * Where the screen and camera go for a camera layout id:
- * 0 bubble, 1 hidden, 2 large, 3 camera only, 4 side by side (camera right), 5 (camera left).
+ * Where the screen and camera go for a camera layout id (0 bubble, 1 hidden, 2 large,
+ * 3 camera only, 4 side by side with the camera right, 5 camera left) under the camera
+ * settings `cc`. Everything that can be eased is a number so two of these can be mixed.
  */
-function layoutGeom(id, p, W, H, r, zoom, hasCam) {
+function layoutGeom(id, cc, p, W, H, r, zoom, hasCam) {
   const s = H / 1080;
   const rad = p.config.styles.cornerRadius * s;
+  const look = { shadow: cc.shadow ? 1 : 0, border: cc.border ? 1 : 0, mir: cc.mirror ? -1 : 1, bcol: cc.borderColor || "#ffffff" };
   if (!hasCam || id === 0 || id === 1) {
-    const b = bubbleBox(p, W, H, r, zoom);
-    return { sr: r, sa: 1, cr: b, ca: hasCam && id === 0 && !p.config.camera.hide ? 1 : 0, rad: b.rad };
+    const b = bubbleBox(p, cc, W, H, zoom);
+    return { sr: r, sa: 1, cr: b, ca: hasCam && id === 0 && !cc.hide ? 1 : 0, rad: b.rad, ...look };
   }
   if (id === 2) {
-    const b = bubbleBox(p, W, H, r, zoom, 1.7);
-    return { sr: r, sa: 1, cr: b, ca: p.config.camera.hide ? 0 : 1, rad: b.rad };
+    const b = bubbleBox(p, cc, W, H, zoom, 1.7);
+    return { sr: r, sa: 1, cr: b, ca: cc.hide ? 0 : 1, rad: b.rad, ...look };
   }
-  if (id === 3) return { sr: r, sa: 0, cr: { x: r.x, y: r.y, w: r.w, h: r.h }, ca: 1, rad };
+  if (id === 3) return { sr: r, sa: 0, cr: { x: r.x, y: r.y, w: r.w, h: r.h }, ca: 1, rad, ...look };
   const gap = r.w * 0.025;
   const sw = r.w * 0.64, cw = r.w - sw - gap;
   const asp = contentAspect(p);
@@ -160,12 +168,18 @@ function layoutGeom(id, p, W, H, r, zoom, hasCam) {
   const screenX = left ? r.x + cw + gap : r.x;
   const sr = { x: screenX + (sw - fw) / 2, y: r.y + (r.h - fh) / 2, w: fw, h: fh };
   const cr = { x: left ? r.x : r.x + sw + gap, y: r.y, w: cw, h: r.h };
-  return { sr, sa: 1, cr, ca: 1, rad };
+  return { sr, sa: 1, cr, ca: 1, rad, ...look };
 }
 
 function mixGeom(a, b, t) {
   const m = (u, v) => ({ x: lerp(u.x, v.x, t), y: lerp(u.y, v.y, t), w: lerp(u.w, v.w, t), h: lerp(u.h, v.h, t) });
-  return { sr: m(a.sr, b.sr), sa: lerp(a.sa, b.sa, t), cr: m(a.cr, b.cr), ca: lerp(a.ca, b.ca, t), rad: lerp(a.rad, b.rad, t) };
+  return {
+    sr: m(a.sr, b.sr), sa: lerp(a.sa, b.sa, t), cr: m(a.cr, b.cr), ca: lerp(a.ca, b.ca, t), rad: lerp(a.rad, b.rad, t),
+    shadow: lerp(a.shadow, b.shadow, t), border: lerp(a.border, b.border, t),
+    // mirroring flips through zero width, so a change of mirror turns the picture around smoothly
+    mir: lerp(a.mir, b.mir, t),
+    bcol: t < 0.5 ? a.bcol : b.bcol,
+  };
 }
 
 /**
@@ -186,11 +200,13 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
   const cv = src.camera;
   const cW = cv && (cv.videoWidth || cv.width), cH = cv && (cv.videoHeight || cv.height);
   const hasCam = !!(cv && cW);
-  const gCur = layoutGeom(cam.layCur | 0, p, W, H, r, cam.zoom, hasCam);
+  const idxCur = cam.layIdxCur == null ? -1 : cam.layIdxCur;
+  const idxPrev = cam.layIdxPrev == null ? -1 : cam.layIdxPrev;
+  const gCur = layoutGeom(cam.layCur | 0, camSettings(p, idxCur), p, W, H, r, cam.zoom, hasCam);
   const mixT = cam.layMix == null ? 1 : easeK(Math.max(0, Math.min(1, cam.layMix)));
-  const geo = mixT >= 1 || (cam.layPrev | 0) === (cam.layCur | 0)
+  const geo = mixT >= 1 || ((cam.layPrev | 0) === (cam.layCur | 0) && idxPrev === idxCur)
     ? gCur
-    : mixGeom(layoutGeom(cam.layPrev | 0, p, W, H, r, cam.zoom, hasCam), gCur, mixT);
+    : mixGeom(layoutGeom(cam.layPrev | 0, camSettings(p, idxPrev), p, W, H, r, cam.zoom, hasCam), gCur, mixT);
   const sr = geo.sr;
 
   // background + shadow (cached layer; the shadow follows the screen's rectangle)
@@ -289,14 +305,13 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
   }
 
   // camera
-  const cc = p.config.camera;
   if (hasCam && geo.ca > 0.01) {
     const { cr } = geo;
     const x = cr.x, y = cr.y, cw = cr.w, ch = cr.h;
     ctx.save();
     ctx.globalAlpha *= geo.ca;
-    if (cc.shadow) {
-      ctx.shadowColor = "rgba(0,0,0,.45)";
+    if (geo.shadow > 0.01) {
+      ctx.shadowColor = `rgba(0,0,0,${0.45 * geo.shadow})`;
       ctx.shadowBlur = 28 * s;
       ctx.shadowOffsetY = 8 * s;
     }
@@ -318,23 +333,20 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
       if (vaI > a) w = h * a; else h = w / a;
       ctx.save();
       ctx.globalAlpha *= alpha;
-      if (cc.mirror) {
-        ctx.translate(x + cw, y);
-        ctx.scale(-1, 1);
-        ctx.drawImage(img, (iw - w) / 2, (ih - h) / 2, w, h, 0, 0, cw, ch);
-      } else {
-        ctx.drawImage(img, (iw - w) / 2, (ih - h) / 2, w, h, x, y, cw, ch);
-      }
+      // mirror eases through 0 (a flip) via the horizontal scale
+      ctx.translate(x + cw / 2, y);
+      ctx.scale(Math.abs(geo.mir) < 0.02 ? 0.02 : geo.mir, 1);
+      ctx.drawImage(img, (iw - w) / 2, (ih - h) / 2, w, h, -cw / 2, 0, cw, ch);
       ctx.restore();
     };
     drawCam(cv, cW, cH, 1);
     if (blend2) drawCam(cv2, cv2.videoWidth || cv2.width, cv2.videoHeight || cv2.height, Math.min(1, ca2));
     ctx.restore();
-    if (cc.border) {
+    if (geo.border > 0.01) {
       ctx.save();
-      ctx.globalAlpha *= geo.ca;
+      ctx.globalAlpha *= geo.ca * geo.border;
       ctx.lineWidth = 3 * s;
-      ctx.strokeStyle = cc.borderColor || "#ffffff";
+      ctx.strokeStyle = geo.bcol || "#ffffff";
       rr(ctx, x, y, cw, ch, geo.rad);
       ctx.stroke();
       ctx.restore();
@@ -363,6 +375,8 @@ export function camAt(track, fi) {
     transKind: track.transKind ? track.transKind[i] : 0,
     transP: track.transP ? track.transP[i] : 0,
     layCur: track.layoutCur ? track.layoutCur[i] : 0,
+    layIdxCur: track.layoutCurIdx ? track.layoutCurIdx[i] : -1,
+    layIdxPrev: track.layoutPrevIdx ? track.layoutPrevIdx[i] : -1,
     layPrev: track.layoutPrev ? track.layoutPrev[i] : 0,
     layMix: track.layoutMix ? track.layoutMix[i] : 1,
   };

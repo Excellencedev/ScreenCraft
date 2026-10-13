@@ -146,7 +146,7 @@ export function renderTimeline() {
       el.className = "block layout" + (S.selected?.type === "layout" && S.selected.id === r.id ? " sel" : "");
       el.style.left = a * pxPerMs + "px";
       el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
-      el.innerHTML = `<div class="h l"></div><span>${LAYOUT_NAMES[r.layout] || r.layout}</span><div class="h r"></div>`;
+      el.innerHTML = `<div class="h l"></div><span>${LAYOUT_NAMES[r.layout] || r.layout}${r.settings ? " · custom" : ""}</span><div class="h r"></div>`;
       el.onpointerdown = (e) => beginRegionDrag(e, r, "layout", el, pxPerMs, a, b);
       cf.appendChild(el);
     }

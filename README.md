@@ -66,7 +66,8 @@ meters, resolution and frame rate, and the project list.
   them on the preview. A **shortcut display** pops up keys like ⌘C or Esc as you press
   them (recordings made with this version or newer).
 - **Camera layouts:** a Camera track changes how the camera is shown over time: large
-  bubble, camera only, side by side (either side) or camera off, eased between.
+  bubble, camera only, side by side (either side) or camera off. Each block can have its own
+  size, position, shape, mirror, border and shadow, and everything eases between blocks.
 - **Captions:** type them or import an SRT; the default is TikTok-style (heavy white text with
   a black outline in the middle of the bottom third), with red, highlight, classic and
   minimal looks; export your captions back to SRT.
