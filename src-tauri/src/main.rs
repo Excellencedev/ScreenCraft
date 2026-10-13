@@ -7,9 +7,10 @@ mod commands;
 mod compress;
 #[cfg(target_os = "macos")]
 mod inputlog;
-#[cfg(target_os = "macos")]
 mod jpegio;
 mod levelmic;
+#[cfg(windows)]
+mod mf;
 mod proxy;
 mod srcframes;
 mod meter;
@@ -204,7 +205,7 @@ fn main() {
                         let _ = windows::show_permissions_window(app);
                     }
                     "compress" => {
-                        let _ = windows::show_compressor(app.clone(), None);
+                        let _ = windows::show_compressor_window(app, None);
                     }
                     "stop" => {
                         let _ = app.emit("stop-record", ());

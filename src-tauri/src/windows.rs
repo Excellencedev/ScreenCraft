@@ -176,18 +176,25 @@ fn url_escape(s: &str) -> String {
     s.replace('%', "%25").replace(' ', "%20").replace('&', "%26").replace('#', "%23")
 }
 
+// Commands that create windows are async: creating a webview from a synchronous
+// command (which runs on the main thread) deadlocks on Windows / WebView2.
+
 #[tauri::command]
-pub fn show_recorder(app: AppHandle) -> Result<(), String> {
+pub async fn show_recorder(app: AppHandle) -> Result<(), String> {
     show_recorder_window(&app).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn show_permissions(app: AppHandle) -> Result<(), String> {
+pub async fn show_permissions(app: AppHandle) -> Result<(), String> {
     show_permissions_window(&app).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn show_compressor(app: AppHandle, input: Option<String>) -> Result<(), String> {
+pub async fn show_compressor(app: AppHandle, input: Option<String>) -> Result<(), String> {
+    show_compressor_window(&app, input)
+}
+
+pub fn show_compressor_window(app: &AppHandle, input: Option<String>) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("compress") {
         let _ = w.close();
     }
@@ -195,7 +202,7 @@ pub fn show_compressor(app: AppHandle, input: Option<String>) -> Result<(), Stri
         Some(p) => format!("compress.html?input={}", url_escape(&p)),
         None => "compress.html".into(),
     };
-    WebviewWindowBuilder::new(&app, "compress", WebviewUrl::App(url.into()))
+    WebviewWindowBuilder::new(app, "compress", WebviewUrl::App(url.into()))
         .title("Compress video")
         .inner_size(780.0, 700.0)
         .min_inner_size(660.0, 600.0)
@@ -207,7 +214,7 @@ pub fn show_compressor(app: AppHandle, input: Option<String>) -> Result<(), Stri
 }
 
 #[tauri::command]
-pub fn open_editor(app: AppHandle, dir: String) -> Result<(), String> {
+pub async fn open_editor(app: AppHandle, dir: String) -> Result<(), String> {
     let label = format!("editor-{}", dir.bytes().fold(5381u64, |h, b| h.wrapping_mul(33) ^ b as u64));
     if let Some(w) = app.get_webview_window(&label) {
         w.set_focus().map_err(|e| e.to_string())?;
@@ -243,7 +250,7 @@ pub fn close_area_picker(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn open_area_picker(app: AppHandle, display_id: Option<u32>) -> Result<(), String> {
+pub async fn open_area_picker(app: AppHandle, display_id: Option<u32>) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("area") {
         let _ = w.close();
     }
@@ -306,7 +313,7 @@ pub struct FrameRect {
 /// surround and one transparent window draws the outline. They are our own
 /// windows, so ScreenCaptureKit excludes them from the recording.
 #[tauri::command]
-pub fn show_area_frame(app: AppHandle, rect: FrameRect, display_id: Option<u32>) -> Result<(), String> {
+pub async fn show_area_frame(app: AppHandle, rect: FrameRect, display_id: Option<u32>) -> Result<(), String> {
     hide_area_frame(app.clone());
 
     let displays = display_frames(&app)?;
@@ -437,7 +444,7 @@ pub fn prewarm_menu_window(app: &AppHandle) {
 /// Stash the items + anchor and tell the menu page to render; the page then calls
 /// `menu_show` with its measured size.
 #[tauri::command]
-pub fn open_menu_window(app: AppHandle, items: serde_json::Value, left: f64) -> Result<(), String> {
+pub async fn open_menu_window(app: AppHandle, items: serde_json::Value, left: f64) -> Result<(), String> {
     use tauri::Emitter;
     let rec = app.get_webview_window("recorder").ok_or("no recorder window")?;
     let scale = rec.scale_factor().map_err(|e| e.to_string())?;
@@ -456,7 +463,7 @@ pub fn menu_take_items() -> Option<serde_json::Value> {
 
 /// Size, place (bottom edge just above the bar) and reveal the menu in one go.
 #[tauri::command]
-pub fn menu_show(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
+pub async fn menu_show(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
     let Some((_, x, bottom)) = MENU_STATE.lock().unwrap().clone() else { return Ok(()) };
     let w = ensure_menu_window(&app).map_err(|e| e.to_string())?;
     w.set_size(tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;

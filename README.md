@@ -109,11 +109,12 @@ permissions persist across rebuilds.
 
 ### Windows (work in progress)
 
-A Windows port is under way on the `windows-port` branch. The app builds and its
-windows open (recorder bar, permissions, compressor), but recording, the preview
-proxy, export frames and compression are still stubs that report "not available on
-Windows yet". Needs [Rust](https://rustup.rs) with the MSVC toolchain and the
-WebView2 runtime (preinstalled on Windows 11).
+A Windows port is under way on the `windows-port` branch. Opening, editing and
+exporting projects works: video is decoded with Media Foundation and JPEG frames are
+encoded with WIC, so no ffmpeg is needed there either. Recording, the standalone
+compressor, device lists and the system-audio meter are not implemented yet and
+report "not available on Windows yet". Needs [Rust](https://rustup.rs) with the MSVC
+toolchain and the WebView2 runtime (preinstalled on Windows 11).
 
 ```powershell
 cargo run -p screencraft

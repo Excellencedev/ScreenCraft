@@ -1,5 +1,5 @@
 // Editor entry point: boot + event wiring. Everything else lives in sibling modules.
-import { invoke, listen, currentWindow } from "../tauri.js";
+import { invoke, listen, currentWindow, FILE_MANAGER } from "../tauri.js";
 import { $, S, P, dir, hooks, media, clamp } from "./state.js";
 import { outDuration } from "./timemap.js";
 import { change, undo, redo, updateUndo, saveNow } from "./history.js";
@@ -139,7 +139,7 @@ function bindUI() {
     const list = await invoke("recent_projects");
     const items = [{ header: "Projects" }];
     for (const pr of list.slice(0, 10)) items.push({ label: pr.name, run: () => invoke("open_editor", { dir: pr.dir }) });
-    items.push("-", { label: "Show this project in Finder", run: () => invoke("reveal_in_finder", { path: dir }) });
+    items.push("-", { label: `Show this project in ${FILE_MANAGER}`, run: () => invoke("reveal_in_finder", { path: dir }) });
     showMenu(anchor, items);
   };
   $("btnCrop").onclick = () => { S.tab = "crop"; renderPanel(); };
