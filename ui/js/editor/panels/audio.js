@@ -37,6 +37,15 @@ export function panelAudio(p) {
   }
   p.append(h3("Music"));
   const list = clips();
+  if (list.length && (m.mic || m.hasMicrophone)) {
+    p.append(toggle("Lower music when I speak", "Ducks the music under your microphone.", () => a.duckMusic, (v) => { a.duckMusic = v; resync(); }));
+    if (a.duckMusic) p.append(slider("Music while speaking", 0.05, 0.8, 0.05, () => a.duckLevel ?? 0.3, (v) => { a.duckLevel = v; resync(); }, { fmt: (v) => Math.round(v * 100) + "%", track: false, key: "duck-level" }));
+  }
+  const selClip = S.selected?.type === "music" && list.find((c) => c.id === S.selected.id);
+  if (selClip) {
+    p.append(slider("Fade in", 0, 5, 0.1, () => (selClip.fadeInMs || 0) / 1000, (v) => { selClip.fadeInMs = Math.round(v * 1000); resync(); }, { fmt: (v) => v.toFixed(1) + " s", track: false, key: "fade-in-" + selClip.id }));
+    p.append(slider("Fade out", 0, 5, 0.1, () => (selClip.fadeOutMs || 0) / 1000, (v) => { selClip.fadeOutMs = Math.round(v * 1000); resync(); }, { fmt: (v) => v.toFixed(1) + " s", track: false, key: "fade-out-" + selClip.id }));
+  }
   if (list.length) {
     p.append(slider("Music volume", 0, 1, 0.01, () => a.musicVolume ?? 0.5, (v) => { a.musicVolume = v; apply(); }, { fmt: (v) => Math.round(v * 100) + "%", track: false }));
     p.append(el('<div class="hint muted">Drag a green block to place it, drag its ends to trim, and press S to split at the playhead.</div>'));

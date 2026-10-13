@@ -4,33 +4,21 @@ import { h3, el } from "../widgets.js";
 
 const GROUPS = [
   {
-    title: "Annotate",
-    items: [
-      ["Text & callouts", "Titles, arrows and boxes with fade or pop animations, placed on the timeline."],
-      ["Blur & spotlight", "Hide passwords and personal info, or dim everything except one area."],
-      ["Keystroke overlay", "Show shortcuts like ⌘⇧4 as a pill while you press them."],
-    ],
-  },
-  {
-    title: "Pace & transitions",
-    items: [
-      ["Speed up idle parts", "Find stretches with no clicks, typing or speech and fast-forward them."],
-      ["Speed ramps", "Ease into and out of fast-forward instead of cutting speed abruptly."],
-      ["Transitions", "Fade, dissolve, wipe and cross-zoom between clips."],
-      ["Freeze frame", "Hold one frame for a moment, for example to point something out."],
-    ],
-  },
-  {
     title: "Sound & captions",
     items: [
-      ["Fades & ducking", "Fade music in and out and lower it automatically while you speak."],
       ["Subtitles", "Type or import SRT captions with styles and burn them into the video."],
+    ],
+  },
+  {
+    title: "Editing",
+    items: [
+      ["Cross-dissolve", "Blend two clips into each other, with overlapping clips on the timeline."],
+      ["Keyframes", "Animate the camera bubble and annotations over time."],
     ],
   },
   {
     title: "Look & export",
     items: [
-      ["Camera layouts", "Camera-only, side-by-side, or large and small for different parts of the video."],
       ["Title cards & logo", "Intro and outro slides and a watermark in the corner."],
       ["Green screen", "Key out a plain background behind you on the camera."],
       ["Platform presets", "One-click export settings for YouTube, X and vertical shorts."],

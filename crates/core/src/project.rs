@@ -83,6 +83,10 @@ pub struct Slice {
     pub volume: f64,
     pub hide_cursor: bool,
     pub disable_smooth_mouse: bool,
+    /// A held single frame (made by "Freeze frame"); its source range is ~1 frame stretched in time.
+    pub freeze: bool,
+    /// Transition played across the cut between the previous slice and this one.
+    pub transition: Option<Transition>,
 }
 
 impl Default for Slice {
@@ -95,7 +99,99 @@ impl Default for Slice {
             volume: 1.0,
             hide_cursor: false,
             disable_smooth_mouse: false,
+            freeze: false,
+            transition: None,
         }
+    }
+}
+
+/// A transition centred on the cut at the start of a slice. `kind`: fade | flash | blur | slide | zoom.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Transition {
+    pub kind: String,
+    pub duration_ms: f64,
+}
+
+impl Default for Transition {
+    fn default() -> Self {
+        Self { kind: "fade".into(), duration_ms: 500.0 }
+    }
+}
+
+/// Something drawn over the video for a stretch of the recording.
+/// `kind`: text | box | ellipse | arrow | highlight | blur | pixelate | spotlight.
+/// `space`: "content" is pinned to the recording (moves and scales with the camera),
+/// "screen" is fixed on the output frame. Coordinates are 0..1 of that space.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Annotation {
+    pub id: String,
+    pub kind: String,
+    pub space: String,
+    pub source_start_ms: f64,
+    pub source_end_ms: f64,
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+    /// Arrow end point.
+    pub x2: f64,
+    pub y2: f64,
+    pub text: String,
+    pub color: String,
+    /// Background fill for text; empty for none.
+    pub fill: String,
+    /// Text size in px at 1080p.
+    pub font_size: f64,
+    pub thickness: f64,
+    /// Blur / pixelate strength 0..1, spotlight dim 0..1.
+    pub strength: f64,
+    /// fade | pop | none
+    pub anim: String,
+    pub anim_ms: f64,
+}
+
+impl Default for Annotation {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            kind: "text".into(),
+            space: "screen".into(),
+            source_start_ms: 0.0,
+            source_end_ms: 0.0,
+            x: 0.5,
+            y: 0.5,
+            w: 0.3,
+            h: 0.12,
+            x2: 0.6,
+            y2: 0.6,
+            text: "Text".into(),
+            color: "#ffffff".into(),
+            fill: "#000000aa".into(),
+            font_size: 44.0,
+            thickness: 5.0,
+            strength: 0.6,
+            anim: "fade".into(),
+            anim_ms: 250.0,
+        }
+    }
+}
+
+/// What the camera looks like for a stretch of the recording.
+/// `layout`: bubble | hidden | large | camera | side-right | side-left.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CameraLayoutRegion {
+    pub id: String,
+    pub source_start_ms: f64,
+    pub source_end_ms: f64,
+    pub layout: String,
+}
+
+impl Default for CameraLayoutRegion {
+    fn default() -> Self {
+        Self { id: String::new(), source_start_ms: 0.0, source_end_ms: 0.0, layout: "bubble".into() }
     }
 }
 
@@ -150,6 +246,8 @@ pub struct Scene {
     pub music: Option<MusicTrack>,
     /// Background music clips laid under the edit, placed on the output timeline.
     pub music_clips: Vec<MusicClip>,
+    pub annotations: Vec<Annotation>,
+    pub camera_layouts: Vec<CameraLayoutRegion>,
 }
 
 /// A trimmed piece of an audio file in the project folder.
@@ -167,6 +265,8 @@ pub struct MusicClip {
     pub dur_ms: f64,
     /// Full length of the file.
     pub file_dur_ms: f64,
+    pub fade_in_ms: f64,
+    pub fade_out_ms: f64,
 }
 
 /// An audio file in the project folder, positioned on the edited timeline.
@@ -423,6 +523,10 @@ pub struct AudioConfig {
     /// Sound set id: mechanical | soft | thock.
     pub key_style: String,
     pub key_volume: f64,
+    /// Lower the music while someone is speaking (microphone level).
+    pub duck_music: bool,
+    /// Music level while ducked, 0..1 of the normal level.
+    pub duck_level: f64,
 }
 
 impl Default for AudioConfig {
@@ -440,7 +544,29 @@ impl Default for AudioConfig {
             key_sounds: false,
             key_style: "mechanical".into(),
             key_volume: 0.5,
+            duck_music: false,
+            duck_level: 0.3,
         }
+    }
+}
+
+/// On-screen display of keyboard shortcuts (only keys recorded with a label: shortcuts and
+/// special keys; ordinary typing is never stored as text).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct KeystrokeConfig {
+    pub enabled: bool,
+    /// bottom-center | bottom-left | bottom-right | top-center
+    pub position: String,
+    /// Size in px at 1080p.
+    pub size: f64,
+    /// How long each shortcut stays up.
+    pub hold_ms: f64,
+}
+
+impl Default for KeystrokeConfig {
+    fn default() -> Self {
+        Self { enabled: false, position: "bottom-center".into(), size: 30.0, hold_ms: 1400.0 }
     }
 }
 
@@ -454,6 +580,7 @@ pub struct Config {
     pub output: Output,
     pub animations: Animations,
     pub audio: AudioConfig,
+    pub keystrokes: KeystrokeConfig,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -493,7 +620,7 @@ impl Project {
         };
         Self {
             name: name.into(),
-            scene: Scene { slices: vec![slice], zooms: Vec::new(), music: None, music_clips: Vec::new() },
+            scene: Scene { slices: vec![slice], ..Default::default() },
             media,
             ..Default::default()
         }

@@ -74,18 +74,44 @@ export function renderTimeline() {
   const clip = $("trackClip");
   const frag = document.createDocumentFragment();
   let acc = 0;
-  for (const s of P().scene.slices) {
+  const transMarks = [];
+  for (const [si, s] of P().scene.slices.entries()) {
     const len = sliceLen(s);
     const el = document.createElement("div");
     el.className = "block clip" + (S.selected?.type === "slice" && S.selected.id === s.id ? " sel" : "");
     el.style.left = acc * pxPerMs + "px";
     el.style.width = Math.max(4, len * pxPerMs - 2) + "px";
     el.dataset.id = s.id;
-    el.innerHTML = `<div class="h l"></div><span>Clip</span><span class="t">${(len / 1000).toFixed(1)}s${s.timeScale !== 1 ? ` · ${s.timeScale}×` : ""}</span><div class="h r"></div>`;
+    if (s.freeze) el.classList.add("freeze");
+    const speed = s.timeScale !== 1 && !s.freeze ? ` · ${+s.timeScale.toFixed(2)}×` : "";
+    el.innerHTML = `<div class="h l"></div><span>${s.freeze ? "Freeze" : "Clip"}</span><span class="t">${(len / 1000).toFixed(1)}s${speed}</span><div class="h r"></div>`;
     el.onpointerdown = (e) => beginClipDrag(e, s, el, pxPerMs);
     frag.appendChild(el);
+    if (si > 0) {
+      // a small marker on every cut: click it to choose a transition
+      const tm = document.createElement("div");
+      tm.className = "block trans-wrap";
+      tm.style.cssText = `left:${acc * pxPerMs - 9}px;width:18px;top:50%;bottom:auto;height:18px;margin-top:-9px;overflow:visible;background:transparent;border:0;padding:0;z-index:6`;
+      const dot = document.createElement("div");
+      dot.className = "trans";
+      dot.style.left = "0";
+      dot.textContent = s.transition ? "◐" : "+";
+      dot.title = s.transition ? `Transition: ${s.transition.kind}` : "Add a transition";
+      dot.style.opacity = s.transition ? "1" : "0.55";
+      dot.onpointerdown = (e) => {
+        e.stopPropagation();
+        S.selected = { type: "slice", id: s.id };
+        S.tab = "pace";
+        renderTimeline();
+        hooks.renderPanel();
+        hooks.syncControls();
+      };
+      tm.appendChild(dot);
+      transMarks.push(tm);
+    }
     acc += len;
   }
+  for (const tm of transMarks) frag.appendChild(tm);
   clip.replaceChildren(frag);
 
   // zoom track: one block per stretch of the timeline that shows the region
@@ -104,6 +130,63 @@ export function renderTimeline() {
     }
   }
   zt.replaceChildren(zf);
+
+  // camera layouts: one block per stretch with a non-default camera look
+  const ct = $("trackCamera");
+  const cf = document.createDocumentFragment();
+  for (const r of P().scene.cameraLayouts || []) {
+    for (const [a, b] of spansOut(r.sourceStartMs, r.sourceEndMs)) {
+      if (b - a < 1) continue;
+      const el = document.createElement("div");
+      el.className = "block layout" + (S.selected?.type === "layout" && S.selected.id === r.id ? " sel" : "");
+      el.style.left = a * pxPerMs + "px";
+      el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
+      el.innerHTML = `<div class="h l"></div><span>${LAYOUT_NAMES[r.layout] || r.layout}</span><div class="h r"></div>`;
+      el.onpointerdown = (e) => beginRegionDrag(e, r, "layout", el, pxPerMs, a, b);
+      cf.appendChild(el);
+    }
+  }
+  ct.replaceChildren(cf);
+  if (!(P().scene.cameraLayouts || []).length) {
+    ct.innerHTML = '<div class="track-hint">Change how the camera looks over time: add a layout from the Camera tab.</div>';
+  }
+
+  // notes (annotations): greedy lanes so overlapping ones stack
+  const nt = $("trackNotes");
+  const nf = document.createDocumentFragment();
+  const lanes = [];
+  const items = [];
+  for (const an of P().scene.annotations || []) {
+    for (const [a, b] of spansOut(an.sourceStartMs, an.sourceEndMs)) {
+      if (b - a >= 1) items.push({ an, a, b });
+    }
+  }
+  items.sort((x, y) => x.a - y.a);
+  for (const it of items) {
+    let lane = lanes.findIndex((end) => end <= it.a + 1);
+    if (lane < 0) lane = lanes.push(0) - 1;
+    lanes[lane] = it.b;
+    it.lane = lane;
+  }
+  for (const { an, a, b, lane } of items) {
+    const el = document.createElement("div");
+    el.className = `block note k-${an.kind}` + (S.selected?.type === "annot" && S.selected.id === an.id ? " sel" : "");
+    el.style.left = a * pxPerMs + "px";
+    el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
+    el.style.marginTop = 4 + lane * 32 + "px";
+    const label = an.kind === "text" ? `“${(an.text || "").slice(0, 28)}”` : NOTE_NAMES[an.kind] || an.kind;
+    el.innerHTML = `<div class="h l"></div><span>${label.replace(/</g, "&lt;")}</span><div class="h r"></div>`;
+    el.onpointerdown = (e) => beginRegionDrag(e, an, "annot", el, pxPerMs, a, b);
+    nf.appendChild(el);
+  }
+  nt.replaceChildren(nf);
+  nt.style.height = Math.max(38, 8 + Math.max(1, lanes.length) * 32) + "px";
+  if (!items.length) nt.innerHTML = '<div class="track-hint">Text, arrows, blur and spotlight appear here: add them from the Annotate tab.</div>';
+  // keep the labels column aligned with the (variable height) tracks
+  const labs = $("tlLabels").children;
+  ["trackClip", "trackZoom", "trackCamera", "trackNotes", "trackMusic"].forEach((id, i) => {
+    if (labs[i]) labs[i].style.height = $(id).offsetHeight + "px";
+  });
 
   // music track: one block per clip, with the file's waveform drawn inside
   const mt = $("trackMusic");
@@ -133,6 +216,63 @@ export function renderTimeline() {
     }
   }
   updateTransport();
+}
+
+export const LAYOUT_NAMES = {
+  bubble: "Bubble", hidden: "Camera off", large: "Large bubble", camera: "Camera only",
+  "side-right": "Side by side", "side-left": "Side by side ◂",
+};
+export const NOTE_NAMES = {
+  text: "Text", box: "Box", ellipse: "Ellipse", arrow: "Arrow", highlight: "Highlight",
+  blur: "Blur", pixelate: "Pixelate", spotlight: "Spotlight",
+};
+
+/** Layout / annotation block: edge handles trim, the body moves it, a click selects it. */
+function beginRegionDrag(e, item, type, el, pxPerMs, a0, b0) {
+  e.stopPropagation();
+  e.preventDefault();
+  S.selected = { type, id: item.id };
+  S.multi = null;
+  S.tab = type === "layout" ? "camera" : "annotate";
+  document.querySelectorAll(".block.sel").forEach((b) => b.classList.remove("sel"));
+  el.classList.add("sel");
+  el.setPointerCapture(e.pointerId);
+  hooks.renderPanel();
+  hooks.syncControls();
+  hooks.draw();
+  const mode = e.target.classList.contains("l") ? "l" : e.target.classList.contains("r") ? "r" : "move";
+  const x0 = e.clientX;
+  const total = outDuration();
+  let na = a0, nb = b0, moved = false;
+  el.onpointermove = (ev) => {
+    if (Math.abs(ev.clientX - x0) < 3 && !moved) return;
+    moved = true;
+    const d = (ev.clientX - x0) / pxPerMs;
+    let a = a0, b = b0;
+    if (mode === "move") {
+      const w = b0 - a0;
+      a = clamp(a0 + d, 0, total - w);
+      b = a + w;
+    } else if (mode === "l") {
+      a = clamp(a0 + d, 0, b0 - 200);
+    } else {
+      b = clamp(b0 + d, a0 + 200, total);
+    }
+    na = a;
+    nb = b;
+    el.style.left = a * pxPerMs + "px";
+    el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
+  };
+  el.onpointerup = (ev) => {
+    el.onpointermove = el.onpointerup = null;
+    try { el.releasePointerCapture(ev.pointerId); } catch {}
+    if (!moved) return;
+    const ns = outToSrc(na).src, ne = outToSrc(nb).src;
+    change(null, () => {
+      item.sourceStartMs = ns;
+      item.sourceEndMs = Math.max(ns + 100, ne);
+    }, { timeline: true, panel: false });
+  };
 }
 
 /** Clip block: edge handles trim, dragging the body re-orders, a click selects + seeks. */
@@ -384,6 +524,18 @@ export function bindScrub() {
 export function splitAtPlayhead() {
   const sel = S.selected;
   const { src, idx } = outToSrc(S.tOut);
+  if (sel?.type === "layout" || sel?.type === "annot") {
+    const list = sel.type === "layout" ? P().scene.cameraLayouts : P().scene.annotations;
+    const it = list.find((x) => x.id === sel.id);
+    if (!it || src <= it.sourceStartMs + 50 || src >= it.sourceEndMs - 50) return;
+    change(null, () => {
+      const right = { ...JSON.parse(JSON.stringify(it)), id: uid(), sourceStartMs: src };
+      it.sourceEndMs = src;
+      list.splice(list.indexOf(it) + 1, 0, right);
+      S.selected = { type: sel.type, id: right.id };
+    }, { panel: true, timeline: true });
+    return;
+  }
   const slices = P().scene.slices;
   const doClips = !sel || sel.type === "slice";
   const doZooms = !sel || sel.type === "zoom";
@@ -446,6 +598,16 @@ export function splitAtPlayhead() {
 
 export function duplicateSelected() {
   const sel = S.selected;
+  if (sel?.type === "annot") {
+    const a = P().scene.annotations.find((x) => x.id === sel.id);
+    if (!a) return;
+    change(null, () => {
+      const copy = { ...JSON.parse(JSON.stringify(a)), id: uid(), x: Math.min(0.9, a.x + 0.04), y: Math.min(0.9, a.y + 0.05) };
+      P().scene.annotations.push(copy);
+      S.selected = { type: "annot", id: copy.id };
+    }, { panel: true, timeline: true });
+    return;
+  }
   if (!sel || sel.type !== "slice") return;
   const idx = P().scene.slices.findIndex((x) => x.id === sel.id);
   if (idx < 0) return;
@@ -461,6 +623,9 @@ export function deleteSelected() {
   if (!sel) return;
   if (sel.type === "music") {
     removeMusicClip(sel.id);
+  } else if (sel.type === "layout" || sel.type === "annot") {
+    const key = sel.type === "layout" ? "cameraLayouts" : "annotations";
+    change(null, () => { P().scene[key] = P().scene[key].filter((x) => x.id !== sel.id); S.selected = null; }, { panel: true, timeline: true });
   } else if (sel.type === "zoom") {
     const ids = selectedZoomIds();
     change(null, () => { P().scene.zooms = P().scene.zooms.filter((z) => !ids.includes(z.id)); S.selected = null; S.multi = null; }, { panel: true, timeline: true });
@@ -479,6 +644,51 @@ export function selectAllZooms() {
   S.tab = "zoom";
   renderTimeline();
   hooks.renderPanel();
+}
+
+/** Where new regions go: from the playhead, up to `len` ms long, inside the current clip. */
+function regionAtPlayhead(len) {
+  const { src, idx } = outToSrc(S.tOut);
+  const sl = P().scene.slices[idx];
+  const start = Math.min(src, Math.max(sl.sourceStartMs, sl.sourceEndMs - 400));
+  return { start, end: Math.min(start + len, sl.sourceEndMs) };
+}
+
+export function addLayoutAtPlayhead(layout = "side-right", len = 4000) {
+  const { start, end } = regionAtPlayhead(len);
+  const r = { id: uid(), sourceStartMs: start, sourceEndMs: end, layout };
+  change(null, () => {
+    P().scene.cameraLayouts = P().scene.cameraLayouts || [];
+    P().scene.cameraLayouts.push(r);
+    S.selected = { type: "layout", id: r.id };
+    S.tab = "camera";
+  }, { panel: true, timeline: true });
+}
+
+const ANNOT_DEFAULTS = {
+  text: { space: "screen", x: 0.1, y: 0.8, w: 0.6, h: 0.1, text: "Your text", fontSize: 48, color: "#ffffff", fill: "#000000b3" },
+  box: { space: "content", x: 0.35, y: 0.35, w: 0.3, h: 0.2, color: "#ffd60a", thickness: 5 },
+  ellipse: { space: "content", x: 0.4, y: 0.35, w: 0.2, h: 0.2, color: "#ffd60a", thickness: 5 },
+  highlight: { space: "content", x: 0.3, y: 0.4, w: 0.4, h: 0.06, color: "#ffe14a" },
+  arrow: { space: "content", x: 0.3, y: 0.3, x2: 0.5, y2: 0.5, color: "#ff453a", thickness: 6 },
+  blur: { space: "content", x: 0.3, y: 0.4, w: 0.3, h: 0.1, strength: 0.7, anim: "none" },
+  pixelate: { space: "content", x: 0.3, y: 0.4, w: 0.3, h: 0.1, strength: 0.6, anim: "none" },
+  spotlight: { space: "content", x: 0.3, y: 0.3, w: 0.4, h: 0.3, strength: 0.65 },
+};
+
+export function addAnnotationAtPlayhead(kind = "text") {
+  const { start, end } = regionAtPlayhead(kind === "blur" || kind === "pixelate" ? 6000 : 3500);
+  const base = {
+    space: "content", x: 0.4, y: 0.4, w: 0.3, h: 0.1, x2: 0.6, y2: 0.6, text: "", color: "#ffffff", fill: "",
+    fontSize: 44, thickness: 5, strength: 0.6, anim: "fade", animMs: 250,
+  };
+  const a = { ...base, ...ANNOT_DEFAULTS[kind], id: uid(), kind, sourceStartMs: start, sourceEndMs: end };
+  change(null, () => {
+    P().scene.annotations = P().scene.annotations || [];
+    P().scene.annotations.push(a);
+    S.selected = { type: "annot", id: a.id };
+    S.tab = "annotate";
+  }, { panel: true, timeline: true, track: false });
 }
 
 export function addZoomAtPlayhead() {

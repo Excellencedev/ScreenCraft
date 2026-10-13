@@ -4,11 +4,13 @@ import { invoke, convertFileSrc } from "../tauri.js";
 import { P, S, dir } from "./state.js";
 import { masterGain, makeLimiter, autoGain } from "../audiolevel.js";
 import { loadSet, scheduleMarks } from "../sounds.js";
+import { speechSegments, toOutputRanges, scheduleDuck } from "../ducking.js";
 
 const A = {
   ctx: null,
   limiter: null,
-  gain: { dev: null, mic: null, music: null, click: null, key: null },
+  gain: { dev: null, mic: null, music: null, click: null, key: null, duck: null },
+  speech: null, // [[start, end]] in microphone-buffer ms, computed once per loaded mic
   fx: { click: null, key: null, clickStyle: "", keyStyle: "" },
   play: null, // { t0, fromOut, rate, horizon }
   bufs: { dev: null, mic: null, micExtra: 1 },
@@ -21,10 +23,15 @@ function ensureCtx() {
   A.ctx = new AudioContext({ sampleRate: 48000 });
   A.limiter = makeLimiter(A.ctx);
   A.limiter.connect(A.ctx.destination);
-  for (const k of ["dev", "mic", "music", "click", "key"]) {
+  for (const k of ["dev", "mic", "click", "key"]) {
     A.gain[k] = A.ctx.createGain();
     A.gain[k].connect(A.limiter);
   }
+  // music -> duck (automated while someone speaks) -> limiter
+  A.gain.duck = A.ctx.createGain();
+  A.gain.duck.connect(A.limiter);
+  A.gain.music = A.ctx.createGain();
+  A.gain.music.connect(A.gain.duck);
   return A.ctx;
 }
 
@@ -62,6 +69,7 @@ export async function loadAudio() {
         const b = await decode(url);
         A.bufs.mic = b;
         A.bufs.micExtra = b && !leveled ? autoGain(b) : 1;
+        A.speech = null;
       })(),
     );
   }
@@ -181,6 +189,7 @@ export async function startAudio(fromOut, leadSec = 0.06, rate = 1) {
     src.connect(g).connect(dest);
     src.start(w, off, Math.min(durSec, buf.duration - off));
     A.nodes.push(src);
+    return { src, gain: g };
   };
   for (const s of P().scene.slices) {
     const len = Math.max(0, s.sourceEndMs - s.sourceStartMs) / Math.max(1e-3, s.timeScale);
@@ -202,7 +211,31 @@ export async function startAudio(fromOut, leadSec = 0.06, rate = 1) {
     const startAt = Math.max(c.offsetMs, fromOut);
     getMusicBuffer(c.file).then(() => {}); // ensure requested (no-op when decoded)
     const buf = peekMusic(c.file);
-    addNode(buf, A.gain.music, t0 + (startAt - fromOut) / 1000 / gr, (c.inMs + (startAt - c.offsetMs)) / 1000, (end - startAt) / 1000, gr, 1);
+    const timeOf = (outMs) => t0 + (outMs - fromOut) / 1000 / gr;
+    const node = addNode(buf, A.gain.music, timeOf(startAt), (c.inMs + (startAt - c.offsetMs)) / 1000, (end - startAt) / 1000, gr, 1);
+    // fade in / out: automate the clip's own gain
+    if (node?.gain && (c.fadeInMs > 0 || c.fadeOutMs > 0)) {
+      const fi = Math.max(0, c.fadeInMs || 0), fo = Math.max(0, c.fadeOutMs || 0);
+      const env = (t) => Math.min(fi > 0 ? Math.min(1, (t - c.offsetMs) / fi) : 1, fo > 0 ? Math.min(1, (end - t) / fo) : 1);
+      const g = node.gain.gain;
+      g.cancelScheduledValues(0);
+      g.setValueAtTime(Math.max(0, env(startAt)), timeOf(startAt));
+      if (fi > 0 && startAt < c.offsetMs + fi) g.linearRampToValueAtTime(1, timeOf(c.offsetMs + fi));
+      if (fo > 0) {
+        const fs = Math.max(startAt, end - fo);
+        g.setValueAtTime(Math.max(0, env(fs)), timeOf(fs));
+        g.linearRampToValueAtTime(0, timeOf(end));
+      }
+    }
+  }
+  // duck the music under speech
+  const a = P().config.audio;
+  const duck = A.gain.duck.gain;
+  duck.cancelScheduledValues(0);
+  duck.setValueAtTime(1, ctx.currentTime);
+  if (a.duckMusic && A.bufs.mic) {
+    A.speech ??= speechSegments(A.bufs.mic, A.bufs.micExtra);
+    scheduleDuck(duck, toOutputRanges(A.speech, m.micOffsetMs || 0, P().scene.slices), a.duckLevel ?? 0.3, fromOut, (t) => t0 + (t - fromOut) / 1000 / gr);
   }
   A.play = { t0, fromOut, rate: gr, horizon: fromOut + FX_WINDOW_MS };
   scheduleEffects(fromOut, A.play.horizon);

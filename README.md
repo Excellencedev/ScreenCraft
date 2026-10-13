@@ -59,6 +59,15 @@ meters, resolution and frame rate, and the project list.
   the timeline itself in and out (slider, **Fit**, or ⌘/Ctrl + scroll) to work on a long
   recording, and shift-click several zoom blocks to edit their settings together.
 - **Playback:** **Space** toggles play / pause; hold it to play at 2× while it is held.
+- **Annotate:** text titles, arrows, boxes, circles and highlights; **blur**, **pixelate**
+  and **spotlight** regions that stay pinned to the recording while the camera zooms; drag
+  them on the preview. A **shortcut display** pops up keys like ⌘C or Esc as you press
+  them (recordings made with this version or newer).
+- **Camera layouts:** a Camera track changes how the camera is shown over time: large
+  bubble, camera only, side by side (either side) or camera off, eased between.
+- **Pace:** speed up idle stretches (found from clicks, typing, cursor motion and, if you
+  like, when you talk), ease speed changes into smooth ramps, freeze a frame for a
+  moment, and add cut transitions (fade, flash, blur, slide, zoom).
 - **Look:** wallpapers, gradients, solid colours or your own image (with blur),
   padding, corner radius, shadow, aspect ratio, crop.
 - **Cursor:** several styles, click effects, hide-when-idle, hides while you type.
@@ -69,7 +78,8 @@ meters, resolution and frame rate, and the project list.
 - **Sound effects:** optional built-in mouse-click and keyboard-typing sounds, placed on
   the recorded clicks and key presses, each with a few styles and its own volume. They
   are synthesised by `scripts/make-sounds.py`, so they are original and licence-free.
-- **Music:** add an audio file, trim and split it, see its waveform on the track.
+- **Music:** add an audio file, trim and split it, see its waveform on the track, fade it
+  in and out, and have it lower itself while you speak.
 - **Project files:** edits stay in memory until you save (**⌘S**); a `*` in the title
   shows unsaved changes and closing or quitting asks before discarding them.
 

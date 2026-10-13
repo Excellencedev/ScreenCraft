@@ -1,4 +1,5 @@
-import { P } from "../state.js";
+import { S, P } from "../state.js";
+import { addLayoutAtPlayhead, deleteSelected, LAYOUT_NAMES } from "../timeline.js";
 import { change } from "../history.js";
 import { h3, el, slider, toggle, segmented, colorField } from "../widgets.js";
 
@@ -9,6 +10,26 @@ export function panelCamera(p) {
     p.append(el('<div class="muted">This recording has no camera track. Enable a camera in the recorder toolbar before recording.</div>'));
     return;
   }
+  // layouts over time: a region on the Camera track changes how the camera is shown
+  const lay = (P().scene.cameraLayouts || []).find((x) => S.selected?.type === "layout" && x.id === S.selected.id);
+  p.append(h3("Layout over time"));
+  if (lay) {
+    p.append(segmented("Layout", Object.entries(LAYOUT_NAMES), () => lay.layout, (v) => (lay.layout = v), { track: true, timeline: true }));
+    p.append(el('<div class="hint muted">Drag the purple block on the Camera track to move it, its ends to trim.</div>'));
+    const del = el('<button class="btn-line danger">Remove this layout</button>');
+    del.onclick = deleteSelected;
+    p.append(del);
+  } else {
+    p.append(el('<div class="muted">Show the camera differently for part of the video. Adds a block at the playhead on the Camera track.</div>'));
+    const grid = el('<div class="add-grid two"></div>');
+    for (const k of ["side-right", "side-left", "camera", "large", "hidden"]) {
+      const b = el(`<button class="add-tile"><span>${LAYOUT_NAMES[k]}</span></button>`);
+      b.onclick = () => addLayoutAtPlayhead(k);
+      grid.appendChild(b);
+    }
+    p.append(grid);
+  }
+  p.append(h3("Bubble"));
   p.append(toggle("Hide camera", null, () => c.hide, (v) => (c.hide = v)));
   p.append(toggle("Mirror", null, () => c.mirror, (v) => (c.mirror = v)));
   p.append(slider("Size", 0.1, 0.5, 0.01, () => c.sizeRatio, (v) => (c.sizeRatio = v), { fmt: (v) => Math.round(v * 100) + "%" }));

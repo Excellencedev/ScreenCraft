@@ -70,10 +70,43 @@ struct Click {
     down: bool,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Key {
     at: Instant,
     code: u16,
+    mods: u8,
+    label: String,
+}
+
+/// Printable name of a key for the on-screen shortcut display (US layout).
+fn key_name(code: u16) -> Option<&'static str> {
+    Some(match code {
+        0 => "A", 1 => "S", 2 => "D", 3 => "F", 4 => "H", 5 => "G", 6 => "Z", 7 => "X", 8 => "C", 9 => "V",
+        11 => "B", 12 => "Q", 13 => "W", 14 => "E", 15 => "R", 16 => "Y", 17 => "T",
+        18 => "1", 19 => "2", 20 => "3", 21 => "4", 22 => "6", 23 => "5", 24 => "=", 25 => "9", 26 => "7",
+        27 => "-", 28 => "8", 29 => "0", 30 => "]", 31 => "O", 32 => "U", 33 => "[", 34 => "I", 35 => "P",
+        37 => "L", 38 => "J", 39 => "'", 40 => "K", 41 => ";", 42 => "\\", 43 => ",", 44 => "/", 45 => "N",
+        46 => "M", 47 => ".", 50 => "`",
+        36 | 76 => "Return", 48 => "Tab", 49 => "Space", 51 => "Delete", 53 => "Esc", 117 => "Fwd Delete",
+        123 => "←", 124 => "→", 125 => "↓", 126 => "↑",
+        122 => "F1", 120 => "F2", 99 => "F3", 118 => "F4", 96 => "F5", 97 => "F6", 98 => "F7", 100 => "F8",
+        101 => "F9", 109 => "F10", 103 => "F11", 111 => "F12",
+        115 => "Home", 119 => "End", 116 => "Page Up", 121 => "Page Down",
+        _ => return None,
+    })
+}
+
+/// Ordinary typing is never stored as text: only shortcuts (a command / control / option
+/// modifier is held) and non-character keys get a label.
+fn key_label(code: u16, mods: u8) -> String {
+    let Some(name) = key_name(code) else { return String::new() };
+    let special = matches!(code, 36 | 76 | 48 | 51 | 53 | 117 | 123..=126 | 122 | 120 | 99 | 118 | 96 | 97 | 98 | 100 | 101 | 109 | 103 | 111 | 115 | 119 | 116 | 121);
+    let shortcut = mods & (1 | 4 | 8) != 0;
+    if shortcut || special {
+        name.to_string()
+    } else {
+        String::new()
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -116,7 +149,15 @@ fn key_tap_loop(stop: Arc<AtomicBool>, buffers: Arc<Mutex<Buffers>>) {
             if ev.get_integer_value_field(EventField::KEYBOARD_EVENT_AUTOREPEAT) == 0 {
                 let code = ev.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE) as u16;
                 if !MODIFIERS.contains(&code) {
-                    b.lock().unwrap().keys.push(Key { at: Instant::now(), code });
+                    use core_graphics::event::CGEventFlags;
+                    let f = ev.get_flags();
+                    let mut mods = 0u8;
+                    if f.contains(CGEventFlags::CGEventFlagCommand) { mods |= 1; }
+                    if f.contains(CGEventFlags::CGEventFlagShift) { mods |= 2; }
+                    if f.contains(CGEventFlags::CGEventFlagAlternate) { mods |= 4; }
+                    if f.contains(CGEventFlags::CGEventFlagControl) { mods |= 8; }
+                    let label = key_label(code, mods);
+                    b.lock().unwrap().keys.push(Key { at: Instant::now(), code, mods, label });
                 }
             }
             CallbackResult::Keep
@@ -177,7 +218,7 @@ impl InputTracker {
             keys: buf
                 .keys
                 .iter()
-                .map(|k| KeyEvent { t: rel(k.at), key: k.code.to_string(), down: true })
+                .map(|k| KeyEvent { t: rel(k.at), key: k.code.to_string(), down: true, mods: k.mods, label: k.label.clone() })
                 .collect(),
             carets: buf
                 .carets

@@ -24,6 +24,39 @@ pub struct KeyMark {
     pub kind: u8,
 }
 
+/// A shortcut / special key to show on screen, in output time.
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ComboMark {
+    pub t_out_ms: f64,
+    pub label: String,
+    pub mods: u8,
+}
+
+/// Camera layout ids shared with the UI: 0 bubble, 1 hidden, 2 large, 3 camera, 4 side-right, 5 side-left.
+pub fn layout_id(name: &str) -> u8 {
+    match name {
+        "hidden" => 1,
+        "large" => 2,
+        "camera" => 3,
+        "side-right" => 4,
+        "side-left" => 5,
+        _ => 0,
+    }
+}
+
+/// Transition ids shared with the UI: 0 none, 1 fade, 2 flash, 3 blur, 4 slide, 5 zoom.
+pub fn transition_id(name: &str) -> u8 {
+    match name {
+        "fade" => 1,
+        "flash" => 2,
+        "blur" => 3,
+        "slide" => 4,
+        "zoom" => 5,
+        _ => 0,
+    }
+}
+
 /// Struct-of-arrays so the JSON stays compact.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -49,6 +82,15 @@ pub struct RenderTrack {
     pub clicks: Vec<ClickMark>,
     /// Key presses (for the typing sound effects), in output time.
     pub keys: Vec<KeyMark>,
+    /// Shortcuts and special keys for the on-screen key display.
+    pub combos: Vec<ComboMark>,
+    /// Transition at each frame: id, and strength (1 at the cut; positive before the cut, negative after).
+    pub trans_kind: Vec<u8>,
+    pub trans_p: Vec<f64>,
+    /// Camera layout at each frame, the one before it and how far the change has progressed (0..1).
+    pub layout_cur: Vec<u8>,
+    pub layout_prev: Vec<u8>,
+    pub layout_mix: Vec<f64>,
 }
 
 fn r4(v: f64) -> f64 {
@@ -85,6 +127,13 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
     ] {
         v.reserve(count);
     }
+
+    // camera layout state: eased over ~0.35 s whenever the layout changes
+    let mut lay_cur = 0u8;
+    let mut lay_prev = 0u8;
+    let mut lay_mix = 1.0f64;
+    let mut lay_init = false;
+    let starts = crate::timeline::slice_output_starts(slices);
 
     let crop_cx = crop.x + crop.width / 2.0;
     let crop_cy = crop.y + crop.height / 2.0;
@@ -234,6 +283,49 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
         tr.cursor_scale.push(r4(press.x));
         tr.cursor_alpha.push(r4(alpha));
         tr.cursor_rotation.push(r4(rotation.x));
+
+        // --- transition across a cut (centred on the start of a slice) ---
+        let mut tk = 0u8;
+        let mut tp = 0.0f64;
+        for (si, sl) in slices.iter().enumerate().skip(1) {
+            if let Some(t) = &sl.transition {
+                let half = (t.duration_ms * 0.5).max(1.0);
+                let d = (t_out - starts[si]).abs();
+                if d < half {
+                    tk = transition_id(&t.kind);
+                    // positive before the cut (outgoing picture), negative after it (incoming)
+                    let k = 1.0 - d / half;
+                    tp = if t_out < starts[si] { k } else { -k };
+                    break;
+                }
+            }
+        }
+        tr.trans_kind.push(tk);
+        tr.trans_p.push(r4(tp));
+
+        // --- camera layout ---
+        let want = p
+            .scene
+            .camera_layouts
+            .iter()
+            .rev()
+            .find(|r| t_src >= r.source_start_ms && t_src < r.source_end_ms)
+            .map(|r| layout_id(&r.layout))
+            .unwrap_or(0);
+        if !lay_init {
+            lay_cur = want;
+            lay_prev = want;
+            lay_init = true;
+        } else if want != lay_cur {
+            lay_prev = lay_cur;
+            lay_cur = want;
+            lay_mix = 0.0;
+        } else {
+            lay_mix = (lay_mix + dt / 0.35).min(1.0);
+        }
+        tr.layout_cur.push(lay_cur);
+        tr.layout_prev.push(lay_prev);
+        tr.layout_mix.push(r4(lay_mix));
     }
 
     // click marks in output time
@@ -241,6 +333,12 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
         if let Some(t_out) = crate::timeline::source_to_output(slices, c.t) {
             let (nx, ny) = input.normalize(c.x, c.y);
             tr.clicks.push(ClickMark { t_out_ms: r4(t_out), x: r4(nx), y: r4(ny) });
+        }
+    }
+    // shortcuts / special keys for the on-screen key display
+    for k in input.keys.iter().filter(|k| k.down && !k.label.is_empty()) {
+        if let Some(t_out) = crate::timeline::source_to_output(slices, k.t) {
+            tr.combos.push(ComboMark { t_out_ms: r4(t_out), label: k.label.clone(), mods: k.mods });
         }
     }
     // key presses in output time (macOS key codes; the Windows logger maps onto the same ones)
@@ -278,6 +376,7 @@ fn loop_position(p: &Project, input: &InputLog, t_src: f64, raw: (f64, f64)) -> 
 mod tests {
     use super::*;
     use crate::input::{Button, ClickEvent, MoveEvent};
+    use crate::project::Slice;
     use crate::project::{Media, ZoomRegion};
 
     fn project() -> (Project, InputLog) {
@@ -330,7 +429,7 @@ mod tests {
         use crate::input::{CaretEvent, KeyEvent};
         let (p, mut log) = project();
         // cursor parked top-right, text caret on the left side of the screen
-        log.keys.push(KeyEvent { t: 3000.0, key: "0".into(), down: true });
+        log.keys.push(KeyEvent { t: 3000.0, key: "0".into(), down: true, ..Default::default() });
         log.carets.push(CaretEvent { t: 3050.0, x: 100.0, y: 250.0, w: 2.0, h: 20.0 });
         let tr = compute_track(&p, &log, 60.0);
         let f = |ms: f64| (ms * 60.0 / 1000.0) as usize;
@@ -390,7 +489,7 @@ mod tests {
     fn camera_heads_for_the_caret_before_typing_starts() {
         use crate::input::{CaretEvent, KeyEvent};
         let (p, mut log) = project();
-        log.keys.push(KeyEvent { t: 2500.0, key: "0".into(), down: true });
+        log.keys.push(KeyEvent { t: 2500.0, key: "0".into(), down: true, ..Default::default() });
         log.carets.push(CaretEvent { t: 2550.0, x: 100.0, y: 250.0, w: 2.0, h: 20.0 });
         let tr = compute_track(&p, &log, 60.0);
         let f = |ms: f64| (ms * 60.0 / 1000.0) as usize;
@@ -407,7 +506,7 @@ mod tests {
         // caret walks steadily left to right across the middle of the screen, 20 Hz samples
         for i in 0..80 {
             let t = 1000.0 + i as f64 * 50.0;
-            log.keys.push(KeyEvent { t, key: "0".into(), down: true });
+            log.keys.push(KeyEvent { t, key: "0".into(), down: true, ..Default::default() });
             let x = 300.0 + i as f64 * 5.0; // 300..695 px of a 1000 px wide capture
             log.carets.push(CaretEvent { t, x, y: 250.0, w: 2.0, h: 20.0 });
         }
@@ -441,9 +540,9 @@ mod tests {
     fn key_marks_follow_the_timeline() {
         use crate::input::KeyEvent;
         let (p, mut log) = project();
-        log.keys.push(KeyEvent { t: 2000.0, key: "49".into(), down: true });
-        log.keys.push(KeyEvent { t: 2100.0, key: "0".into(), down: true });
-        log.keys.push(KeyEvent { t: 2150.0, key: "0".into(), down: false });
+        log.keys.push(KeyEvent { t: 2000.0, key: "49".into(), down: true, ..Default::default() });
+        log.keys.push(KeyEvent { t: 2100.0, key: "0".into(), down: true, ..Default::default() });
+        log.keys.push(KeyEvent { t: 2150.0, key: "0".into(), down: false, ..Default::default() });
         let tr = compute_track(&p, &log, 60.0);
         assert_eq!(tr.keys.len(), 2);
         assert_eq!(tr.keys[0].kind, 1);
@@ -451,11 +550,43 @@ mod tests {
     }
 
     #[test]
+    fn layout_and_transition_marks() {
+        use crate::project::{CameraLayoutRegion, Transition};
+        let (mut p, log) = project();
+        p.scene.camera_layouts.push(CameraLayoutRegion {
+            id: "l".into(),
+            source_start_ms: 2000.0,
+            source_end_ms: 4000.0,
+            layout: "side-right".into(),
+        });
+        // cut the recording in two at 3000 ms with a fade across the join
+        p.scene.slices = vec![
+            Slice { id: "a".into(), source_start_ms: 0.0, source_end_ms: 3000.0, ..Default::default() },
+            Slice {
+                id: "b".into(),
+                source_start_ms: 3000.0,
+                source_end_ms: 6000.0,
+                transition: Some(Transition { kind: "fade".into(), duration_ms: 400.0 }),
+                ..Default::default()
+            },
+        ];
+        let tr = compute_track(&p, &log, 60.0);
+        let f = |ms: f64| (ms * 60.0 / 1000.0) as usize;
+        assert_eq!(tr.layout_cur[f(1000.0)], 0);
+        assert_eq!(tr.layout_cur[f(2500.0)], 4);
+        assert!(tr.layout_mix[f(2010.0)] < 1.0);
+        assert_eq!(tr.layout_prev[f(2010.0)], 0);
+        assert_eq!(tr.trans_kind[f(3000.0)], 1);
+        assert!(tr.trans_p[f(3000.0)] > 0.9);
+        assert_eq!(tr.trans_kind[f(1000.0)], 0);
+    }
+
+    #[test]
     fn cursor_fades_out_while_typing_and_back_in_over_half_a_second() {
         use crate::input::KeyEvent;
         let (p, mut log) = project();
         for i in 0..20 {
-            log.keys.push(KeyEvent { t: 1000.0 + i as f64 * 100.0, key: "0".into(), down: true });
+            log.keys.push(KeyEvent { t: 1000.0 + i as f64 * 100.0, key: "0".into(), down: true, ..Default::default() });
         }
         let tr = compute_track(&p, &log, 60.0);
         let f = |ms: f64| (ms * 60.0 / 1000.0).round() as usize;

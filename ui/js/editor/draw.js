@@ -6,7 +6,7 @@ import { SC_BASE } from "../tauri.js";
 
 const canvas = $("preview");
 const ctx = canvas.getContext("2d", { alpha: false });
-const drawSrc = { screen: null, camera: null, bgImage: null, cache: {} };
+export const drawSrc = { screen: null, camera: null, bgImage: null, cache: {}, bounds: new Map(), geom: {}, combos: [] };
 
 let markerShown = false;
 
@@ -83,12 +83,41 @@ export function draw() {
   }
   drawSrc.bgImage = media.bgImage;
   if (!drawSrc.screen) return;
+  drawSrc.combos = S.track.combos || [];
   paintFrame(ctx, W, H, P(), cam, S.tOut, S.track.clicks, drawSrc);
+  if (S.selected?.type === "annot") drawSelection(W, H);
   if (S.selected?.type === "zoom") updateManualMarker(cam);
   else if (markerShown) {
     $("manualMarker").hidden = true;
     markerShown = false;
   }
+}
+
+/** Editor-only outline and handles for the selected annotation (never exported). */
+function drawSelection(W, H) {
+  const a = (P().scene.annotations || []).find((x) => x.id === S.selected.id);
+  const b = a && drawSrc.bounds.get(a.id);
+  if (!b) return;
+  const u = H / 1080;
+  ctx.save();
+  ctx.strokeStyle = "#6aaee8";
+  ctx.fillStyle = "#6aaee8";
+  ctx.lineWidth = 2 * u;
+  ctx.setLineDash([6 * u, 4 * u]);
+  if (b.arrow) {
+    const [x1, y1, x2, y2] = b.arrow;
+    ctx.setLineDash([]);
+    for (const [x, y] of [[x1, y1], [x2, y2]]) {
+      ctx.beginPath();
+      ctx.arc(x, y, 7 * u, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+    ctx.setLineDash([]);
+    if (a.kind !== "text") ctx.fillRect(b.x + b.w - 5 * u, b.y + b.h - 5 * u, 10 * u, 10 * u);
+  }
+  ctx.restore();
 }
 
 function updateManualMarker(cam) {

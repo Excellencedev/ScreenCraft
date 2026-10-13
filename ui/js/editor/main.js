@@ -17,6 +17,7 @@ import { contentRect, camAt } from "../render.js";
 import { migrateMusic } from "./music.js";
 import { Strip } from "./frames.js";
 import { loadAudio } from "./audio.js";
+import { beginAnnotDrag } from "./annotEdit.js";
 
 hooks.updateTitle = () => {
   const t = $("title");
@@ -187,6 +188,7 @@ function bindUI() {
 
   // preview click: play/pause, or pick the manual zoom target
   $("preview").addEventListener("pointerdown", (e) => {
+    if (beginAnnotDrag(e)) return;
     const z = S.selected?.type === "zoom" && P().scene.zooms.find((x) => x.id === S.selected.id);
     if (!z || z.kind !== "manual") {
       S.playing ? pause() : play();

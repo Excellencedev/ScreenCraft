@@ -22,8 +22,56 @@ use std::time::{Duration, Instant};
 struct Buffers {
     moves: Vec<(Instant, f64, f64, CursorKind)>,
     clicks: Vec<(Instant, f64, f64, Button, bool)>,
-    keys: Vec<(Instant, &'static str)>,
+    keys: Vec<(Instant, &'static str, u8, String)>,
     carets: Vec<(Instant, f64, f64, f64, f64)>,
+}
+
+/// Modifier bits currently held: 1 = windows, 2 = shift, 4 = alt, 8 = control.
+fn held_mods() -> u8 {
+    let down = |vk: VIRTUAL_KEY| unsafe { GetAsyncKeyState(vk.0 as i32) } as u16 & 0x8000 != 0;
+    let mut m = 0u8;
+    if down(VK_LWIN) || down(VK_RWIN) { m |= 1; }
+    if down(VK_SHIFT) { m |= 2; }
+    if down(VK_MENU) { m |= 4; }
+    if down(VK_CONTROL) { m |= 8; }
+    m
+}
+
+/// Printable name of a key for the on-screen shortcut display. Ordinary typing is never stored
+/// as text: only shortcuts (windows / alt / control held) and non-character keys get one.
+fn key_label(vk: u32, mods: u8) -> String {
+    let v = vk as u16;
+    let special = match VIRTUAL_KEY(v) {
+        VK_RETURN => Some("Return"),
+        VK_TAB => Some("Tab"),
+        VK_ESCAPE => Some("Esc"),
+        VK_BACK => Some("Backspace"),
+        VK_DELETE => Some("Delete"),
+        VK_LEFT => Some("←"),
+        VK_RIGHT => Some("→"),
+        VK_UP => Some("↑"),
+        VK_DOWN => Some("↓"),
+        VK_HOME => Some("Home"),
+        VK_END => Some("End"),
+        VK_PRIOR => Some("Page Up"),
+        VK_NEXT => Some("Page Down"),
+        _ => None,
+    };
+    if let Some(n) = special {
+        return n.to_string();
+    }
+    if (0x70..=0x7B).contains(&v) {
+        return format!("F{}", v - 0x6F);
+    }
+    if mods & (1 | 4 | 8) != 0 {
+        if (0x30..=0x39).contains(&v) || (0x41..=0x5A).contains(&v) {
+            return (v as u8 as char).to_string();
+        }
+        if v == VK_SPACE.0 {
+            return "Space".to_string();
+        }
+    }
+    String::new()
 }
 
 /// The keyboard hook is a plain function, so it reaches the active buffers here.
@@ -67,7 +115,9 @@ unsafe extern "system" fn keyboard_hook(code: i32, wparam: WPARAM, lparam: LPARA
             // held keys auto-repeat; only the first press counts
             if held.insert(info.vkCode) {
                 if let (Some(k), Some(b)) = (key_code(info.vkCode), HOOK_TARGET.lock().unwrap().as_ref()) {
-                    b.lock().unwrap().keys.push((Instant::now(), k));
+                    let mods = held_mods();
+                    let label = key_label(info.vkCode, mods);
+                    b.lock().unwrap().keys.push((Instant::now(), k, mods, label));
                 }
             }
         } else if msg == WM_KEYUP || msg == WM_SYSKEYUP {
@@ -224,7 +274,7 @@ impl InputTracker {
             bounds,
             moves: buf.moves.iter().map(|m| MoveEvent { t: rel(m.0), x: m.1, y: m.2, cursor: m.3 }).collect(),
             clicks: buf.clicks.iter().map(|c| ClickEvent { t: rel(c.0), x: c.1, y: c.2, button: c.3, down: c.4 }).collect(),
-            keys: buf.keys.iter().map(|k| KeyEvent { t: rel(k.0), key: k.1.to_string(), down: true }).collect(),
+            keys: buf.keys.iter().map(|k| KeyEvent { t: rel(k.0), key: k.1.to_string(), down: true, mods: k.2, label: k.3.clone() }).collect(),
             carets: buf.carets.iter().map(|c| CaretEvent { t: rel(c.0), x: c.1, y: c.2, w: c.3, h: c.4 }).collect(),
         }
     }

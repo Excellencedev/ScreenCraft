@@ -112,7 +112,7 @@ mod tests {
         ClickEvent { t, x: 0.0, y: 0.0, button: Button::Left, down: true }
     }
     fn key(t: f64) -> KeyEvent {
-        KeyEvent { t, key: "0".into(), down: true }
+        KeyEvent { t, key: "0".into(), down: true, ..Default::default() }
     }
 
     #[test]

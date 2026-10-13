@@ -6,6 +6,8 @@ import { panelZoom } from "./zoom.js";
 import { panelAudio } from "./audio.js";
 import { panelCrop } from "./crop.js";
 import { panelSoon } from "./soon.js";
+import { panelAnnotate } from "./annotate.js";
+import { panelPace } from "./pace.js";
 import { el } from "../widgets.js";
 
 const TABS = [
@@ -15,6 +17,8 @@ const TABS = [
   ["zoom", "Zoom", '<circle cx="11" cy="11" r="6"/><path d="M21 21l-5-5M11 8v6M8 11h6"/>', panelZoom],
   ["audio", "Audio", '<path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 010 6"/>', panelAudio],
   ["crop", "Crop", '<path d="M6 2v14a2 2 0 002 2h14M2 6h14a2 2 0 012 2v14"/>', panelCrop],
+  ["annotate", "Annotate", '<path d="M5 6h14M12 6v13M9 19h6"/>', panelAnnotate],
+  ["pace", "Pace & transitions", '<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>', panelPace],
   ["soon", "Coming soon", '<path d="M12 3l2.4 5.2 5.6.7-4.1 3.9 1 5.6L12 15.7 7.1 18.4l1-5.6L4 8.9l5.6-.7z"/>', panelSoon],
 ];
 

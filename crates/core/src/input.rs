@@ -64,11 +64,18 @@ pub struct ClickEvent {
     pub down: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub struct KeyEvent {
     pub t: f64,
     pub key: String,
     pub down: bool,
+    /// Modifier bits held with the key: 1 = command / windows, 2 = shift, 4 = option / alt, 8 = control.
+    #[serde(default)]
+    pub mods: u8,
+    /// Readable name, only recorded for shortcuts and special keys ("C", "Return", "Esc", "←").
+    /// Ordinary typing is deliberately never stored as text.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub label: String,
 }
 
 /// Text caret rectangle (global points) sampled while typing.
@@ -272,7 +279,7 @@ mod refine_tests {
         let mut log = InputLog::default();
         log.bounds = Rect { x: 0.0, y: 0.0, width: 1000.0, height: 1000.0 };
         for n in 0..20 {
-            log.keys.push(KeyEvent { t: 1000.0 + n as f64 * 100.0, key: "0".into(), down: true });
+            log.keys.push(KeyEvent { t: 1000.0 + n as f64 * 100.0, key: "0".into(), down: true, ..Default::default() });
         }
         for n in 0..10 {
             log.carets.push(CaretEvent { t: 1050.0 + n as f64 * 200.0, x: 100.0, y: 500.0, w: 700.0, h: 20.0 });

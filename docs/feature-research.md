@@ -62,3 +62,14 @@ Rank = how often a tutorial / demo creator would use it x how well it fits our d
 Left out on purpose: auto-captions, background removal, motion tracking, text-to-speech
 and anything else that needs a model; cloud collaboration and stock libraries (licensing
 and hosting, not a fit for an offline local-first app).
+
+## Status (2026-10-13)
+
+Built: text and callouts (1), blur / pixelate / spotlight (2), keystroke overlay (3),
+idle speed-up (4), speed ramps (5), cut transitions (6, as dip-style effects on a single
+lane: fade, flash, blur, slide, zoom), freeze frame (9), music fades and ducking (8) and
+camera layouts (10).
+
+Still open: subtitles (7), true cross-dissolve (needs overlapping clips), keyframes (11),
+title cards and logo (12), chroma key (13), colour adjustments (14), platform export
+presets (15), device frames (16), brand kits (17).

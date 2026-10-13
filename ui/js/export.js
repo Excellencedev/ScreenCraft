@@ -4,6 +4,7 @@ import { GIFEncoder, quantize, applyPalette } from "../vendor/gifenc.esm.js";
 import { invoke, convertFileSrc, SC_BASE } from "./tauri.js";
 import { outputSize, paintFrame, camAt, lerpCam, contentRect } from "./render.js";
 import { loadSet, scheduleMarks } from "./sounds.js";
+import { speechSegments, toOutputRanges, scheduleDuck } from "./ducking.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -95,14 +96,31 @@ async function renderAudio(project, dir, outDurSec, track) {
   const master = masterGain(a.volume);
   const limiter = makeLimiter(off);
   limiter.connect(off.destination);
+  // music bus: clips (with fades) -> duck (automated under speech) -> limiter
+  const duckBus = off.createGain();
+  duckBus.connect(limiter);
+  if (a.duckMusic && tracks.some((t) => t.mono)) {
+    const mic = tracks.find((t) => t.mono);
+    const ranges = toOutputRanges(speechSegments(mic.buf, mic.level), mic.offset * 1000, project.scene.slices);
+    scheduleDuck(duckBus.gain, ranges, a.duckLevel ?? 0.3, 0, (t) => t / 1000);
+  }
   for (const { c, buf } of musicClips) {
     const when = Math.max(0, c.offsetMs) / 1000;
     if (when >= outDurSec) continue;
     const g = off.createGain();
     g.gain.value = master * (a.musicVolume ?? 0.5);
+    const env = off.createGain();
+    const fi = Math.max(0, c.fadeInMs || 0) / 1000, fo = Math.max(0, c.fadeOutMs || 0) / 1000;
+    const endSec = Math.min(when + c.durMs / 1000, outDurSec);
+    env.gain.setValueAtTime(fi > 0 ? 0 : 1, when);
+    if (fi > 0) env.gain.linearRampToValueAtTime(1, when + fi);
+    if (fo > 0) {
+      env.gain.setValueAtTime(1, Math.max(when + fi, endSec - fo));
+      env.gain.linearRampToValueAtTime(0, endSec);
+    }
     const node = off.createBufferSource();
     node.buffer = buf;
-    node.connect(g).connect(limiter);
+    node.connect(env).connect(g).connect(duckBus);
     node.start(when, Math.max(0, c.inMs) / 1000, Math.min(c.durMs / 1000, outDurSec - when));
   }
   // built-in click / typing sound effects, placed at the recorded event times
@@ -246,7 +264,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
   venc.configure(vcfg);
 
   const total = track.count;
-  const src = { screen: null, camera: null, bgImage, cache: {} };
+  const src = { screen: null, camera: null, bgImage, cache: {}, combos: track.combos || [] };
   // Only ask for as many source pixels as this frame can show: at 1x zoom a retina
   // capture is far larger than a 1080p canvas, and zoomed frames need more.
   const rect = contentRect(project, W, H);
@@ -374,7 +392,7 @@ export async function exportGif({ project, dir, path, resolution, onProgress, sh
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const gifCache = {};
-  const gifSrc = { screen: null, camera: null, bgImage, cache: gifCache };
+  const gifSrc = { screen: null, camera: null, bgImage, cache: gifCache, combos: track.combos || [] };
   const gif = GIFEncoder();
   const delay = Math.round(1000 / fps);
   for (let i = 0; i < track.count; i++) {
