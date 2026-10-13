@@ -1,7 +1,7 @@
 // Editor entry point: boot + event wiring. Everything else lives in sibling modules.
 import { invoke, listen, currentWindow, FILE_MANAGER } from "../tauri.js";
 import { $, S, P, dir, hooks, media, clamp } from "./state.js";
-import { outDuration } from "./timemap.js";
+import { outDuration, srcToOut } from "./timemap.js";
 import { change, undo, redo, updateUndo, saveNow } from "./history.js";
 import { draw, frameIndex, displayedRect } from "./draw.js";
 import { play, pause, requestSeek, scheduleTrack, computeTrack, refreshSliceAudio, syncMusic, setRate } from "./playback.js";
@@ -26,7 +26,7 @@ hooks.updateTitle = () => {
   currentWindow().setTitle?.(P().name + (S.dirty ? " *" : "")).catch?.(() => {});
 };
 hooks.draw = draw;
-hooks.syncMusic = () => { syncMusic(); syncBgImage(); };
+hooks.syncMusic = () => { syncMusic(); syncBgImage(); syncWatermark(); };
 /** Keep the decoded background image in step with the project (also after undo/redo). */
 export function syncBgImage() {
   const bg = P()?.config.styles.background;
@@ -39,6 +39,21 @@ export function syncBgImage() {
   media.bgImage = img;
 }
 hooks.syncBgImage = syncBgImage;
+/** Keep the decoded watermark in step with the project (also after undo/redo). */
+export function syncWatermark() {
+  const wm = P()?.config.watermark;
+  if (!wm || !wm.image) {
+    media.watermarkImg = null;
+    return;
+  }
+  if (media.watermarkImg && media.watermarkImg.dataset.src === wm.image) return;
+  const img = new Image();
+  img.dataset.src = wm.image;
+  img.onload = () => hooks.draw();
+  img.src = wm.image;
+  media.watermarkImg = img;
+}
+hooks.syncWatermark = syncWatermark;
 hooks.renderTimeline = renderTimeline;
 hooks.renderPanel = renderPanel;
 hooks.scheduleTrack = scheduleTrack;
@@ -273,7 +288,21 @@ function bindUI() {
     }
     else if (e.key === "s" && !mod) splitAtPlayhead();
     else if (e.key === "z" && !mod) addZoomAtPlayhead();
-    else if (e.key === "d" && !mod) duplicateSelected();
+    else if (e.key === "d" && mod) { e.preventDefault(); duplicateSelected(); }
+    else if (e.key === "q" && !mod) { pause(); requestSeek(0); }
+    else if (e.key === "e" && !mod) { pause(); requestSeek(outDuration()); }
+    else if ((e.key === "a" || e.key === "d") && !mod) {
+      // jump to the start of the previous / next zoom region and stop at the first / last one
+      const starts = P().scene.zooms
+        .map((z) => srcToOut(z.sourceStartMs))
+        .filter((t) => t != null)
+        .sort((x, y) => x - y);
+      const eps = 30;
+      const target = e.key === "a"
+        ? [...starts].reverse().find((t) => t < S.tOut - eps)
+        : starts.find((t) => t > S.tOut + eps);
+      if (target != null) { pause(); requestSeek(target); }
+    }
     else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); deleteSelected(); }
     else if (e.key === "ArrowLeft") { pause(); requestSeek(S.tOut - (e.shiftKey ? 1000 : 1000 / 30)); }
     else if (e.key === "ArrowRight") { pause(); requestSeek(S.tOut + (e.shiftKey ? 1000 : 1000 / 30)); }
@@ -342,7 +371,10 @@ async function boot() {
 
     const bg = P().config.styles.background;
     if (bg.kind === "image" && bg.image) syncBgImage();
+    syncWatermark();
     migrateMusic();
+    // zoom regions always follow the cursor now (older projects may still hold manual ones)
+    for (const z of P().scene.zooms) z.kind = "follow-cursor";
     bindUI();
     guardClose();
     renderPanel();

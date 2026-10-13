@@ -233,6 +233,23 @@ export function drawKeys(ctx, W, H, cfg, combos, tOutMs, s) {
   ctx.restore();
 }
 
+/** A logo / watermark image anchored in the frame (corners, edges or centre). */
+export function drawWatermark(ctx, W, H, wm, img, s) {
+  if (!wm || !wm.enabled || !wm.image || !img) return;
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  if (!iw || !ih) return;
+  const w = Math.max(8, (wm.size || 0.12) * W);
+  const h = (w * ih) / iw;
+  const margin = 0.025 * Math.min(W, H) + 6 * s;
+  const x = margin + (wm.x ?? 1) * (W - w - 2 * margin);
+  const y = margin + (wm.y ?? 0) * (H - h - 2 * margin);
+  ctx.save();
+  ctx.globalAlpha *= clamp01(wm.opacity ?? 0.7);
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, x, y, w, h);
+  ctx.restore();
+}
+
 /** Captions in the project's style (TikTok-like by default), centred in the bottom third. */
 export function drawSubtitles(ctx, W, H, p, tSrc, s) {
   const list = p.scene.subtitles;

@@ -305,6 +305,14 @@ async function exportMp4Once({ project, dir, path, resolution, fps, motionBlur, 
     await bgImage.decode().catch(() => {});
   }
 
+  let watermarkImg = null;
+  const wmCfg = project.config.watermark;
+  if (wmCfg?.enabled && wmCfg.image) {
+    watermarkImg = new Image();
+    watermarkImg.src = wmCfg.image;
+    await watermarkImg.decode().catch(() => { watermarkImg = null; });
+  }
+
   const bitrate = qualityBitrate(W, H, fps, quality, codec === "hevc");
   const { cfg: vcfg, kind: vkind } = await pickCodec(W, H, fps, bitrate, software ? "avc" : codec, software);
 
@@ -329,7 +337,7 @@ async function exportMp4Once({ project, dir, path, resolution, fps, motionBlur, 
   liveEncoders.add(venc);
 
   const total = track.count;
-  const src = { screen: null, camera: null, bgImage, cache: {}, combos: track.combos || [] };
+  const src = { screen: null, camera: null, bgImage, watermarkImg, cache: {}, combos: track.combos || [] };
   // Only ask for as many source pixels as this frame can show: at 1x zoom a retina
   // capture is far larger than a 1080p canvas, and zoomed frames need more.
   const rect = contentRect(project, W, H);
@@ -472,7 +480,13 @@ export async function exportGif({ project, dir, path, resolution, onProgress, sh
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const gifCache = {};
-  const gifSrc = { screen: null, camera: null, bgImage, cache: gifCache, combos: track.combos || [] };
+  let gifWm = null;
+  if (project.config.watermark?.enabled && project.config.watermark.image) {
+    gifWm = new Image();
+    gifWm.src = project.config.watermark.image;
+    await gifWm.decode().catch(() => { gifWm = null; });
+  }
+  const gifSrc = { screen: null, camera: null, bgImage, watermarkImg: gifWm, cache: gifCache, combos: track.combos || [] };
   const gif = GIFEncoder();
   const delay = Math.round(1000 / fps);
   for (let i = 0; i < track.count; i++) {

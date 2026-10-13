@@ -77,42 +77,75 @@ export function renderTimeline() {
   const frag = document.createDocumentFragment();
   let acc = 0;
   const transMarks = [];
-  for (const [si, s] of P().scene.slices.entries()) {
+  const xText = (k) => `${+k.toFixed(2)}×`;
+  const slices = P().scene.slices;
+  const marker = (s, at) => {
+    // a small marker on every cut: click it to choose a transition
+    const tm = document.createElement("div");
+    tm.className = "block trans-wrap";
+    tm.style.cssText = `left:${at * pxPerMs - 9}px;width:18px;top:50%;bottom:auto;height:18px;margin-top:-9px;overflow:visible;background:transparent;border:0;padding:0;z-index:6`;
+    const dot = document.createElement("div");
+    dot.className = "trans";
+    dot.style.left = "0";
+    dot.textContent = s.transition ? "◐" : "+";
+    dot.title = s.transition ? `Transition: ${s.transition.kind}` : "Add a transition";
+    dot.style.opacity = s.transition ? "1" : "0.55";
+    dot.onpointerdown = (e) => {
+      e.stopPropagation();
+      S.selected = { type: "slice", id: s.id };
+      S.tab = "pace";
+      renderTimeline();
+      hooks.renderPanel();
+      hooks.syncControls();
+    };
+    tm.appendChild(dot);
+    transMarks.push(tm);
+  };
+  for (let si = 0; si < slices.length; si++) {
+    const s = slices[si];
+    if (s.ramp) {
+      // the staircase of a speed ramp is one block, not a dozen slivers
+      let sj = si, glen = 0;
+      while (sj < slices.length && slices[sj].ramp) glen += sliceLen(slices[sj++]);
+      const first = slices[si], last = slices[sj - 1];
+      const el = document.createElement("div");
+      el.className = "block clip ramp" + (S.selected?.type === "slice" && slices.slice(si, sj).some((x) => x.id === S.selected.id) ? " sel" : "");
+      el.style.left = acc * pxPerMs + "px";
+      el.style.width = Math.max(6, glen * pxPerMs - 2) + "px";
+      if (glen * pxPerMs < 52) el.classList.add("tiny");
+      el.innerHTML = `<span class="pill-x">${xText(first.timeScale)} → ${xText(last.timeScale)}</span>`;
+      el.title = "Speed ramp";
+      el.onpointerdown = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        S.selected = { type: "slice", id: first.id };
+        hooks.renderPanel();
+        hooks.syncControls();
+        renderTimeline();
+        const rect = $("tlInner").getBoundingClientRect();
+        requestSeek((e.clientX - rect.left) / pxPerMs);
+      };
+      frag.appendChild(el);
+      if (si > 0) marker(first, acc);
+      acc += glen;
+      si = sj - 1;
+      continue;
+    }
     const len = sliceLen(s);
     const el = document.createElement("div");
     el.className = "block clip" + (S.selected?.type === "slice" && S.selected.id === s.id ? " sel" : "");
     el.style.left = acc * pxPerMs + "px";
     el.style.width = Math.max(4, len * pxPerMs - 2) + "px";
-    // the many short pieces of a speed ramp: no handles or labels, just a sliver
-    if (len * pxPerMs < 24) el.classList.add("tiny");
+    if (len * pxPerMs < 24) el.classList.add("tiny"); // too short for handles or labels
     el.dataset.id = s.id;
     if (s.freeze) el.classList.add("freeze");
-    const speed = s.timeScale !== 1 && !s.freeze ? ` · ${+s.timeScale.toFixed(2)}×` : "";
-    el.innerHTML = `<div class="h l"></div><span>${s.freeze ? "Freeze" : "Clip"}</span><span class="t">${(len / 1000).toFixed(1)}s${speed}</span><div class="h r"></div>`;
+    const sped = s.timeScale !== 1 && !s.freeze;
+    el.innerHTML = sped
+      ? `<div class="h l"></div><span class="pill-x">${xText(s.timeScale)}</span><div class="h r"></div>`
+      : `<div class="h l"></div><span>${s.freeze ? "Freeze" : "Clip"}</span><span class="t">${(len / 1000).toFixed(1)}s</span><div class="h r"></div>`;
     el.onpointerdown = (e) => beginClipDrag(e, s, el, pxPerMs);
     frag.appendChild(el);
-    if (si > 0) {
-      // a small marker on every cut: click it to choose a transition
-      const tm = document.createElement("div");
-      tm.className = "block trans-wrap";
-      tm.style.cssText = `left:${acc * pxPerMs - 9}px;width:18px;top:50%;bottom:auto;height:18px;margin-top:-9px;overflow:visible;background:transparent;border:0;padding:0;z-index:6`;
-      const dot = document.createElement("div");
-      dot.className = "trans";
-      dot.style.left = "0";
-      dot.textContent = s.transition ? "◐" : "+";
-      dot.title = s.transition ? `Transition: ${s.transition.kind}` : "Add a transition";
-      dot.style.opacity = s.transition ? "1" : "0.55";
-      dot.onpointerdown = (e) => {
-        e.stopPropagation();
-        S.selected = { type: "slice", id: s.id };
-        S.tab = "pace";
-        renderTimeline();
-        hooks.renderPanel();
-        hooks.syncControls();
-      };
-      tm.appendChild(dot);
-      transMarks.push(tm);
-    }
+    if (si > 0) marker(s, acc);
     acc += len;
   }
   for (const tm of transMarks) frag.appendChild(tm);

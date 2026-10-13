@@ -75,7 +75,8 @@ meters, resolution and frame rate, and the project list.
   like, when you talk), ease speed changes into smooth ramps, freeze a frame for a
   moment, and add cut transitions (true cross-dissolve, fade, flash, blur, slide, zoom).
 - **Look:** wallpapers, gradients, solid colours or your own image (with blur),
-  padding, corner radius, shadow, aspect ratio, crop.
+  padding, corner radius, shadow, aspect ratio, crop, and a logo **watermark** (position, size,
+  opacity).
 - **Cursor:** several styles, click effects, hide-when-idle, and it hides when you start typing and only comes back when you move the mouse.
 - **Camera bubble:** size, shape, nine anchor positions (optionally flush to the frame
   edge, ignoring the padding), mirror, border, and it shrinks smoothly while the view is
@@ -186,7 +187,7 @@ clicking the title in the editor.
 
 ### Shortcuts
 
-`Space` play / pause (hold for 2×) · `Esc` close the open dialog · `S` split at playhead · `Z` add zoom · `D` duplicate ·
+`Space` play / pause (hold for 2×) · `Esc` close the open dialog · `S` split at playhead · `Z` add zoom · `⌘D` duplicate · `Q` / `E` jump to start / end · `A` / `D` previous / next zoom ·
 `⌫` delete selection · `←` `→` step · `⌘Z` / `⇧⌘Z` undo / redo · `⌘S` save ·
 `⌘⇧2` start / stop recording
 

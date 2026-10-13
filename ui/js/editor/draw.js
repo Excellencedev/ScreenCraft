@@ -97,6 +97,7 @@ export function draw() {
     }
   }
   drawSrc.bgImage = media.bgImage;
+  drawSrc.watermarkImg = media.watermarkImg;
   if (!drawSrc.screen) return;
   drawSrc.combos = S.track.combos || [];
   paintFrame(ctx, W, H, P(), cam, S.tOut, S.track.clicks, drawSrc);

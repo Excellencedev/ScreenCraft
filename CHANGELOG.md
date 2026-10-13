@@ -2,6 +2,13 @@
 
 ## 0.2.0
 
+- Sped-up clips show one compact pill ("2×"), and a speed ramp is one block ("2.3× → 4.2×")
+  instead of a row of slivers; zoom regions over a ramp stay one block too.
+- Watermark: upload a logo, place it on a 3×3 grid, set size and opacity (also in exports).
+- Zoom regions always follow the cursor (the manual option is gone).
+- New shortcuts: Q / E jump to the start / end, A / D jump to the previous / next zoom start.
+  Duplicate moved to ⌘D.
+
 - The cursor now hides when you start typing and stays hidden until the mouse moves again
   (shortcuts like ⌘C do not hide it).
 

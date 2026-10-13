@@ -1,6 +1,6 @@
 import { drawBackground } from "./wallpapers.js";
 import { drawCursor } from "./cursors.js";
-import { drawAnnotations, drawKeys, drawSubtitles, applyTransition } from "./overlays.js";
+import { drawAnnotations, drawKeys, drawSubtitles, drawWatermark, applyTransition } from "./overlays.js";
 
 export const ASPECTS = {
   "16:9": 16 / 9, "9:16": 9 / 16, "1:1": 1, "4:3": 4 / 3, "3:4": 3 / 4, "4:5": 4 / 5, "21:9": 21 / 9,
@@ -355,6 +355,7 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
 
   // titles / callouts fixed on the frame, then shortcuts, then the cut transition
   drawAnnotations(ctx, { p, tSrc: cam.tSrc ?? 0, W, H, s, zoomK: 1, bounds: src.bounds }, "screen");
+  drawWatermark(ctx, W, H, p.config.watermark, src.watermarkImg, s);
   drawKeys(ctx, W, H, p.config.keystrokes, src.combos, tOutMs, s);
   drawSubtitles(ctx, W, H, p, cam.tSrc ?? 0, s);
   if (cam.transKind) {

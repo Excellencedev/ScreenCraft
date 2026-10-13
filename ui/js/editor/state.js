@@ -25,7 +25,7 @@ export const S = {
 };
 
 /** Decoded media elements and images used by the compositor. */
-export const media = { strips: { screen: null, camera: null }, bgImage: null };
+export const media = { strips: { screen: null, camera: null }, bgImage: null, watermarkImg: null };
 
 export const P = () => S.project;
 export const uid = () => Math.random().toString(36).slice(2, 10);

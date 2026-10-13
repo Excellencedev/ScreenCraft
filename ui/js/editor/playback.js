@@ -17,7 +17,7 @@ export function updateTransport(force = true) {
   if (!tlW) tlW = Math.max(100, $("tlInner").clientWidth);
   const px = dur ? (S.tOut / dur) * tlW : 0;
   $("playhead").style.transform = `translateX(${px}px)`;
-  if (S.playing && S.tlZoom > 1) {
+  if (S.tlZoom > 1 && !S.scrubbing) {
     // keep the playhead in view while the timeline is zoomed in
     const sc = $("tlScroll");
     if (px > sc.scrollLeft + sc.clientWidth - 40 || px < sc.scrollLeft) sc.scrollLeft = Math.max(0, px - 80);

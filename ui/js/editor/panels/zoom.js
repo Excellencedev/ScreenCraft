@@ -30,8 +30,7 @@ export function panelZoom(p) {
   const an = P().config.animations;
   p.append(slider("Ease in", 0, 1.5, 0.05, () => (z.easeInMs ?? an.easeInMs) / 1000, (v) => all((g) => (g.easeInMs = v * 1000)), { fmt: (v) => v.toFixed(2) + " s", track: true, key: "ei-" + z.id }));
   p.append(slider("Ease out", 0, 1.5, 0.05, () => (z.easeOutMs ?? an.easeOutMs) / 1000, (v) => all((g) => (g.easeOutMs = v * 1000)), { fmt: (v) => v.toFixed(2) + " s", track: true, key: "eo-" + z.id }));
-  p.append(segmented("Zoom position", [["follow-cursor", "Auto"], ["manual", "Manual"]], () => z.kind, (v) => all((g) => (g.kind = v)), { track: true, timeline: true }));
-  p.append(el(`<div class="hint muted">${z.kind === "manual" ? "Click the preview to choose where the camera looks." : "Camera keeps the cursor centred and follows the text caret while you type."}</div>`));
+  p.append(el('<div class="hint muted">The camera keeps the cursor centred and follows the text caret while you type.</div>'));
   p.append(toggle("Instant animation", "Apply the zoom immediately without easing.", () => z.instant, (v) => all((g) => (g.instant = v)), { track: true }));
   p.append(toggle("Disabled", null, () => z.isDisabled, (v) => all((g) => (g.isDisabled = v)), { track: true }));
   const del = el(`<button class="btn-line danger">${group.length > 1 ? `Delete ${group.length} zooms` : "Delete zoom"}</button>`);

@@ -97,6 +97,7 @@ pub fn read_image_data_url(path: String) -> CmdResult<String> {
         "webp" => "image/webp",
         "heic" => "image/heic",
         "bmp" => "image/bmp",
+        "svg" => "image/svg+xml",
         "tif" | "tiff" => "image/tiff",
         _ => "application/octet-stream",
     };

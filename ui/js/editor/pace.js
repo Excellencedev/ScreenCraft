@@ -91,7 +91,7 @@ export function easeSpeedChanges(rampMs, onlyIndex = null) {
         const start = fromA ? curA : curB;
         const piece = {
           ...(fromA ? A : B), id: uid(), sourceStartMs: start, sourceEndMs: start + len,
-          timeScale: +k.toFixed(3), transition: null, freeze: false,
+          timeScale: +k.toFixed(3), transition: null, freeze: false, ramp: true,
         };
         if (fromA) curA += len;
         else curB += len;

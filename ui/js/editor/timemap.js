@@ -44,19 +44,23 @@ export function spansOut(a, b) {
   const out = [];
   let acc = 0;
   let prev = null;
+  let prevRamp = false;
   for (const s of P().scene.slices) {
     const lo = Math.max(a, s.sourceStartMs), hi = Math.min(b, s.sourceEndMs);
     if (hi > lo) {
       const o0 = acc + (lo - s.sourceStartMs) / s.timeScale;
       const o1 = acc + (hi - s.sourceStartMs) / s.timeScale;
       const last = out[out.length - 1];
-      if (last && prev === s.timeScale && Math.abs(last[1] - o0) < 0.5 && Math.abs(last[3] - lo) < 0.5) {
+      // back-to-back pieces of one speed ramp read as a single stretch too
+      const same = prev === s.timeScale || (s.ramp && prevRamp);
+      if (last && same && Math.abs(last[1] - o0) < 0.5 && Math.abs(last[3] - lo) < 0.5) {
         last[1] = o1;
         last[3] = hi;
       } else {
         out.push([o0, o1, lo, hi]);
       }
       prev = s.timeScale;
+      prevRamp = !!s.ramp;
     }
     acc += sliceLen(s);
   }

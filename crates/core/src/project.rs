@@ -85,6 +85,8 @@ pub struct Slice {
     pub disable_smooth_mouse: bool,
     /// A held single frame (made by "Freeze frame"); its source range is ~1 frame stretched in time.
     pub freeze: bool,
+    /// One step of a speed ramp. The editor shows consecutive ramp pieces as one block.
+    pub ramp: bool,
     /// Transition played across the cut between the previous slice and this one.
     pub transition: Option<Transition>,
 }
@@ -100,6 +102,7 @@ impl Default for Slice {
             hide_cursor: false,
             disable_smooth_mouse: false,
             freeze: false,
+            ramp: false,
             transition: None,
         }
     }
@@ -615,6 +618,27 @@ impl Default for AudioConfig {
     }
 }
 
+/// An image (logo) laid over the whole video.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Watermark {
+    pub enabled: bool,
+    /// The image as a `data:` URL (kept inside the project, downscaled by the editor).
+    pub image: String,
+    /// Anchor in the frame, 0..1 on each axis (0 = left / top, 1 = right / bottom).
+    pub x: f64,
+    pub y: f64,
+    /// Width as a fraction of the frame width.
+    pub size: f64,
+    pub opacity: f64,
+}
+
+impl Default for Watermark {
+    fn default() -> Self {
+        Self { enabled: true, image: String::new(), x: 1.0, y: 0.0, size: 0.12, opacity: 0.7 }
+    }
+}
+
 /// On-screen display of keyboard shortcuts (only keys recorded with a label: shortcuts and
 /// special keys; ordinary typing is never stored as text).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -647,6 +671,7 @@ pub struct Config {
     pub audio: AudioConfig,
     pub keystrokes: KeystrokeConfig,
     pub subtitles: SubtitleStyle,
+    pub watermark: Watermark,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

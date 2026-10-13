@@ -219,3 +219,8 @@ body.resizing * { cursor: inherit !important; }
 .btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 4px; }
 .btn-row .btn-line { flex: 1; min-width: 90px; }
 .block.caption { background: #1f8f87; color: #fff; }
+/* speed pill: the same compact pill on every sped-up clip */
+.block .pill-x { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 20px; padding: 0 9px; border-radius: 10px; background: rgba(0,0,0,.30); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
+.block.clip .pill-x { color: #2d1405; background: rgba(45,20,5,.16); }
+.block.ramp { background: repeating-linear-gradient(135deg, #c98a63 0 10px, #be7d57 10px 20px); }
+.block.tiny .pill-x { display: none; }
