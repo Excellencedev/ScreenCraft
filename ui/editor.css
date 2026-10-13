@@ -170,3 +170,10 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 .preset-row input:focus { outline: none; border-color: var(--accent-2); }
 #menu .preset-row .del { width: 30px; flex: none; display: grid; place-items: center; padding: 6px 0; color: #ff9aa5; }
 .preset-empty { color: var(--muted); font-size: 12px; padding: 6px 10px; max-width: 230px; }
+/* roadmap cards in the "Coming soon" panel */
+.soon-group { margin: 16px 0 6px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.soon-card { border: 1px dashed var(--line-2); border-radius: 9px; padding: 9px 11px; margin-bottom: 7px; opacity: .85; }
+.soon-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.soon-top b { font-weight: 600; font-size: 12.5px; }
+.soon-badge { font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-2); border: 1px solid rgba(106,174,232,.45); border-radius: 999px; padding: 1px 7px; flex: none; }
+.soon-desc { margin-top: 3px; font-size: 11.5px; line-height: 1.4; color: var(--muted); }

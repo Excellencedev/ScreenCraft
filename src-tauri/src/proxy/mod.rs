@@ -54,6 +54,23 @@ fn newer(a: &Path, than: &Path) -> bool {
     }
 }
 
+/// ((screen width, jpeg quality), (camera width, jpeg quality)) for the recording's length.
+fn proxy_tier(dir: &Path) -> ((u32, u8), (u32, u8)) {
+    let secs = std::fs::read(dir.join("project.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .and_then(|v| v["media"]["durationMs"].as_f64())
+        .unwrap_or(0.0)
+        / 1000.0;
+    if secs <= 240.0 {
+        ((1280, 62), (480, 60))
+    } else if secs <= 480.0 {
+        ((1120, 56), (440, 54))
+    } else {
+        ((960, 50), (400, 50))
+    }
+}
+
 /// Build (or reuse) the proxy for a project. `progress` gets 0..1 over both strips.
 pub fn ensure(
     dir: &Path,
@@ -86,17 +103,21 @@ pub fn ensure(
         }
     }
 
+    // Long recordings get a lighter proxy: an 11-minute 60 fps recording at the full tier was
+    // 2.5 GB of JPEGs (5x the source video). The paused frame is always re-fetched at full
+    // resolution, so only playback / scrubbing quality is traded.
+    let ((sw, sq), (cw, cq)) = proxy_tier(dir);
     let two = cam_src.is_some();
     let screen = build_strip(
         &screen_src,
         &dir.join("proxy-screen.sci"),
         &dir.join("proxy-screen.idx"),
-        1280,
-        62,
+        sw,
+        sq,
         &mut |p| progress(if two { p * 0.7 } else { p }),
     )?;
     let camera = match &cam_src {
-        Some(c) => build_strip(c, &dir.join("proxy-camera.sci"), &dir.join("proxy-camera.idx"), 480, 60, &mut |p| {
+        Some(c) => build_strip(c, &dir.join("proxy-camera.sci"), &dir.join("proxy-camera.idx"), cw, cq, &mut |p| {
             progress(0.7 + p * 0.3)
         })
         .ok(),
