@@ -133,7 +133,7 @@ fn write_wav(path: &Path, samples: &[f32], rate: u32) -> Result<(), String> {
     f.flush().map_err(|e| e.to_string())
 }
 
-fn level(dir: &Path, rel: &str) -> Result<String, String> {
+pub fn level(dir: &Path, rel: &str) -> Result<String, String> {
     let src = dir.join(rel);
     let out: PathBuf = dir.join(OUT_NAME);
     // reuse the cached file when it is newer than the recording

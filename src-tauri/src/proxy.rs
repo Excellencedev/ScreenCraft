@@ -399,21 +399,89 @@ pub fn forget(dir: &str) {
     }
 }
 
-/// Build in the background and report progress to the UI.
+/// Projects whose proxy is being built right now, with the latest progress. Lets the
+/// build that starts when a recording stops be shared with the editor that opens on it.
+static BUILDING: Mutex<Option<std::collections::HashMap<String, f64>>> = Mutex::new(None);
+
+fn begin(dir: &str) -> bool {
+    let mut g = BUILDING.lock().unwrap();
+    let m = g.get_or_insert_with(Default::default);
+    if m.contains_key(dir) {
+        false
+    } else {
+        m.insert(dir.to_string(), 0.0);
+        true
+    }
+}
+
+fn set_progress(dir: &str, p: f64) {
+    if let Some(m) = BUILDING.lock().unwrap().as_mut() {
+        if let Some(v) = m.get_mut(dir) {
+            *v = p;
+        }
+    }
+}
+
+fn end(dir: &str) {
+    if let Some(m) = BUILDING.lock().unwrap().as_mut() {
+        m.remove(dir);
+    }
+}
+
+fn progress_of(dir: &str) -> Option<f64> {
+    BUILDING.lock().unwrap().as_ref().and_then(|m| m.get(dir).copied())
+}
+
+fn build_tracked(app: &tauri::AppHandle, dir: &str, screen: &str, camera: Option<&str>) -> Result<ProxyMeta, String> {
+    use tauri::Emitter;
+    forget(dir);
+    let mut last = -1.0f64;
+    let r = ensure(Path::new(dir), screen, camera, |p| {
+        set_progress(dir, p);
+        if p - last >= 0.01 || p >= 1.0 {
+            last = p;
+            let _ = app.emit("proxy-progress", p);
+        }
+    });
+    forget(dir);
+    r
+}
+
+/// Kick off the proxy build (and mic levelling) as soon as a recording is saved, so
+/// it is usually finished by the time the editor opens.
+pub fn start_background(app: tauri::AppHandle, dir: String, screen: String, camera: Option<String>, mic: Option<String>) {
+    if !begin(&dir) {
+        return;
+    }
+    std::thread::spawn(move || {
+        let r = build_tracked(&app, &dir, &screen, camera.as_deref());
+        end(&dir);
+        if let Err(e) = r {
+            eprintln!("[proxy] background build failed: {e}");
+        }
+        if let Some(m) = mic {
+            let _ = crate::levelmic::level(Path::new(&dir), &m);
+        }
+    });
+}
+
+/// Build in the background and report progress to the UI. If the build is already
+/// running (started when the recording stopped), just follow it.
 #[tauri::command]
 pub async fn ensure_proxy(app: tauri::AppHandle, dir: String, screen: String, camera: Option<String>) -> Result<ProxyMeta, String> {
     use tauri::Emitter;
     tauri::async_runtime::spawn_blocking(move || {
-        forget(&dir);
-        let mut last = -1.0f64;
-        let r = ensure(Path::new(&dir), &screen, camera.as_deref(), |p| {
-            if p - last >= 0.01 || p >= 1.0 {
-                last = p;
+        loop {
+            if begin(&dir) {
+                let r = build_tracked(&app, &dir, &screen, camera.as_deref());
+                end(&dir);
+                return r;
+            }
+            if let Some(p) = progress_of(&dir) {
                 let _ = app.emit("proxy-progress", p);
             }
-        });
-        forget(&dir);
-        r
+            std::thread::sleep(std::time::Duration::from_millis(120));
+        }
     })
     .await
     .map_err(|e| e.to_string())?

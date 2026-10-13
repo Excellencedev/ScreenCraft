@@ -87,6 +87,7 @@ pub fn mic_chunk(state: State<AppState>, request: Request<'_>) -> CmdResult<()> 
 
 #[tauri::command]
 pub fn stop_recording(
+    app: tauri::AppHandle,
     state: State<AppState>,
     camera_started_unix_ms: Option<f64>,
     mic_started_unix_ms: Option<f64>,
@@ -138,5 +139,13 @@ pub fn stop_recording(
     project.created_at = timestamp();
     project.scene.zooms = generate(&log, info.duration_ms, &AutoZoomOptions::default());
     write_project(&info.dir, &project)?;
-    Ok(info.dir.to_string_lossy().into())
+    let dir: String = info.dir.to_string_lossy().into();
+    crate::proxy::start_background(
+        app,
+        dir.clone(),
+        project.media.screen.clone(),
+        project.media.camera.clone(),
+        project.media.mic.clone(),
+    );
+    Ok(dir)
 }
