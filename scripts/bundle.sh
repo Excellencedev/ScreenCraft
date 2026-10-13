@@ -10,19 +10,17 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp target/release/screencraft "$APP/Contents/MacOS/ScreenCraft"
 
-# icon.icns from the PNG
+# icon.icns from the 1024px master (see scripts/make-icon.swift)
 ICONSET="$(mktemp -d)/ScreenCraft.iconset"
 mkdir -p "$ICONSET"
-for s in 16 32 64 128 256 512; do
-  sips -z $s $s src-tauri/icons/icon.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+MASTER=src-tauri/icons/icon-1024.png
+for s in 16 32 128 256 512; do
+  sips -z $s $s "$MASTER" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+  sips -z $((s * 2)) $((s * 2)) "$MASTER" --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
 done
-cp "$ICONSET/icon_32x32.png"   "$ICONSET/icon_16x16@2x.png"
-cp "$ICONSET/icon_64x64.png"   "$ICONSET/icon_32x32@2x.png"
-cp "$ICONSET/icon_256x256.png" "$ICONSET/icon_128x128@2x.png"
-cp "$ICONSET/icon_512x512.png" "$ICONSET/icon_256x256@2x.png"
-cp src-tauri/icons/icon.png    "$ICONSET/icon_512x512@2x.png"
-rm -f "$ICONSET/icon_64x64.png"
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/ScreenCraft.icns"
+
+VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' src-tauri/tauri.conf.json | head -1)"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -35,7 +33,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleExecutable</key><string>ScreenCraft</string>
   <key>CFBundleIconFile</key><string>ScreenCraft</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleShortVersionString</key><string>__VERSION__</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>15.0</string>
   <key>NSHighResolutionCapable</key><true/>
@@ -45,6 +43,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+sed -i '' "s/__VERSION__/$VERSION/" "$APP/Contents/Info.plist"
 
 # Sign with a *stable* designated requirement (bundle identifier only). A plain
 # ad-hoc signature pins the code hash, so every rebuild looks like a brand-new

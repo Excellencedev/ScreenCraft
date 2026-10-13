@@ -93,6 +93,15 @@ open ~/Applications/ScreenCraft.app
 `./scripts/bundle.sh` without `--install` leaves the app at `dist/ScreenCraft.app`.
 The first release build takes a few minutes.
 
+To get a disk image to hand to someone else (drag the app onto Applications):
+
+```bash
+./scripts/dmg.sh                  # writes dist/ScreenCraft-<version>.dmg
+```
+
+The app is only ad-hoc signed, so on another Mac the first launch needs a right-click →
+**Open**. The app icon is rendered by `scripts/make-icon.swift`.
+
 **Permissions.** On first launch a setup window checks the macOS permissions the app
 needs and takes you to the right System Settings pane:
 
