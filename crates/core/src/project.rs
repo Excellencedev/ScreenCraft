@@ -336,6 +336,8 @@ pub struct CameraConfig {
     /// Position of the camera in the frame, 0..1 on each axis.
     pub position: Point,
     pub padding_ratio: f64,
+    /// Sit exactly on the frame edge instead of inside the padding.
+    pub edge_flush: bool,
     pub corner_radius_ratio: f64,
     /// Scale applied to the camera while zoomed in.
     pub zoomed_scale: f64,
@@ -354,6 +356,7 @@ impl Default for CameraConfig {
             size_ratio: 0.30,
             position: Point { x: 1.0, y: 1.0 },
             padding_ratio: 0.5,
+            edge_flush: false,
             corner_radius_ratio: 0.25,
             zoomed_scale: 0.7,
             shadow: true,

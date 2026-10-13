@@ -58,6 +58,8 @@ meters, resolution and frame rate, and the project list.
   delete clips; change speed per clip; drag zoom regions and music clips freely. Zoom
   the timeline itself in and out (slider, **Fit**, or ⌘/Ctrl + scroll) to work on a long
   recording, and shift-click several zoom blocks to edit their settings together.
+- **Workspace:** drag the divider above the timeline and the divider beside the side panel
+  to give the area you are working in more room (double-click a divider to reset).
 - **Playback:** **Space** toggles play / pause; hold it to play at 2× while it is held.
 - **Annotate:** text titles, arrows, boxes, circles and highlights; **blur**, **pixelate**
   and **spotlight** regions that stay pinned to the recording while the camera zooms; drag
@@ -71,8 +73,9 @@ meters, resolution and frame rate, and the project list.
 - **Look:** wallpapers, gradients, solid colours or your own image (with blur),
   padding, corner radius, shadow, aspect ratio, crop.
 - **Cursor:** several styles, click effects, hide-when-idle, hides while you type.
-- **Camera bubble:** size, shape, position, mirror, border, and it shrinks smoothly
-  while the view is zoomed in.
+- **Camera bubble:** size, shape, nine anchor positions (optionally flush to the frame
+  edge, ignoring the padding), mirror, border, and it shrinks smoothly while the view is
+  zoomed in.
 - **Audio:** separate mic / device / music / master levels. The microphone is
   levelled and centred automatically.
 - **Sound effects:** optional built-in mouse-click and keyboard-typing sounds, placed on

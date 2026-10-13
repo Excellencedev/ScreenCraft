@@ -34,6 +34,8 @@ export function setTimelineZoom(z, anchorX) {
 }
 
 export function bindTimelineZoom() {
+  // when the timeline is short the tracks scroll vertically: keep the labels in step
+  $("tlScroll").addEventListener("scroll", () => { $("tlLabels").scrollTop = $("tlScroll").scrollTop; });
   const step = (f) => setTimelineZoom(S.tlZoom * f);
   $("tlZoomIn").onclick = () => step(1.6);
   $("tlZoomOut").onclick = () => step(1 / 1.6);

@@ -126,7 +126,8 @@ function bubbleBox(p, W, H, r, zoom, mul = 1) {
   base = Math.min(base, Math.min(W, H) * 0.8);
   const w = a >= 1 ? base * a : base;
   const h = a >= 1 ? base : base / a;
-  const pad = cc.paddingRatio * 0.08 * Math.min(W, H) + 8 * s;
+  // "flush" pins the camera to the frame edge, ignoring the padding
+  const pad = cc.edgeFlush ? 0 : cc.paddingRatio * 0.08 * Math.min(W, H) + 8 * s;
   return {
     x: pad + cc.position.x * (W - w - 2 * pad),
     y: pad + cc.position.y * (H - h - 2 * pad),

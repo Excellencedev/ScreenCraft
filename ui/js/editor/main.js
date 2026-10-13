@@ -152,7 +152,67 @@ function spaceUp() {
   else pause();
 }
 
+/** Draggable dividers for the timeline height and the side panel width (remembered). */
+function bindSplitters() {
+  const root = document.documentElement;
+  const load = (k, d) => { try { return parseFloat(localStorage.getItem(k)) || d; } catch { return d; } };
+  const save = (k, v) => { try { localStorage.setItem(k, String(Math.round(v))); } catch {} };
+  const limits = {
+    tl: () => [190, Math.max(240, innerHeight - 48 - 230)],
+    side: () => [250, Math.min(620, innerWidth - 420)],
+  };
+  const clampV = (k, v) => { const [a, b] = limits[k](); return Math.min(b, Math.max(a, v)); };
+  const apply = (tl, side) => {
+    if (tl != null) root.style.setProperty("--tl-h", clampV("tl", tl) + "px");
+    if (side != null) root.style.setProperty("--side-w", clampV("side", side) + "px");
+  };
+  apply(load("sc-tl-h", 318), load("sc-side-w", 340));
+  let raf = 0;
+  const relayout = () => {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => { renderTimeline(); draw(); });
+  };
+  const drag = (el, axis) => {
+    el.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      el.classList.add("drag");
+      document.body.classList.add("resizing");
+      const start = axis === "y" ? e.clientY : e.clientX;
+      const tl0 = $("timeline").getBoundingClientRect().height;
+      const side0 = $("side").getBoundingClientRect().width;
+      const move = (ev) => {
+        if (axis === "y") apply(tl0 - (ev.clientY - start), null);
+        else apply(null, side0 + (ev.clientX - start));
+        relayout();
+      };
+      const up = () => {
+        el.classList.remove("drag");
+        document.body.classList.remove("resizing");
+        el.removeEventListener("pointermove", move);
+        el.removeEventListener("pointerup", up);
+        save("sc-tl-h", $("timeline").getBoundingClientRect().height);
+        save("sc-side-w", $("side").getBoundingClientRect().width);
+      };
+      el.addEventListener("pointermove", move);
+      el.addEventListener("pointerup", up);
+    });
+    // double-click resets
+    el.addEventListener("dblclick", () => {
+      if (axis === "y") apply(318, null);
+      else apply(null, 340);
+      save("sc-tl-h", 318);
+      save("sc-side-w", 340);
+      relayout();
+    });
+  };
+  drag($("splitV"), "y");
+  drag($("splitH"), "x");
+  addEventListener("resize", () => apply(load("sc-tl-h", 318), load("sc-side-w", 340)));
+}
+
 function bindUI() {
+  bindSplitters();
   bindTitle();
   $("btnPlay").onclick = () => (S.playing ? pause() : play());
   $("btnStart").onclick = () => { pause(); requestSeek(0); };

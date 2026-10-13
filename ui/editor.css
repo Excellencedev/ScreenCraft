@@ -1,6 +1,6 @@
 html, body { background: var(--bg); overflow: hidden; }
 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-#app { display: grid; grid-template-rows: 48px minmax(0, 1fr) 318px; height: 100vh; }
+#app { display: grid; grid-template-rows: 48px minmax(0, 1fr) var(--tl-h, 318px); height: 100vh; }
 
 /* ---- top bar: project on the left, actions on the right */
 #top { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 8px; -webkit-app-region: drag; border-bottom: 1px solid var(--line); background: var(--panel); }
@@ -27,8 +27,8 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .projects-btn svg { width: 16px; height: 16px; order: -1; }
 
 /* ---- workspace: inspector on the left, stage on the right */
-#main { display: grid; grid-template-columns: 340px minmax(0, 1fr); min-height: 0; overflow: hidden; }
-#side { grid-column: 1; grid-row: 1; display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; border-right: 1px solid var(--line); background: var(--panel); }
+#main { display: grid; grid-template-columns: var(--side-w, 340px) minmax(0, 1fr); min-height: 0; overflow: hidden; }
+#side { position: relative; grid-column: 1; grid-row: 1; display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; border-right: 1px solid var(--line); background: var(--panel); }
 #stage { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 10px 18px 0; background: radial-gradient(ellipse at 50% 30%, #0e1624 0%, var(--bg) 70%); }
 #rail { display: flex; flex-direction: row; gap: 2px; padding: 8px 10px 0; border-bottom: 1px solid var(--line); }
 #rail button { flex: 1; height: 38px; border-radius: 7px 7px 0 0; display: grid; place-items: center; color: #7f8ba1; position: relative; }
@@ -84,7 +84,7 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 #timeline { border-top: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; padding: 0 16px 10px; position: relative; z-index: 5; background: var(--panel); }
 #tlTools { display: flex; align-items: center; gap: 6px; height: 42px; }
 .tl-body { display: flex; flex: 1; min-height: 0; }
-#tlLabels { width: 58px; flex: none; padding-top: 24px; }
+#tlLabels { width: 58px; flex: none; padding-top: 24px; overflow: hidden; }
 #tlLabels div { display: flex; align-items: center; height: 38px; margin-top: 6px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 
 #tlScroll { flex: 1; min-width: 0; overflow-x: auto; overflow-y: auto; position: relative; contain: layout paint; }
@@ -199,3 +199,18 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 #panel textarea { width: 100%; background: var(--bg, #0b0f17); border: 1px solid var(--line-2); border-radius: 7px; color: #e6ecf7; padding: 8px 10px; font: inherit; resize: vertical; }
 #panel textarea:focus { outline: none; border-color: var(--accent-2); }
 .add-grid.two { grid-template-columns: repeat(2, 1fr); }
+
+.pos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; max-width: 168px; }
+.pos-grid button { padding: 7px 0; border: 1px solid var(--line-2); border-radius: 6px; background: var(--panel-2); color: #cdd6e8; }
+.pos-grid button:hover { background: var(--raise); }
+.pos-grid button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* draggable dividers: the timeline's top edge and the side panel's right edge */
+#splitV { position: absolute; left: 0; right: 0; top: -4px; height: 9px; cursor: row-resize; z-index: 30; }
+#splitV::after { content: ""; position: absolute; left: 50%; top: 3px; width: 44px; height: 3px; margin-left: -22px; border-radius: 2px; background: var(--line-2); transition: background .12s; }
+#splitV:hover::after, #splitV.drag::after { background: var(--accent-2); }
+#splitH { position: absolute; top: 0; bottom: 0; right: -4px; width: 9px; cursor: col-resize; z-index: 30; }
+#splitH::after { content: ""; position: absolute; top: 50%; left: 3px; height: 44px; width: 3px; margin-top: -22px; border-radius: 2px; background: var(--line-2); transition: background .12s; }
+#splitH:hover::after, #splitH.drag::after { background: var(--accent-2); }
+body.resizing { user-select: none; }
+body.resizing * { cursor: inherit !important; }

@@ -577,7 +577,8 @@ mod tests {
         assert!(tr.layout_mix[f(2010.0)] < 1.0);
         assert_eq!(tr.layout_prev[f(2010.0)], 0);
         assert_eq!(tr.trans_kind[f(3000.0)], 1);
-        assert!(tr.trans_p[f(3000.0)] > 0.9);
+        assert!(tr.trans_p[f(3000.0)].abs() > 0.9);
+        assert!(tr.trans_p[f(2900.0)] > 0.0 && tr.trans_p[f(3100.0)] < 0.0);
         assert_eq!(tr.trans_kind[f(1000.0)], 0);
     }
 
