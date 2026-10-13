@@ -20,8 +20,8 @@
 </p>
 
 <p align="center">
-  <a href="ScreenCraft.dmg"><b>Download for macOS</b></a> ·
-  <a href="ScreenCraft-Setup.exe"><b>Download for Windows</b></a> ·
+  <a href="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg"><b>Download for macOS</b></a> ·
+  <a href="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft-Setup.exe"><b>Download for Windows</b></a> ·
   <a href="CHANGELOG.md">Changelog</a>
 </p>
 
@@ -131,7 +131,7 @@ meters, resolution and frame rate, and the project list.
 
 ### macOS
 
-Download [`ScreenCraft.dmg`](ScreenCraft.dmg) from the root of this repository, open
+Download [`ScreenCraft.dmg`](https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg) from the root of this repository, open
 it and drag **ScreenCraft** onto **Applications**. The app is only ad-hoc signed (not
 notarised), so the first time you open it use right-click → **Open**.
 
@@ -161,7 +161,7 @@ permissions setup is needed. Capture uses Windows.Graphics.Capture, decoding and
 encoding go through Media Foundation (hardware H.264 where available), system audio
 comes from a WASAPI loopback, and the recording shortcut is **Ctrl+Shift+2**.
 
-Download [`ScreenCraft-Setup.exe`](ScreenCraft-Setup.exe) from the root of this
+Download [`ScreenCraft-Setup.exe`](https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft-Setup.exe) from the root of this
 repository and run it. It installs per user (no administrator rights) into
 `%LOCALAPPDATA%\Programs\ScreenCraft` with Start Menu and Desktop shortcuts, an entry
 in *Settings → Apps*, and fetches the WebView2 runtime from Microsoft if it is missing
