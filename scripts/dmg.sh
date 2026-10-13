@@ -47,4 +47,6 @@ sync
 hdiutil detach -quiet "$MNT" || hdiutil detach -force -quiet "$MNT"
 hdiutil convert -quiet "$RW" -format UDZO -imagekey zlib-level=9 -o "$OUT"
 rm -f "$RW"
-echo "Built $OUT ($(du -h "$OUT" | cut -f1))"
+# the repo keeps the current installer at its root under a fixed name
+cp "$OUT" ScreenCraft.dmg
+echo "Built $OUT ($(du -h "$OUT" | cut -f1)) and copied it to ./ScreenCraft.dmg"

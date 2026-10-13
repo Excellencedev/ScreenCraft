@@ -1,6 +1,6 @@
 # ScreenCraft
 
-A screen recorder and video editor for macOS, written in Rust. Record your display,
+A screen recorder and video editor for macOS and Windows, written in Rust. Record your display,
 a window or an area (with an optional camera bubble, microphone and system audio),
 then turn the raw capture into a polished video: smooth automatic zooms that follow
 your cursor and typing, restyled cursor, backgrounds, rounded corners, shadows,
@@ -48,7 +48,7 @@ meters, resolution and frame rate, and the project list.
   level meter. Choose resolution (Native / 2560 / 1920 / 1600 / 1280) and 30 or 60 fps.
 - The system cursor is not baked into the video, so it can be redrawn, smoothed and
   restyled in the editor. Clicks, cursor motion and keystrokes are logged alongside.
-- Draggable recording HUD, countdown, global shortcut **⌘⇧2**, menu-bar controls.
+- Draggable recording HUD, countdown, global shortcut **⌘⇧2** (**Ctrl+Shift+2** on Windows), menu-bar controls.
 
 **Editing**
 - **Zoom:** automatic zoom regions generated from your clicks and typing, with
@@ -75,32 +75,13 @@ meters, resolution and frame rate, and the project list.
 
 ## Install
 
-ScreenCraft is built from source; there is no signed release download yet.
+### macOS
 
-**Requirements**
-- macOS 15 (Sequoia) or newer (developed and tested on Apple silicon)
-- [Rust](https://rustup.rs) (stable) and the Xcode command line tools
-  (`xcode-select --install`)
+Download [`ScreenCraft.dmg`](ScreenCraft.dmg) from the root of this repository, open
+it and drag **ScreenCraft** onto **Applications**. The app is only ad-hoc signed (not
+notarised), so the first time you open it use right-click → **Open**.
 
-```bash
-git clone https://github.com/MarshallNickolauson/ScreenCraft.git
-cd ScreenCraft
-
-./scripts/bundle.sh --install     # builds a release app and copies it to ~/Applications
-open ~/Applications/ScreenCraft.app
-```
-
-`./scripts/bundle.sh` without `--install` leaves the app at `dist/ScreenCraft.app`.
-The first release build takes a few minutes.
-
-To get a disk image to hand to someone else (drag the app onto Applications):
-
-```bash
-./scripts/dmg.sh                  # writes dist/ScreenCraft-<version>.dmg
-```
-
-The app is only ad-hoc signed, so on another Mac the first launch needs a right-click →
-**Open**. The app icon is rendered by `scripts/make-icon.swift`.
+Requires macOS 15 (Sequoia) or newer; developed and tested on Apple silicon.
 
 **Permissions.** On first launch a setup window checks the macOS permissions the app
 needs and takes you to the right System Settings pane:
@@ -116,24 +97,43 @@ macOS applies Screen Recording and Input Monitoring after the app restarts; the
 window offers a restart button. The app is signed ad hoc with a stable identity, so
 permissions persist across rebuilds.
 
-### Windows (work in progress)
+### Windows
 
-A Windows port is under way on the `windows-port` branch. Recording (display,
-window or area, with camera, microphone and system audio), editing and exporting
-work. Capture uses Windows.Graphics.Capture, encoding and decoding go through Media
-Foundation (hardware H.264 where available), system audio comes from a WASAPI
-loopback, and the camera and microphone are recorded by the web view as on macOS.
-No permissions setup is needed. Not done yet: the standalone compressor (and
-compress-after-export). Typing focus follows the text caret only in apps that use
-the classic Win32 caret; elsewhere it is estimated from keystrokes. Needs
-[Rust](https://rustup.rs) with the MSVC toolchain and the WebView2 runtime
-(preinstalled on Windows 11).
+Windows 10 / 11 is supported (added in
+[PR #1](https://github.com/MarshallNickolauson/ScreenCraft/pull/1) by
+[@PierrunoYT](https://github.com/PierrunoYT)). Recording (display, window or area,
+with camera, microphone and system audio), editing and exporting all work; no
+permissions setup is needed. Capture uses Windows.Graphics.Capture, decoding and
+encoding go through Media Foundation (hardware H.264 where available), system audio
+comes from a WASAPI loopback, and the recording shortcut is **Ctrl+Shift+2**.
+
+A ready-made `.exe` installer is not in the repository yet. Build and run it from
+source on a Windows PC with [Rust](https://rustup.rs) (MSVC toolchain) and the
+WebView2 runtime (preinstalled on Windows 11):
 
 ```powershell
-cargo run -p screencraft
+git clone https://github.com/MarshallNickolauson/ScreenCraft.git
+cd ScreenCraft
+cargo run --release -p screencraft
 ```
 
-The recording shortcut is **Ctrl+Shift+2** on Windows.
+The standalone compressor (and compress-after-export) is not available on Windows yet,
+and typing focus follows the text caret only in apps that expose a classic Win32 caret;
+elsewhere it is estimated from keystrokes.
+
+### Build from source (macOS)
+
+```bash
+git clone https://github.com/MarshallNickolauson/ScreenCraft.git
+cd ScreenCraft
+./scripts/bundle.sh --install     # builds a release app and copies it to ~/Applications
+open ~/Applications/ScreenCraft.app
+```
+
+Needs [Rust](https://rustup.rs) (stable) and the Xcode command line tools
+(`xcode-select --install`). `./scripts/bundle.sh` without `--install` leaves the app at
+`dist/ScreenCraft.app`; `./scripts/dmg.sh` also rebuilds `ScreenCraft.dmg`. The first
+release build takes a few minutes. The app icon is rendered by `scripts/make-icon.swift`.
 
 ## Using it
 
@@ -158,7 +158,7 @@ clicking the title in the editor.
 | Piece | Where | What it does |
 | --- | --- | --- |
 | `screencraft-core` | `crates/core` | Pure Rust: project model, spring physics, timeline mapping, auto-zoom generation and the per-frame camera / cursor render track. Unit tested. |
-| App shell | `src-tauri` | Tauri 2 app: ScreenCaptureKit capture, input and caret tracking, project IO, native preview proxy and frame server, audio levelling, AVFoundation compression, windows and menus. |
+| App shell | `src-tauri` | Tauri 2 app: capture, input and caret tracking, project IO, native preview proxy and frame server, audio levelling, compression, windows and menus. Platform code lives in per-feature folders (`capture/`, `proxy/`, `srcframes/`, `jpegio/`, `inputlog/`, `meter/`, `compress/`) with `macos.rs` (ScreenCaptureKit, AVFoundation, ImageIO) and `windows.rs` (Windows.Graphics.Capture, Media Foundation, WIC) backends. |
 | UI | `ui` | Plain ES modules, no bundler: recorder bar, editor, canvas compositor and timeline. Exports with WebCodecs. |
 
 Some details worth knowing:
@@ -191,7 +191,8 @@ MIT, see [LICENSE](LICENSE).
 
 ## Known limitations
 
-- macOS only (it depends on ScreenCaptureKit and AVFoundation).
+- macOS and Windows only. The two ports share the UI and `screencraft-core`; native capture, decoding and encoding are separate per-platform modules (see below).
+- Windows: no standalone compressor yet, and no `.exe` installer checked in.
 - Preview proxies are large (roughly 2–3 MB per second of recording); delete the
   `proxy-*` files in a project folder to reclaim space.
 - Export is not real-time; long 60 fps projects take a while.
