@@ -39,8 +39,9 @@ fn speech_flags(dir: &Path, mic: &str, mic_offset_ms: f64, duration_ms: f64) -> 
         return None;
     }
     let n = (duration_ms / 100.0).ceil() as usize;
-    let mut out = vec![false; n];
-    for (i, flag) in out.iter_mut().enumerate() {
+    // loudness of every 100 ms bucket of the (levelled) microphone
+    let mut rms = vec![0.0f64; n];
+    for (i, r) in rms.iter_mut().enumerate() {
         // microphone time = source time + offset
         let start = (((i as f64 * 100.0 + mic_offset_ms) / 1000.0) * rate as f64).round();
         if start < 0.0 {
@@ -58,10 +59,17 @@ fn speech_flags(dir: &Path, mic: &str, mic_offset_ms: f64, duration_ms: f64) -> 
             sum += v * v;
             cnt += 1;
         }
-        if cnt > 0 && (sum / cnt as f64).sqrt() > 0.018 {
-            *flag = true;
+        if cnt > 0 {
+            *r = (sum / cnt as f64).sqrt();
         }
     }
+    // levelling lifts a quiet room to a healthy level, so judge against the room's own noise
+    // floor (the 20th percentile) rather than a fixed number
+    let mut sorted: Vec<f64> = rms.iter().copied().filter(|v| *v > 0.0).collect();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let floor = sorted.get(sorted.len() / 5).copied().unwrap_or(0.0);
+    let thr = (floor * 3.0).max(0.03);
+    let mut out: Vec<bool> = rms.iter().map(|v| *v > thr).collect();
     // bridge short gaps between words so a sentence reads as one stretch
     let gap = 4;
     let mut last: Option<usize> = None;

@@ -5,17 +5,23 @@
  * Stretches of `buf` (an AudioBuffer) whose level is above a speech threshold, in
  * microphone-buffer milliseconds. `gain` is the same levelling factor the mix applies.
  */
-export function speechSegments(buf, gain = 1, thresholdRms = 0.02) {
+export function speechSegments(buf, gain = 1, minRms = 0.02) {
   if (!buf || !buf.length) return [];
   const ch = buf.getChannelData(0);
   const win = Math.max(1, Math.round(buf.sampleRate * 0.05));
   const n = Math.floor(ch.length / win);
-  const loud = new Array(n);
+  const lvl = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     let s = 0;
     for (let j = i * win; j < (i + 1) * win; j++) s += ch[j] * ch[j];
-    loud[i] = Math.sqrt(s / win) * gain > thresholdRms;
+    lvl[i] = Math.sqrt(s / win) * gain;
   }
+  // judge against the room's own noise floor (20th percentile), not a fixed level
+  const sorted = Float32Array.from(lvl).sort();
+  const floor = sorted[Math.floor(n / 5)] || 0;
+  const threshold = Math.max(minRms, floor * 3);
+  const loud = new Array(n);
+  for (let i = 0; i < n; i++) loud[i] = lvl[i] > threshold;
   // hold 300 ms after the last loud window and bridge gaps up to 350 ms
   const segs = [];
   let start = -1, last = -1;

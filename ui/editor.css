@@ -214,3 +214,5 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 #splitH:hover::after, #splitH.drag::after { background: var(--accent-2); }
 body.resizing { user-select: none; }
 body.resizing * { cursor: inherit !important; }
+.block.tiny .h, .block.tiny span { display: none; }
+.block.tiny { border-width: 0; }

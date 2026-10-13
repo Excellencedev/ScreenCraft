@@ -29,9 +29,8 @@ pub fn idle_segments(log: &InputLog, duration_ms: f64, speech: Option<&[bool]>, 
     for k in &log.keys {
         mark(&mut active, k.t, 400.0);
     }
-    for c in &log.carets {
-        mark(&mut active, c.t, 200.0);
-    }
+    // (caret samples are not activity by themselves: they are logged continuously once
+    // someone has typed, and the key presses already mark the typing)
     // cursor motion: more than ~6 points per 100 ms bucket counts as activity
     let mut prev: Option<(f64, f64, f64)> = None;
     for m in &log.moves {

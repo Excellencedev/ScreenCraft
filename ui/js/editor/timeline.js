@@ -83,6 +83,8 @@ export function renderTimeline() {
     el.className = "block clip" + (S.selected?.type === "slice" && S.selected.id === s.id ? " sel" : "");
     el.style.left = acc * pxPerMs + "px";
     el.style.width = Math.max(4, len * pxPerMs - 2) + "px";
+    // the many short pieces of a speed ramp: no handles or labels, just a sliver
+    if (len * pxPerMs < 24) el.classList.add("tiny");
     el.dataset.id = s.id;
     if (s.freeze) el.classList.add("freeze");
     const speed = s.timeScale !== 1 && !s.freeze ? ` · ${+s.timeScale.toFixed(2)}×` : "";
