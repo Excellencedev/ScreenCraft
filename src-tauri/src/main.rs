@@ -72,6 +72,7 @@ fn main() {
                     kind: parts[1].to_string(),
                     t_ms,
                     quality,
+                    max_w: param("w").parse::<u32>().unwrap_or(0).min(16384),
                     reply: Box::new(respond),
                 });
             } else {
