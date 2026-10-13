@@ -14,6 +14,31 @@ There are no AI features: just recording, camera, editing and zoom.
 > way. "Screen Studio" is a trademark of its respective owner. ScreenCraft contains no
 > code, artwork or other assets from that product.
 
+## Screenshots
+
+The editor, with a generated demo recording (a synthetic "app" with a typing
+box, not real footage). Zoom regions are the blue blocks on the timeline.
+
+![The editor](docs/screenshots/editor.jpg)
+
+Paused inside a zoom: the camera is framing the cards and the preview re-fetches a
+full-resolution frame so zoomed stills stay sharp.
+
+![Zoomed in the editor](docs/screenshots/editor-zoom.jpg)
+
+Cursor and camera-motion settings:
+
+![Cursor and camera motion](docs/screenshots/editor-cursor.jpg)
+
+Export, with optional compress-after-export and a size estimate:
+
+![Export dialog](docs/screenshots/export.jpg)
+
+The recorder bar: capture mode, camera / microphone / system audio with level
+meters, resolution and frame rate, and the project list.
+
+![Recorder bar](docs/screenshots/recorder.jpg)
+
 ## What it does
 
 **Recording**
