@@ -56,6 +56,8 @@ struct Session {
     /// Frames just passed, so requests that arrive slightly out of order are still served.
     recent: std::collections::VecDeque<(f64, Retained<CMSampleBuffer>)>,
     eof: bool,
+    /// Time of the last forced reopen after the reader ran dry early.
+    last_retry: f64,
 }
 
 fn obj<T: objc2::Message>(r: Retained<T>) -> Retained<AnyObject> {
@@ -90,7 +92,7 @@ impl Session {
             let asset = AVURLAsset::URLAssetWithURL_options(&url, None);
             let duration = asset.duration().seconds();
             let (reader, output) = open_at(&asset, start_s, duration)?;
-            Some(Session { asset, reader, output, duration, cur: None, next: None, recent: Default::default(), eof: false })
+            Some(Session { asset, reader, output, duration, cur: None, next: None, recent: Default::default(), eof: false, last_retry: -10.0 })
         }
     }
 
@@ -134,6 +136,24 @@ impl Session {
         let far = self.cur.as_ref().map(|c| t - c.0 > 4.0).unwrap_or(false);
         if behind || far {
             self.reopen((t - 0.25).max(0.0));
+        }
+        // The reader can end early (a damaged or oddly timestamped file): a frame that
+        // stopped well before `t` would freeze the picture, so reopen at `t` and carry on.
+        // If nothing more can be read, keep showing the last good frame.
+        let stalled = self.eof && self.cur.as_ref().map(|c| t - c.0 > 0.5).unwrap_or(false) && t - self.last_retry > 0.5;
+        if stalled {
+            self.last_retry = t;
+            let held = self.cur.take();
+            if self.reopen((t - 0.1).max(0.0)) {
+                self.next = self.pull();
+                if self.next.is_none() {
+                    self.eof = true;
+                }
+            }
+            if self.next.is_none() && self.cur.is_none() {
+                self.cur = held;
+                self.eof = true;
+            }
         }
         if self.cur.is_none() && self.next.is_none() && !self.eof {
             self.next = self.pull();

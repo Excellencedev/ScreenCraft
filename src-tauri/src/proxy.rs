@@ -28,7 +28,7 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
 pub const FPS: f64 = 30.0;
-const VERSION: u32 = 3;
+const VERSION: u32 = 4;
 
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct StripMeta {
@@ -84,18 +84,30 @@ fn build_strip(
         let w = (target_w as f64).min(size.width).round() as u32 & !1;
         let h = ((w as f64 * size.height / size.width).round() as u32) & !1;
 
-        let reader = AVAssetReader::initWithAsset_error(AVAssetReader::alloc(), &asset)
-            .map_err(|e| e.localizedDescription().to_string())?;
         let settings = dict(vec![
             ("PixelFormatType", num_i(1111970369)), // 32BGRA
             ("Width", num_i(w as i64)),
             ("Height", num_i(h as i64)),
         ]);
-        let vout = AVAssetReaderTrackOutput::assetReaderTrackOutputWithTrack_outputSettings(&track, Some(&settings));
-        reader.addOutput(&vout);
-        if !reader.startReading() {
-            return Err("could not start reading the video".into());
-        }
+        // (re)open a reader, optionally starting part-way (used to resume after an early end)
+        let open_reader = |start_s: f64| -> Result<(Retained<AVAssetReader>, Retained<AVAssetReaderTrackOutput>), String> {
+            let reader = AVAssetReader::initWithAsset_error(AVAssetReader::alloc(), &asset)
+                .map_err(|e| e.localizedDescription().to_string())?;
+            let out = AVAssetReaderTrackOutput::assetReaderTrackOutputWithTrack_outputSettings(&track, Some(&settings));
+            reader.addOutput(&out);
+            if start_s > 0.0 {
+                let span = if duration.is_finite() && duration > start_s { duration - start_s } else { 86_400.0 };
+                reader.setTimeRange(objc2_core_media::CMTimeRange {
+                    start: objc2_core_media::CMTime::new((start_s * 1000.0) as i64, 1000),
+                    duration: objc2_core_media::CMTime::new(((span + 1.0) * 1000.0) as i64, 1000),
+                });
+            }
+            if !reader.startReading() {
+                return Err("could not start reading the video".into());
+            }
+            Ok((reader, out))
+        };
+        let (mut reader, mut vout) = open_reader(0.0)?;
 
         // encoder workers: slot -> jpeg
         let (job_tx, job_rx) = mpsc::sync_channel::<(usize, Vec<u8>)>(8);
@@ -153,11 +165,15 @@ fn build_strip(
         let step = 1.0 / FPS;
         let mut slot = 0usize; // next slot to emit (slot k is the frame shown at k / FPS)
         let mut shift = 0.0f64; // timestamp discontinuity compensation
+        let mut last_raw = 0.0f64;
+        let mut resumes = 0;
+        'read: loop {
         while let Some(sample) = vout.copyNextSampleBuffer() {
             let raw_pts = sample.presentation_time_stamp().seconds();
             if !raw_pts.is_finite() {
                 continue;
             }
+            last_raw = raw_pts;
             let Some(img) = sample.image_buffer() else { continue };
             let mut pts = raw_pts - shift;
             let want_t = slot as f64 * step;
@@ -211,6 +227,22 @@ fn build_strip(
                 progress((raw_pts / duration).clamp(0.0, 1.0));
             }
         }
+        // the reader sometimes ends well before the clip does (damaged / odd timestamps):
+        // pick the file up again just past the last frame instead of freezing the strip
+        if duration.is_finite() && duration < 86_400.0 && last_raw < duration - 1.5 && resumes < 40 {
+            resumes += 1;
+            match open_reader(last_raw + 0.05) {
+                Ok((r, o)) => {
+                    reader = r;
+                    vout = o;
+                    continue 'read;
+                }
+                Err(_) => {}
+            }
+        }
+        break 'read;
+        }
+        let _ = &reader;
         drop(job_tx);
         for wk in workers {
             let _ = wk.join();
