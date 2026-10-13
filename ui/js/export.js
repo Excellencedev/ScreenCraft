@@ -3,6 +3,7 @@ import { Muxer, ArrayBufferTarget } from "../vendor/mp4-muxer.mjs";
 import { GIFEncoder, quantize, applyPalette } from "../vendor/gifenc.esm.js";
 import { invoke, convertFileSrc, SC_BASE } from "./tauri.js";
 import { outputSize, paintFrame, camAt, lerpCam, contentRect } from "./render.js";
+import { loadSet, scheduleMarks } from "./sounds.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -70,7 +71,7 @@ async function decodeFile(url) {
 }
 
 /** Build the exported audio timeline: device audio and microphone mixed with their own levels. */
-async function renderAudio(project, dir, outDurSec) {
+async function renderAudio(project, dir, outDurSec, track) {
   const a = project.config.audio;
   const tracks = [];
   const device = await decodeFile(convertFileSrc(`${dir}/${project.media.screen}`));
@@ -86,7 +87,9 @@ async function renderAudio(project, dir, outDurSec) {
     const buf = decoded.get(c.file);
     if (buf && buf.length) musicClips.push({ c, buf });
   }
-  if (!tracks.length && !musicClips.length) return null;
+  const wantClicks = !!a.clickSounds && (track?.clicks?.length || 0) > 0;
+  const wantKeys = !!a.keySounds && (track?.keys?.length || 0) > 0;
+  if (!tracks.length && !musicClips.length && !wantClicks && !wantKeys) return null;
   const sr = 48000;
   const off = new OfflineAudioContext(2, Math.ceil(outDurSec * sr), sr);
   const master = masterGain(a.volume);
@@ -102,6 +105,23 @@ async function renderAudio(project, dir, outDurSec) {
     node.connect(g).connect(limiter);
     node.start(when, Math.max(0, c.inMs) / 1000, Math.min(c.durMs / 1000, outDurSec - when));
   }
+  // built-in click / typing sound effects, placed at the recorded event times
+  const fxWhen = (t) => t / 1000;
+  if (wantClicks) {
+    const g = off.createGain();
+    g.gain.value = master * (a.clickVolume ?? 0.6);
+    g.connect(limiter);
+    const set = await loadSet(off, "click", a.clickStyle || "soft");
+    scheduleMarks(off, g, track.clicks, set, 0, outDurSec * 1000, fxWhen);
+  }
+  if (wantKeys) {
+    const g = off.createGain();
+    g.gain.value = master * (a.keyVolume ?? 0.5);
+    g.connect(limiter);
+    const set = await loadSet(off, "key", a.keyStyle || "mechanical");
+    scheduleMarks(off, g, track.keys.map((k) => ({ tOutMs: k.tOutMs, kind: k.kind })), set, 0, outDurSec * 1000, fxWhen);
+  }
+
   let at = 0;
   for (const s of project.scene.slices) {
     const srcDur = (s.sourceEndMs - s.sourceStartMs) / 1000;
@@ -209,7 +229,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
   onProgress(0.02, "Preparing audio…");
   const outDurSec = track.durationMs / 1000;
   let audio = null;
-  try { audio = await renderAudio(project, dir, outDurSec); } catch { audio = null; }
+  try { audio = await renderAudio(project, dir, outDurSec, track); } catch { audio = null; }
 
   const target = new ArrayBufferTarget();
   const muxer = new Muxer({

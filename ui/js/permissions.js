@@ -68,3 +68,6 @@ $("bContinue").onclick = async () => {
 await refresh();
 setInterval(refresh, 1500);
 addEventListener("focus", refresh);
+
+// Escape closes the window like "Skip"
+addEventListener("keydown", (e) => { if (e.key === "Escape") $("bSkip").click(); });

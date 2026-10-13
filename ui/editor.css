@@ -87,7 +87,7 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 #tlLabels { width: 58px; flex: none; padding-top: 24px; }
 #tlLabels div { display: flex; align-items: center; height: 42px; margin-top: 6px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 #tlLabels div:nth-child(2) { height: 46px; }
-#tlScroll { flex: 1; min-width: 0; overflow-x: hidden; overflow-y: auto; position: relative; contain: layout paint; }
+#tlScroll { flex: 1; min-width: 0; overflow-x: auto; overflow-y: auto; position: relative; contain: layout paint; }
 #tlInner { position: relative; padding-top: 24px; }
 #ruler { position: absolute; left: 0; right: 0; top: 0; height: 24px; cursor: pointer; }
 #ruler .tick { position: absolute; top: 14px; width: 1px; height: 6px; background: #35435c; }
@@ -156,3 +156,17 @@ input[type=color] { width: 44px; height: 30px; border: 0; background: none; padd
 .ask-btns .spacer { flex: 1; }
 .ask-btns .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .ask-btns .btn-line { width: auto; margin-top: 0; padding: 8px 14px; }
+
+.tl-zoom { display: flex; align-items: center; gap: 4px; margin-right: 10px; }
+.tl-zoom input[type=range] { width: 110px; }
+#tlScroll::-webkit-scrollbar { height: 8px; }
+#tlScroll::-webkit-scrollbar-thumb { background: #2b3850; border-radius: 4px; }
+/* presets popover */
+.preset-save { display: flex; gap: 6px; }
+#menu .preset-save .save { flex: 1; text-align: center; background: var(--raise); }
+#menu .preset-save .gear { width: 34px; flex: none; display: grid; place-items: center; padding: 0; color: #b9c3d6; border: 1px solid var(--line-2); }
+.preset-row { display: flex; gap: 6px; align-items: center; margin: 2px 0; }
+.preset-row input { flex: 1; min-width: 0; background: var(--bg, #0b0f17); border: 1px solid var(--line-2); border-radius: 6px; color: #e6ecf7; padding: 6px 8px; font: inherit; }
+.preset-row input:focus { outline: none; border-color: var(--accent-2); }
+#menu .preset-row .del { width: 30px; flex: none; display: grid; place-items: center; padding: 6px 0; color: #ff9aa5; }
+.preset-empty { color: var(--muted); font-size: 12px; padding: 6px 10px; max-width: 230px; }

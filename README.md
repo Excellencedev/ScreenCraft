@@ -55,7 +55,10 @@ meters, resolution and frame rate, and the project list.
   adjustable ease in / ease out, plus manual zooms you can place anywhere. The camera
   keeps the cursor near the centre and, while you type, follows the text caret.
 - **Timeline:** video, zoom and music tracks. Split, trim, reorder, duplicate and
-  delete clips; change speed per clip; drag zoom regions and music clips freely.
+  delete clips; change speed per clip; drag zoom regions and music clips freely. Zoom
+  the timeline itself in and out (slider, **Fit**, or ⌘/Ctrl + scroll) to work on a long
+  recording, and shift-click several zoom blocks to edit their settings together.
+- **Playback:** **Space** toggles play / pause; hold it to play at 2× while it is held.
 - **Look:** wallpapers, gradients, solid colours or your own image (with blur),
   padding, corner radius, shadow, aspect ratio, crop.
 - **Cursor:** several styles, click effects, hide-when-idle, hides while you type.
@@ -63,6 +66,9 @@ meters, resolution and frame rate, and the project list.
   while the view is zoomed in.
 - **Audio:** separate mic / device / music / master levels. The microphone is
   levelled and centred automatically.
+- **Sound effects:** optional built-in mouse-click and keyboard-typing sounds, placed on
+  the recorded clicks and key presses, each with a few styles and its own volume. They
+  are synthesised by `scripts/make-sounds.py`, so they are original and licence-free.
 - **Music:** add an audio file, trim and split it, see its waveform on the track.
 - **Project files:** edits stay in memory until you save (**⌘S**); a `*` in the title
   shows unsaved changes and closing or quitting asks before discarding them.
@@ -165,7 +171,7 @@ clicking the title in the editor.
 
 ### Shortcuts
 
-`Space` play / pause · `S` split at playhead · `Z` add zoom · `D` duplicate ·
+`Space` play / pause (hold for 2×) · `Esc` close the open dialog · `S` split at playhead · `Z` add zoom · `D` duplicate ·
 `⌫` delete selection · `←` `→` step · `⌘Z` / `⇧⌘Z` undo / redo · `⌘S` save ·
 `⌘⇧2` start / stop recording
 
@@ -197,6 +203,7 @@ A `.screencraft` package contains `screen.mp4`, optional `camera.mp4` and `mic.m
 
 ```bash
 cargo test -p screencraft-core     # unit tests for the core crate
+python3 scripts/make-sounds.py     # regenerate the click / typing sounds (needs numpy)
 cargo check -p screencraft         # type-check the app
 ./scripts/bundle.sh --install      # rebuild and reinstall
 ```

@@ -16,6 +16,14 @@ pub struct ClickMark {
     pub y: f64,
 }
 
+/// A key press in output time. `kind`: 0 = character, 1 = space, 2 = return, 3 = backspace/delete, 4 = tab.
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyMark {
+    pub t_out_ms: f64,
+    pub kind: u8,
+}
+
 /// Struct-of-arrays so the JSON stays compact.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -39,6 +47,8 @@ pub struct RenderTrack {
     /// Cursor tilt in radians when velocity rotation is on.
     pub cursor_rotation: Vec<f64>,
     pub clicks: Vec<ClickMark>,
+    /// Key presses (for the typing sound effects), in output time.
+    pub keys: Vec<KeyMark>,
 }
 
 fn r4(v: f64) -> f64 {
@@ -233,6 +243,19 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
             tr.clicks.push(ClickMark { t_out_ms: r4(t_out), x: r4(nx), y: r4(ny) });
         }
     }
+    // key presses in output time (macOS key codes; the Windows logger maps onto the same ones)
+    for k in input.keys.iter().filter(|k| k.down) {
+        if let Some(t_out) = crate::timeline::source_to_output(slices, k.t) {
+            let kind = match k.key.as_str() {
+                "49" => 1,
+                "36" | "76" => 2,
+                "51" | "117" => 3,
+                "48" => 4,
+                _ => 0,
+            };
+            tr.keys.push(KeyMark { t_out_ms: r4(t_out), kind });
+        }
+    }
     tr
 }
 
@@ -412,6 +435,19 @@ mod tests {
             let real = (100.0 + ms / 50.0 * 6.0) / 1000.0;
             assert!((tr.mx[i] - real).abs() < 0.01, "cursor {:.3} vs real {real:.3} at {ms}", tr.mx[i]);
         }
+    }
+
+    #[test]
+    fn key_marks_follow_the_timeline() {
+        use crate::input::KeyEvent;
+        let (p, mut log) = project();
+        log.keys.push(KeyEvent { t: 2000.0, key: "49".into(), down: true });
+        log.keys.push(KeyEvent { t: 2100.0, key: "0".into(), down: true });
+        log.keys.push(KeyEvent { t: 2150.0, key: "0".into(), down: false });
+        let tr = compute_track(&p, &log, 60.0);
+        assert_eq!(tr.keys.len(), 2);
+        assert_eq!(tr.keys[0].kind, 1);
+        assert!((tr.keys[0].t_out_ms - 2000.0).abs() < 1.0);
     }
 
     #[test]

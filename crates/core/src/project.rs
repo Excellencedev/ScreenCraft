@@ -413,11 +413,34 @@ pub struct AudioConfig {
     pub music_volume: f64,
     pub mute_microphone: bool,
     pub mute_system_audio: bool,
+    /// Built-in mouse click sound effects, placed on every recorded click.
+    pub click_sounds: bool,
+    /// Sound set id (see `ui/sounds`): soft | crisp | classic.
+    pub click_style: String,
+    pub click_volume: f64,
+    /// Built-in keyboard typing sounds, placed on every recorded key press.
+    pub key_sounds: bool,
+    /// Sound set id: mechanical | soft | thock.
+    pub key_style: String,
+    pub key_volume: f64,
 }
 
 impl Default for AudioConfig {
     fn default() -> Self {
-        Self { volume: 0.5, mic_volume: 1.0, device_volume: 1.0, music_volume: 0.5, mute_microphone: false, mute_system_audio: false }
+        Self {
+            volume: 0.5,
+            mic_volume: 1.0,
+            device_volume: 1.0,
+            music_volume: 0.5,
+            mute_microphone: false,
+            mute_system_audio: false,
+            click_sounds: false,
+            click_style: "soft".into(),
+            click_volume: 0.6,
+            key_sounds: false,
+            key_style: "mechanical".into(),
+            key_volume: 0.5,
+        }
     }
 }
 

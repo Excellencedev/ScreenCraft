@@ -1,13 +1,16 @@
 // Audio for the preview: everything is decoded once into AudioBuffers and scheduled on a
 // WebAudio clock. No <audio>/<video> element is ever played, seeked or re-rated.
 import { invoke, convertFileSrc } from "../tauri.js";
-import { P, dir } from "./state.js";
+import { P, S, dir } from "./state.js";
 import { masterGain, makeLimiter, autoGain } from "../audiolevel.js";
+import { loadSet, scheduleMarks } from "../sounds.js";
 
 const A = {
   ctx: null,
   limiter: null,
-  gain: { dev: null, mic: null, music: null },
+  gain: { dev: null, mic: null, music: null, click: null, key: null },
+  fx: { click: null, key: null, clickStyle: "", keyStyle: "" },
+  play: null, // { t0, fromOut, rate, horizon }
   bufs: { dev: null, mic: null, micExtra: 1 },
   music: new Map(), // file -> Promise<AudioBuffer|null>
   nodes: [],
@@ -18,7 +21,7 @@ function ensureCtx() {
   A.ctx = new AudioContext({ sampleRate: 48000 });
   A.limiter = makeLimiter(A.ctx);
   A.limiter.connect(A.ctx.destination);
-  for (const k of ["dev", "mic", "music"]) {
+  for (const k of ["dev", "mic", "music", "click", "key"]) {
     A.gain[k] = A.ctx.createGain();
     A.gain[k].connect(A.limiter);
   }
@@ -79,9 +82,66 @@ export function applyLevels() {
   A.gain.dev.gain.value = master * a.deviceVolume;
   A.gain.mic.gain.value = master * a.micVolume * A.bufs.micExtra;
   A.gain.music.gain.value = master * (a.musicVolume ?? 0.5);
+  A.gain.click.gain.value = master * (a.clickVolume ?? 0.6);
+  A.gain.key.gain.value = master * (a.keyVolume ?? 0.5);
+}
+
+/** Decode the selected click / typing sound sets (no-op when already loaded). */
+async function loadEffects() {
+  const ctx = ensureCtx();
+  const a = P().config.audio;
+  if (a.clickSounds && A.fx.clickStyle !== a.clickStyle) {
+    A.fx.click = await loadSet(ctx, "click", a.clickStyle || "soft");
+    A.fx.clickStyle = a.clickStyle;
+  }
+  if (a.keySounds && A.fx.keyStyle !== a.keyStyle) {
+    A.fx.key = await loadSet(ctx, "key", a.keyStyle || "mechanical");
+    A.fx.keyStyle = a.keyStyle;
+  }
+}
+
+const FX_WINDOW_MS = 90000;
+/** Place click / typing effects between output times `from` and `to` on the audio clock. */
+function scheduleEffects(from, to) {
+  const ctx = A.ctx, p = A.play;
+  const a = P().config.audio;
+  const tr = S.track;
+  if (!ctx || !p || !tr) return;
+  const when = (t) => p.t0 + (t - p.fromOut) / 1000 / p.rate;
+  if (a.clickSounds && A.fx.click) {
+    A.nodes.push(...scheduleMarks(ctx, A.gain.click, tr.clicks || [], A.fx.click, from, to, when));
+  }
+  if (a.keySounds && A.fx.key) {
+    A.nodes.push(...scheduleMarks(ctx, A.gain.key, (tr.keys || []).map((k) => ({ tOutMs: k.tOutMs, kind: k.kind })), A.fx.key, from, to, when));
+  }
+}
+
+/** Called regularly while playing: keeps effects scheduled ahead of the playhead. */
+export function topUpEffects(tOut) {
+  const p = A.play;
+  if (!p) return;
+  if (tOut + 20000 < p.horizon) return;
+  const next = tOut + FX_WINDOW_MS;
+  scheduleEffects(p.horizon, next);
+  p.horizon = next;
+}
+
+/** Play one hit of a sound set (used when the style is picked in the Audio panel). */
+export async function previewSound(kind, style) {
+  const ctx = ensureCtx();
+  await ctx.resume().catch(() => {});
+  applyLevels();
+  const set = await loadSet(ctx, kind, style);
+  const buf = set?.normal?.[0];
+  if (!buf) return;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(kind === "click" ? A.gain.click : A.gain.key);
+  src.start();
 }
 
 export function stopAudio() {
+  A.play = null;
   for (const n of A.nodes) {
     try { n.stop(); } catch {}
     try { n.disconnect(); } catch {}
@@ -93,12 +153,14 @@ export function stopAudio() {
  * Schedule every audible piece from output time `fromOut` (ms). Returns the AudioContext
  * time at which `fromOut` is heard.
  */
-export async function startAudio(fromOut, leadSec = 0.06) {
+export async function startAudio(fromOut, leadSec = 0.06, rate = 1) {
   const ctx = ensureCtx();
   await ctx.resume().catch(() => {});
+  await loadEffects().catch(() => {});
   stopAudio();
   applyLevels();
   const t0 = ctx.currentTime + leadSec;
+  const gr = Math.max(0.25, rate);
   const m = P().media;
   let acc = 0;
   const addNode = (buf, dest, when, offsetSec, durSec, rate, vol) => {
@@ -127,8 +189,8 @@ export async function startAudio(fromOut, leadSec = 0.06) {
       const intoSlice = Math.max(0, fromOut - acc); // output ms already past
       const srcStart = s.sourceStartMs + intoSlice * s.timeScale;
       const srcDur = (s.sourceEndMs - srcStart) / 1000;
-      const when = t0 + Math.max(0, acc - fromOut) / 1000;
-      const rate = Math.min(16, Math.max(0.0625, s.timeScale));
+      const when = t0 + Math.max(0, acc - fromOut) / 1000 / gr;
+      const rate = Math.min(16, Math.max(0.0625, s.timeScale * gr));
       addNode(A.bufs.dev, A.gain.dev, when, srcStart / 1000, srcDur, rate, s.volume);
       addNode(A.bufs.mic, A.gain.mic, when, (srcStart + (m.micOffsetMs || 0)) / 1000, srcDur, rate, s.volume);
     }
@@ -140,8 +202,10 @@ export async function startAudio(fromOut, leadSec = 0.06) {
     const startAt = Math.max(c.offsetMs, fromOut);
     getMusicBuffer(c.file).then(() => {}); // ensure requested (no-op when decoded)
     const buf = peekMusic(c.file);
-    addNode(buf, A.gain.music, t0 + (startAt - fromOut) / 1000, (c.inMs + (startAt - c.offsetMs)) / 1000, (end - startAt) / 1000, 1, 1);
+    addNode(buf, A.gain.music, t0 + (startAt - fromOut) / 1000 / gr, (c.inMs + (startAt - c.offsetMs)) / 1000, (end - startAt) / 1000, gr, 1);
   }
+  A.play = { t0, fromOut, rate: gr, horizon: fromOut + FX_WINDOW_MS };
+  scheduleEffects(fromOut, A.play.horizon);
   return t0;
 }
 

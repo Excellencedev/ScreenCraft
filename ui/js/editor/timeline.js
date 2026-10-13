@@ -7,8 +7,45 @@ import { addMusic, clips as musicClips, drawWave, removeMusicClip } from "./musi
 import { change } from "./history.js";
 import { requestSeek, pause, play, updateTransport, setTimelineWidth } from "./playback.js";
 
+/** Ids of every selected zoom region (the first one drives the panel). */
+export const selectedZoomIds = () => (S.multi?.length ? S.multi : S.selected?.type === "zoom" ? [S.selected.id] : []);
+const isZoomSel = (id) => selectedZoomIds().includes(id);
+
 const tlWidth = () => Math.max(100, $("tlInner").clientWidth);
 let rulerKey = "";
+
+// ---- timeline zoom: the inner strip is made wider than the viewport and scrolled
+const ZOOM_MAX = 60;
+const rangeToZoom = (v) => Math.pow(ZOOM_MAX, v / 100);
+const zoomToRange = (z) => (Math.log(z) / Math.log(ZOOM_MAX)) * 100;
+
+/** Set the timeline zoom (1 = fit). The time under `anchorX` (client px) stays put. */
+export function setTimelineZoom(z, anchorX) {
+  z = clamp(z, 1, ZOOM_MAX);
+  const scroll = $("tlScroll"), inner = $("tlInner");
+  const rect = scroll.getBoundingClientRect();
+  const ax = anchorX ?? rect.left + rect.width / 2;
+  const frac = (scroll.scrollLeft + (ax - rect.left)) / Math.max(1, inner.clientWidth);
+  S.tlZoom = z;
+  inner.style.width = z === 1 ? "" : `${z * 100}%`;
+  $("tlZoomRange").value = String(zoomToRange(z));
+  renderTimeline();
+  scroll.scrollLeft = frac * inner.clientWidth - (ax - rect.left);
+}
+
+export function bindTimelineZoom() {
+  const step = (f) => setTimelineZoom(S.tlZoom * f);
+  $("tlZoomIn").onclick = () => step(1.6);
+  $("tlZoomOut").onclick = () => step(1 / 1.6);
+  $("tlZoomFit").onclick = () => { setTimelineZoom(1); $("tlScroll").scrollLeft = 0; };
+  $("tlZoomRange").oninput = (e) => setTimelineZoom(rangeToZoom(parseFloat(e.target.value)));
+  // ⌘/Ctrl + wheel (and trackpad pinch) zooms around the pointer
+  $("tlScroll").addEventListener("wheel", (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    setTimelineZoom(S.tlZoom * Math.exp(-e.deltaY * 0.01), e.clientX);
+  }, { passive: false });
+}
 
 function renderRuler(dur, W, pxPerMs) {
   const key = `${Math.round(dur)}|${W}`;
@@ -58,7 +95,7 @@ export function renderTimeline() {
     for (const [a, b] of spansOut(z.sourceStartMs, z.sourceEndMs)) {
       if (b - a < 1) continue;
       const el = document.createElement("div");
-      el.className = "block zoom" + (z.isDisabled ? " disabled" : "") + (S.selected?.type === "zoom" && S.selected.id === z.id ? " sel" : "");
+      el.className = "block zoom" + (z.isDisabled ? " disabled" : "") + (isZoomSel(z.id) ? " sel" : "");
       el.style.left = a * pxPerMs + "px";
       el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
       el.innerHTML = `<div class="h l"></div><span>Zoom</span><span class="t">${z.zoom.toFixed(1)}× · ${z.kind === "manual" ? "Manual" : "Auto"}</span><div class="h r"></div>`;
@@ -171,9 +208,26 @@ function beginClipDrag(e, s, el, pxPerMs) {
 function beginZoomDrag(e, z, el, pxPerMs, a0, b0) {
   e.stopPropagation();
   e.preventDefault();
-  el.setPointerCapture(e.pointerId);
-  S.selected = { type: "zoom", id: z.id };
   S.tab = "zoom";
+  // Shift / ⌘ / Ctrl-click adds or removes a region from the selection (no drag).
+  if (e.shiftKey || e.metaKey || e.ctrlKey) {
+    const ids = selectedZoomIds().slice();
+    const at = ids.indexOf(z.id);
+    if (at >= 0) ids.splice(at, 1);
+    else ids.push(z.id);
+    S.selected = ids.length ? { type: "zoom", id: ids[0] } : null;
+    S.multi = ids.length > 1 ? ids : null;
+    renderTimeline();
+    hooks.renderPanel();
+    hooks.syncControls();
+    return;
+  }
+  const wasInGroup = isZoomSel(z.id) && S.multi?.length > 1;
+  if (!wasInGroup) {
+    S.selected = { type: "zoom", id: z.id };
+    S.multi = null;
+  }
+  el.setPointerCapture(e.pointerId);
   document.querySelectorAll("#trackZoom .block.sel, #trackClip .block.sel").forEach((b) => b.classList.remove("sel"));
   el.classList.add("sel");
   hooks.renderPanel();
@@ -205,7 +259,17 @@ function beginZoomDrag(e, z, el, pxPerMs, a0, b0) {
   el.onpointerup = (ev) => {
     el.onpointermove = el.onpointerup = null;
     try { el.releasePointerCapture(ev.pointerId); } catch {}
-    if (!moved) return;
+    if (!moved) {
+      if (wasInGroup) {
+        S.selected = { type: "zoom", id: z.id };
+        S.multi = null;
+        renderTimeline();
+        hooks.renderPanel();
+      }
+      return;
+    }
+    S.selected = { type: "zoom", id: z.id };
+    S.multi = null;
     const ns = outToSrc(na).src, ne = outToSrc(nb).src;
     change("zoom-drag-" + z.id, () => {
       const spans = spansOut(z.sourceStartMs, z.sourceEndMs);
@@ -286,6 +350,7 @@ export function bindScrub() {
   inner.addEventListener("pointerdown", (e) => {
     if (e.target.closest(".block, .add-music")) return;
     S.selected = null;
+    S.multi = null;
     document.querySelectorAll(".block.sel").forEach((b) => b.classList.remove("sel"));
     hooks.renderPanel();
     const wasPlaying = S.playing;
@@ -339,8 +404,9 @@ export function splitAtPlayhead() {
   const mclips = doMusic
     ? musicClips().filter((c) => (sel ? c.id === sel.id : true) && S.tOut > c.offsetMs + 50 && S.tOut < c.offsetMs + c.durMs - 50)
     : [];
+  const zoomIds = selectedZoomIds();
   const zooms = doZooms
-    ? P().scene.zooms.filter((z) => (sel ? z.id === sel.id : true) && src > z.sourceStartMs + 50 && src < z.sourceEndMs - 50)
+    ? P().scene.zooms.filter((z) => (sel ? zoomIds.includes(z.id) : true) && src > z.sourceStartMs + 50 && src < z.sourceEndMs - 50)
     : [];
   if (clipIdx < 0 && !zooms.length && !mclips.length) return;
 
@@ -360,15 +426,20 @@ export function splitAtPlayhead() {
       list.splice(list.indexOf(c) + 1, 0, right);
       if (sel?.type === "music") S.selected = { type: "music", id: right.id };
     }
+    const rights = [];
     for (const z of zooms) {
       const right = { ...JSON.parse(JSON.stringify(z)), id: uid(), sourceStartMs: src };
+      rights.push(right.id);
       // tiny eases at the cut so the camera doesn't dip between the two halves
       z.sourceEndMs = src;
       z.easeOutMs = 1;
       right.easeInMs = 1;
       const at = P().scene.zooms.indexOf(z);
       P().scene.zooms.splice(at + 1, 0, right);
-      if (sel?.type === "zoom") S.selected = { type: "zoom", id: right.id };
+    }
+    if (sel?.type === "zoom" && rights.length) {
+      S.selected = { type: "zoom", id: rights[0] };
+      S.multi = rights.length > 1 ? rights : null;
     }
   }, { panel: true, timeline: true });
 }
@@ -391,11 +462,23 @@ export function deleteSelected() {
   if (sel.type === "music") {
     removeMusicClip(sel.id);
   } else if (sel.type === "zoom") {
-    change(null, () => { P().scene.zooms = P().scene.zooms.filter((z) => z.id !== sel.id); S.selected = null; }, { panel: true, timeline: true });
+    const ids = selectedZoomIds();
+    change(null, () => { P().scene.zooms = P().scene.zooms.filter((z) => !ids.includes(z.id)); S.selected = null; S.multi = null; }, { panel: true, timeline: true });
   } else if (P().scene.slices.length > 1) {
     change(null, () => { P().scene.slices = P().scene.slices.filter((s) => s.id !== sel.id); S.selected = null; }, { panel: true, timeline: true });
     requestSeek(Math.min(S.tOut, outDuration()));
   }
+}
+
+/** Select every zoom region (⌘/Ctrl + A while editing zooms). */
+export function selectAllZooms() {
+  const ids = P().scene.zooms.map((z) => z.id);
+  if (!ids.length) return;
+  S.selected = { type: "zoom", id: ids[0] };
+  S.multi = ids.length > 1 ? ids : null;
+  S.tab = "zoom";
+  renderTimeline();
+  hooks.renderPanel();
 }
 
 export function addZoomAtPlayhead() {

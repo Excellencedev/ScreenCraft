@@ -4,9 +4,9 @@ import { $, S, P, dir, hooks, media, clamp } from "./state.js";
 import { outDuration } from "./timemap.js";
 import { change, undo, redo, updateUndo, saveNow } from "./history.js";
 import { draw, frameIndex, displayedRect } from "./draw.js";
-import { play, pause, requestSeek, scheduleTrack, computeTrack, refreshSliceAudio, syncMusic } from "./playback.js";
+import { play, pause, requestSeek, scheduleTrack, computeTrack, refreshSliceAudio, syncMusic, setRate } from "./playback.js";
 import {
-  renderTimeline, bindScrub, splitAtPlayhead, deleteSelected, addZoomAtPlayhead, autoZoom, duplicateSelected,
+  renderTimeline, bindScrub, bindTimelineZoom, splitAtPlayhead, deleteSelected, addZoomAtPlayhead, autoZoom, duplicateSelected, selectAllZooms,
 } from "./timeline.js";
 import { renderPanel } from "./panels/index.js";
 import { presetsMenu } from "./presets.js";
@@ -122,6 +122,35 @@ function bindTitle() {
   };
 }
 
+/**
+ * Spacebar: a tap toggles play / pause; holding it plays at 2x for as long as it is held
+ * (then goes back to what it was doing: playing at 1x, or paused).
+ */
+const HOLD_MS = 250;
+let space = null; // { wasPlaying, timer, held }
+function spaceDown() {
+  if (space) return;
+  space = { wasPlaying: S.playing, held: false, timer: 0 };
+  space.timer = setTimeout(() => {
+    if (!space) return;
+    space.held = true;
+    if (S.playing) setRate(2);
+    else play().then(() => setRate(2));
+  }, HOLD_MS);
+}
+function spaceUp() {
+  if (!space) return;
+  const s = space;
+  space = null;
+  clearTimeout(s.timer);
+  if (!s.held) {
+    S.playing ? pause() : play(); // a tap
+    return;
+  }
+  if (s.wasPlaying) setRate(1);
+  else pause();
+}
+
 function bindUI() {
   bindTitle();
   $("btnPlay").onclick = () => (S.playing ? pause() : play());
@@ -176,23 +205,39 @@ function bindUI() {
   addEventListener("keydown", (e) => {
     if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
     const mod = e.metaKey || e.ctrlKey;
-    if (e.code === "Space") { e.preventDefault(); S.playing ? pause() : play(); }
+    if (e.code === "Space") {
+      e.preventDefault();
+      if (!e.repeat) spaceDown();
+    }
     else if (e.key === "s" && !mod) splitAtPlayhead();
     else if (e.key === "z" && !mod) addZoomAtPlayhead();
     else if (e.key === "d" && !mod) duplicateSelected();
     else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); deleteSelected(); }
     else if (e.key === "ArrowLeft") { pause(); requestSeek(S.tOut - (e.shiftKey ? 1000 : 1000 / 30)); }
     else if (e.key === "ArrowRight") { pause(); requestSeek(S.tOut + (e.shiftKey ? 1000 : 1000 / 30)); }
+    else if (mod && e.key.toLowerCase() === "a") { e.preventDefault(); selectAllZooms(); }
     else if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
     else if (mod && e.key.toLowerCase() === "e") { e.preventDefault(); openExport(); }
     else if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); saveNow().catch((err) => alert("Could not save: " + err)); }
   });
+  // Escape closes whatever is open on top: the save prompt, export dialog or a popover menu
+  addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.target.isContentEditable) return;
+    if (!$("saveAsk").hidden) $("askCancel").click();
+    else if (!$("modal").hidden) $("expCancel").click();
+    else if (!$("menu").hidden) $("menu").hidden = true;
+    else return;
+    e.preventDefault();
+  }, true);
+  addEventListener("keyup", (e) => { if (e.code === "Space") spaceUp(); });
+  addEventListener("blur", () => spaceUp());
   let rz = null;
   addEventListener("resize", () => {
     clearTimeout(rz);
     rz = setTimeout(() => { renderTimeline(); draw(); }, 80);
   });
   bindScrub();
+  bindTimelineZoom();
   bindExport();
 }
 

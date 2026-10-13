@@ -73,6 +73,12 @@
       <button class="icon-btn" id="btnDelete" title="Delete selected (⌫)"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
       <button class="pill small" id="btnAutoZoom" title="Regenerate zooms from clicks">Auto zooms</button>
       <span class="spacer"></span>
+      <div class="tl-zoom" title="Zoom the timeline (also ⌘/Ctrl + scroll)">
+        <button class="icon-btn" id="tlZoomOut" title="Zoom timeline out"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M21 21l-5-5M8 11h6"/></svg></button>
+        <input type="range" id="tlZoomRange" min="0" max="100" step="1" value="0" />
+        <button class="icon-btn" id="tlZoomIn" title="Zoom timeline in"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M21 21l-5-5M11 8v6M8 11h6"/></svg></button>
+        <button class="pill small" id="tlZoomFit" title="Fit the whole project">Fit</button>
+      </div>
       <label class="sel">Speed
         <select id="selSpeed">
           <option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="0.75">0.75×</option>

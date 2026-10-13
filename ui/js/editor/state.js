@@ -20,6 +20,8 @@ export const S = {
   lastKey: null,
   lastT: 0,
   curSlice: 0,
+  tlZoom: 1, // timeline zoom: 1 = whole project fits the width
+  multi: null, // ids of all selected zoom regions when several are selected (first = shown in the panel)
 };
 
 /** Decoded media elements and images used by the compositor. */
