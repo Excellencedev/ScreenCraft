@@ -8,6 +8,38 @@ import { speechSegments, toOutputRanges, scheduleDuck } from "./ducking.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const withTimeout = (p, ms, what) =>
+  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(`${what} took too long`)), ms))]);
+
+/**
+ * Wait until an encoder's queue is at most `limit`. A broken hardware encoder simply stops
+ * draining its queue (no error, no output), which used to hang the export forever; so this
+ * also watches for cancel, reported errors, a closed encoder and a queue that stops moving.
+ */
+async function drainQueue(enc, limit, { getErr, shouldCancel, stallMs = 20000, what = "video" }) {
+  let last = enc.encodeQueueSize;
+  let since = performance.now();
+  while (enc.encodeQueueSize > limit) {
+    if (shouldCancel?.()) throw new Error("cancelled");
+    const e = getErr?.();
+    if (e) throw e;
+    if (enc.state === "closed") throw new Error(`The ${what} encoder closed unexpectedly.`);
+    const q = enc.encodeQueueSize;
+    if (q < last) {
+      last = q;
+      since = performance.now();
+    } else if (performance.now() - since > stallMs) {
+      const err = new Error(`The ${what} encoder stopped responding.`);
+      err.stalled = true;
+      throw err;
+    }
+    await sleep(3);
+  }
+}
+
+// encoders of the running export, so a failed attempt can always release them
+const liveEncoders = new Set();
+
 // A small worker pool fetches + decodes full-resolution source frames (see srcframes.rs).
 const WORKERS = 6;
 let pool = null;
@@ -195,13 +227,14 @@ function fixAudioMeta(meta) {
   return meta;
 }
 
-async function pickCodec(W, H, fps, bitrate, want) {
+async function pickCodec(W, H, fps, bitrate, want, software = false) {
   const hevc = ["hvc1.1.6.L153.B0", "hvc1.1.6.L123.B0", "hvc1.1.6.L93.B0"];
   const avc = ["avc1.640034", "avc1.64002A", "avc1.640028", "avc1.4d0028", "avc1.42001f"];
   const groups = want === "hevc" ? [["hevc", hevc], ["avc", avc]] : [["avc", avc]];
   for (const [kind, list] of groups) {
     for (const codec of list) {
       const cfg = { codec, width: W, height: H, bitrate, framerate: fps };
+      if (software) cfg.hardwareAcceleration = "prefer-software";
       try {
         const sup = await VideoEncoder.isConfigSupported(cfg);
         if (sup.supported) return { cfg, kind };
@@ -219,7 +252,38 @@ export function qualityBitrate(W, H, fps, quality, hevc) {
   return Math.round(Math.min(100e6, Math.max(250e3, W * H * fps * bpp)));
 }
 
-export async function exportMp4({ project, dir, path, resolution, fps, motionBlur, codec = "avc", quality = 55, onProgress, shouldCancel }) {
+/**
+ * Export to MP4. If the hardware video encoder stalls (some machines accept a configuration
+ * and then never produce a frame), start over once with the software encoder.
+ */
+export async function exportMp4(opts) {
+  const closeEncoders = () => {
+    for (const e of liveEncoders) {
+      try { e.close(); } catch {}
+    }
+    liveEncoders.clear();
+  };
+  try {
+    return await exportMp4Once(opts, false);
+  } catch (e) {
+    closeEncoders();
+    endPool();
+    if (e?.stalled && !opts.shouldCancel?.()) {
+      invoke("dbg_log", { msg: "export: hardware encoder stalled, retrying with the software encoder" }).catch(() => {});
+      opts.onProgress?.(0, "The hardware encoder stopped; trying the software encoder…");
+      try {
+        return await exportMp4Once(opts, true);
+      } catch (e2) {
+        closeEncoders();
+        endPool();
+        throw e2;
+      }
+    }
+    throw e;
+  }
+}
+
+async function exportMp4Once({ project, dir, path, resolution, fps, motionBlur, codec = "avc", quality = 55, onProgress, shouldCancel }, software) {
   if (typeof VideoEncoder === "undefined") throw new Error("WebCodecs is not available in this web view.");
   const { W, H } = outputSize(project, resolution);
   endPool();
@@ -242,7 +306,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
   }
 
   const bitrate = qualityBitrate(W, H, fps, quality, codec === "hevc");
-  const { cfg: vcfg, kind: vkind } = await pickCodec(W, H, fps, bitrate, codec);
+  const { cfg: vcfg, kind: vkind } = await pickCodec(W, H, fps, bitrate, software ? "avc" : codec, software);
 
   onProgress(0.02, "Preparing audio…");
   const outDurSec = track.durationMs / 1000;
@@ -262,6 +326,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     error: (e) => (encError = e),
   });
   venc.configure(vcfg);
+  liveEncoders.add(venc);
 
   const total = track.count;
   const src = { screen: null, camera: null, bgImage, cache: {}, combos: track.combos || [] };
@@ -314,7 +379,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     if (!queue.length) topUp(i);
     const tw = performance.now();
     const head = queue.shift();
-    const got = await head.p;
+    const got = await withTimeout(head.p, 45000, `Reading frame ${i + 1} from the recording`);
     prof.wait += performance.now() - tw;
     const tp = performance.now();
     topUp(i + 1);
@@ -344,7 +409,7 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     const frame = new VideoFrame(canvas, { timestamp: Math.round((i * 1e6) / fps), duration: Math.round(1e6 / fps) });
     venc.encode(frame, { keyFrame: i % (fps * 2) === 0 });
     frame.close();
-    while (venc.encodeQueueSize > 12) await sleep(1);
+    await drainQueue(venc, 12, { getErr: () => encError, shouldCancel, what: "video" });
     prof.enc += performance.now() - te;
     if ((i + 1) % 120 === 0) {
       invoke("dbg_log", { msg: `export 120 frames: wait ${(prof.wait / 120).toFixed(1)} ms, paint ${(prof.paint / 120).toFixed(1)} ms, encode ${(prof.enc / 120).toFixed(1)} ms per frame` }).catch(() => {});
@@ -352,8 +417,9 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     }
     if (i % 4 === 0) onProgress(0.05 + 0.85 * (i / total), `Rendering frame ${i + 1} of ${total}`);
   }
-  await venc.flush();
+  await withTimeout(venc.flush(), 120000, "Finishing the video");
   venc.close();
+  liveEncoders.delete(venc);
   invoke("dbg_log", { msg: `export: ${total} frames in ${((performance.now() - tStart) / 1000).toFixed(1)} s = ${(total / ((performance.now() - tStart) / 1000)).toFixed(1)} fps` }).catch(() => {});
 
   if (audio) {
@@ -375,9 +441,9 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
       });
       aenc.encode(ad);
       ad.close();
-      while (aenc.encodeQueueSize > 8) await sleep(2);
+      await drainQueue(aenc, 8, { getErr: () => encError, shouldCancel, what: "audio" });
     }
-    await aenc.flush();
+    await withTimeout(aenc.flush(), 60000, "Finishing the audio");
     aenc.close();
   }
   if (encError) throw encError;

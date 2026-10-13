@@ -26,6 +26,10 @@
 
 **Export**
 - Roughly 40-65 fps at 1080p60 with source frames scaled to what each frame needs.
+- No more silent hangs: if the hardware video encoder stops answering (the export used to sit
+  at "Rendering frame 13" forever), the export now notices, retries once with the software
+  encoder, and otherwise shows an error. Cancel works while it waits, and reading a frame
+  from the recording times out instead of waiting forever.
 
 **Platform**
 - Windows support (thanks @PierrunoYT) and an NSIS installer script.
