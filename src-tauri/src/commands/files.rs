@@ -92,3 +92,9 @@ pub fn read_image_data_url(path: String) -> CmdResult<String> {
     }
     Ok(out)
 }
+
+/// Development aid: lets the page print timing lines to the app's stderr.
+#[tauri::command]
+pub fn dbg_log(msg: String) {
+    eprintln!("[js] {msg}");
+}

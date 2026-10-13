@@ -14,7 +14,7 @@ const waiting = new Map();
 function getPool() {
   if (pool) return pool;
   pool = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const w = new Worker("js/exportWorker.js");
     w.onmessage = (e) => {
       const { id, bmp, error } = e.data;
@@ -38,7 +38,7 @@ function endPool() {
 function srcFrame(dir, kind, tMs, quality = 90) {
   const url = `sc://localhost/src/${kind}?t=${Math.max(0, tMs).toFixed(3)}&d=${encodeURIComponent(dir)}&q=${quality}`;
   const id = nextId++;
-  const w = getPool()[nextWorker++ % 3];
+  const w = getPool()[nextWorker++ % 4];
   return new Promise((resolve, reject) => {
     waiting.set(id, { resolve, reject });
     w.postMessage({ id, url });
@@ -231,7 +231,8 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     camera: hasCam ? await srcFrame(dir, "camera", track.tSrc[ti] + project.media.cameraOffsetMs, 88).catch(() => null) : null,
   });
   // keep a few source frames in flight: native decode and JPEG encode run ahead of painting
-  const AHEAD = 3;
+  const prof = { wait: 0, paint: 0, enc: 0 };
+  const AHEAD = 6;
   const queue = [];
   const topUp = (i) => {
     for (let k = queue.length; k < AHEAD; k++) {
@@ -250,8 +251,11 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     src.camera?.close?.();
     // frame i+1 is requested as soon as frame i arrives, so native decode/encode overlaps painting
     if (!queue.length) topUp(i);
+    const tw = performance.now();
     const head = queue.shift();
     const got = await head.p;
+    prof.wait += performance.now() - tw;
+    const tp = performance.now();
     topUp(i + 1);
     src.screen = got.screen;
     src.camera = got.camera;
@@ -272,10 +276,17 @@ export async function exportMp4({ project, dir, path, resolution, fps, motionBlu
     } else {
       paintFrame(ctx, W, H, project, cam, tOut, track.clicks, src);
     }
+    prof.paint += performance.now() - tp;
+    const te = performance.now();
     const frame = new VideoFrame(canvas, { timestamp: Math.round((i * 1e6) / fps), duration: Math.round(1e6 / fps) });
     venc.encode(frame, { keyFrame: i % (fps * 2) === 0 });
     frame.close();
     while (venc.encodeQueueSize > 12) await sleep(1);
+    prof.enc += performance.now() - te;
+    if ((i + 1) % 120 === 0) {
+      invoke("dbg_log", { msg: `export 120 frames: wait ${(prof.wait / 120).toFixed(1)} ms, paint ${(prof.paint / 120).toFixed(1)} ms, encode ${(prof.enc / 120).toFixed(1)} ms per frame` }).catch(() => {});
+      prof.wait = prof.paint = prof.enc = 0;
+    }
     if (i % 4 === 0) onProgress(0.05 + 0.85 * (i / total), `Rendering frame ${i + 1} of ${total}`);
   }
   await venc.flush();

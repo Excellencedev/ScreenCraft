@@ -221,7 +221,7 @@ fn jpeg(packed: Vec<u8>, w: usize, h: usize, quality: u8) -> Option<Vec<u8>> {
 }
 
 /// At most this many frames are JPEG-encoding at once (decode keeps running meanwhile).
-const ENCODERS: usize = 4;
+const ENCODERS: usize = 6;
 static INFLIGHT: (std::sync::Mutex<usize>, std::sync::Condvar) = (std::sync::Mutex::new(0), std::sync::Condvar::new());
 
 fn worker(rx: std::sync::mpsc::Receiver<Request>) {

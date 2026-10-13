@@ -1,5 +1,5 @@
 // Canvas preview drawing with adaptive resolution.
-import { $, S, P, TRACK_FPS, media } from "./state.js";
+import { $, S, P, TRACK_FPS, media, dir } from "./state.js";
 import { outToSrc } from "./timemap.js";
 import { outputSize, contentRect, paintFrame, camAt } from "../render.js";
 
@@ -22,6 +22,29 @@ export function displayedRect() {
     y += (r.height - h) / 2;
   }
   return { left: x, top: y, width: w, height: h };
+}
+
+// Sharp stand-in for the proxy frame while paused: a full-resolution source frame is
+// requested after the picture has rested for a moment (zoomed views look much crisper).
+let hq = { key: null, bmp: null };
+let hqTimer = 0;
+function scheduleHq(srcMs) {
+  clearTimeout(hqTimer);
+  hqTimer = setTimeout(async () => {
+    if (S.playing || S.scrubbing) return;
+    try {
+      const r = await fetch(`sc://localhost/src/screen?t=${srcMs.toFixed(3)}&d=${encodeURIComponent(dir)}&q=90`);
+      if (!r.ok) return;
+      const bmp = await createImageBitmap(await r.blob());
+      if (S.playing || Math.abs(outToSrc(S.tOut).src - srcMs) > 0.5) {
+        bmp.close();
+        return;
+      }
+      hq.bmp?.close?.();
+      hq = { key: srcMs.toFixed(3), bmp };
+      draw();
+    } catch {}
+  }, 220);
 }
 
 export const frameIndex = () => Math.round((S.tOut * TRACK_FPS) / 1000);
@@ -47,6 +70,10 @@ export function draw() {
     const i = st.screen.index(srcMs);
     st.screen.want(i, dirn);
     drawSrc.screen = st.screen.peek(i);
+    if (!S.playing && !S.scrubbing) {
+      if (hq.bmp && hq.key === srcMs.toFixed(3)) drawSrc.screen = hq.bmp;
+      else scheduleHq(srcMs);
+    }
   }
   if (st.camera) {
     const i = st.camera.index(srcMs + P().media.cameraOffsetMs);

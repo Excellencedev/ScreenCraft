@@ -134,6 +134,7 @@ fn main() {
             windows::menu_show,
             windows::close_menu_window,
             commands::files::read_image_data_url,
+            commands::files::dbg_log,
             windows::close_area_picker,
             commands::projects::rename_project,
             commands::projects::compute_render_track,
