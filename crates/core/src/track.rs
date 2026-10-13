@@ -165,6 +165,9 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
     let mut zoom_v = 0.0f64;
     let mut last_move_t = 0.0;
     let mut last_raw = (0.0, 0.0);
+    // typing hides the cursor until the mouse is moved again
+    let mut hidden_by_typing = false;
+    let mut last_key_count = 0usize;
     let press_cfg = crate::spring::SpringConfig { stiffness: 500.0, damping: 30.0, mass: 1.0, clamp: true, precision: 0.001 };
     let rot_cfg = crate::spring::SpringConfig { stiffness: 200.0, damping: 20.0, mass: 1.0, clamp: false, precision: 0.001 };
     let edge = anim.follow == "edge";
@@ -189,17 +192,33 @@ pub fn compute_track(p: &Project, input: &InputLog, fps: f64) -> RenderTrack {
             mx = smooth_damp(mx, rx, &mut mvx, st, dt);
             my = smooth_damp(my, ry, &mut mvy, st, dt);
         }
-        if (rx - last_raw.0).abs() + (ry - last_raw.1).abs() > 1e-4 {
+        let moved = (rx - last_raw.0).abs() + (ry - last_raw.1).abs();
+        if moved > 1e-4 {
             last_move_t = t_out;
         }
         last_raw = (rx, ry);
 
+        // A key press (not a shortcut) hides the cursor; it stays hidden until the mouse moves
+        // again, like the system cursor does while you type.
+        let key_count = input
+            .keys
+            .partition_point(|k| k.t <= t_src);
+        if key_count > last_key_count {
+            let typed = input.keys[last_key_count..key_count].iter().any(|k| k.down && k.mods & (1 | 4 | 8) == 0);
+            if typed {
+                hidden_by_typing = true;
+            }
+        }
+        last_key_count = key_count;
+        // a real movement (not sensor jitter) brings it back
+        if moved > 0.0015 && initialised {
+            hidden_by_typing = false;
+        }
+
         let down = input.button_down_at(t_src);
         press.step(if down { 0.78 } else { 1.0 }, dt, &press_cfg);
         let hide_idle = p.config.cursor.hide_not_moving_after_ms.map(|ms| t_out - last_move_t > ms).unwrap_or(false);
-        // the cursor steps out of the way while typing and returns when typing stops
-        let typing_now = input.typing_at(t_src, 400.0);
-        let want_alpha = if p.config.cursor.hide || slice.hide_cursor || hide_idle || typing_now { 0.0 } else { 1.0 };
+        let want_alpha = if p.config.cursor.hide || slice.hide_cursor || hide_idle || hidden_by_typing { 0.0 } else { 1.0 };
         let step = dt / 0.5;
         alpha = if want_alpha > alpha { (alpha + step).min(want_alpha) } else { (alpha - step).max(want_alpha) };
         rotation.step(0.0, dt, &rot_cfg);
@@ -677,18 +696,33 @@ mod tests {
     }
 
     #[test]
-    fn cursor_fades_out_while_typing_and_back_in_over_half_a_second() {
+    fn cursor_hides_when_typing_and_only_returns_when_the_mouse_moves() {
         use crate::input::KeyEvent;
         let (p, mut log) = project();
         for i in 0..20 {
             log.keys.push(KeyEvent { t: 1000.0 + i as f64 * 100.0, key: "0".into(), down: true, ..Default::default() });
         }
+        // the mouse sits still until 5000 ms, then moves
+        log.moves = vec![
+            MoveEvent { t: 0.0, x: 800.0, y: 100.0, cursor: CursorKind::Arrow },
+            MoveEvent { t: 5000.0, x: 800.0, y: 100.0, cursor: CursorKind::Arrow },
+            MoveEvent { t: 5300.0, x: 600.0, y: 300.0, cursor: CursorKind::Arrow },
+        ];
         let tr = compute_track(&p, &log, 60.0);
         let f = |ms: f64| (ms * 60.0 / 1000.0).round() as usize;
-        assert!(tr.cursor_alpha[f(500.0)] > 0.99);
+        assert!(tr.cursor_alpha[f(500.0)] > 0.99, "visible before typing");
         assert!(tr.cursor_alpha[f(2000.0)] < 0.01, "hidden while typing");
-        // last key at 2900, hold 400 ms, then 0.5 s ramp back to full
-        assert!(tr.cursor_alpha[f(3600.0)] > 0.2 && tr.cursor_alpha[f(3600.0)] < 0.8);
-        assert!(tr.cursor_alpha[f(4200.0)] > 0.99);
+        assert!(tr.cursor_alpha[f(4500.0)] < 0.01, "still hidden after typing stopped");
+        assert!(tr.cursor_alpha[f(5800.0)] > 0.99, "back once the mouse moved");
+    }
+
+    #[test]
+    fn shortcuts_do_not_hide_the_cursor() {
+        use crate::input::KeyEvent;
+        let (p, mut log) = project();
+        log.keys.push(KeyEvent { t: 1000.0, key: "8".into(), down: true, mods: 1, label: "C".into() });
+        let tr = compute_track(&p, &log, 60.0);
+        let f = |ms: f64| (ms * 60.0 / 1000.0).round() as usize;
+        assert!(tr.cursor_alpha[f(1500.0)] > 0.99);
     }
 }

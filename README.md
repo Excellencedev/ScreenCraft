@@ -76,7 +76,7 @@ meters, resolution and frame rate, and the project list.
   moment, and add cut transitions (true cross-dissolve, fade, flash, blur, slide, zoom).
 - **Look:** wallpapers, gradients, solid colours or your own image (with blur),
   padding, corner radius, shadow, aspect ratio, crop.
-- **Cursor:** several styles, click effects, hide-when-idle, hides while you type.
+- **Cursor:** several styles, click effects, hide-when-idle, and it hides when you start typing and only comes back when you move the mouse.
 - **Camera bubble:** size, shape, nine anchor positions (optionally flush to the frame
   edge, ignoring the padding), mirror, border, and it shrinks smoothly while the view is
   zoomed in.

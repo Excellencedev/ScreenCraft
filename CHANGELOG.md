@@ -2,6 +2,9 @@
 
 ## 0.2.0
 
+- The cursor now hides when you start typing and stays hidden until the mouse moves again
+  (shortcuts like ⌘C do not hide it).
+
 **Editor**
 - Annotations: text, arrows, boxes, circles, highlights, blur, pixelate and spotlight,
   pinned to the recording or fixed on the frame, dragged on the preview.
