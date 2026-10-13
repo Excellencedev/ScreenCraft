@@ -1,12 +1,42 @@
-# ScreenCraft
+<p align="center">
+  <img src="src-tauri/icons/icon-1024.png" alt="ScreenCraft" width="128">
+</p>
 
-A screen recorder and video editor for macOS and Windows, written in Rust. Record your display,
-a window or an area (with an optional camera bubble, microphone and system audio),
-then turn the raw capture into a polished video: smooth automatic zooms that follow
-your cursor and typing, restyled cursor, backgrounds, rounded corners, shadows,
-cuts, speed changes, background music and MP4 / GIF export.
+<h1 align="center">ScreenCraft</h1>
 
-There are no AI features: just recording, camera, editing and zoom.
+<p align="center">
+  <b>Screen recording and video editing; an open-source, from-scratch alternative to Screen Studio, built in Rust.</b><br>
+  Automatic zooms that follow your cursor and typing, smooth cursor, camera layouts, annotations,<br>
+  captions, speed ramps and transitions, in a native app that records and exports on your own machine.
+</p>
+
+<p align="center">
+  <img alt="Rust" src="https://img.shields.io/badge/core-Rust-b7410e?style=flat-square&logo=rust">
+  <img alt="macOS · Windows" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows-native-0EA5C6?style=flat-square">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-3a3a3a?style=flat-square">
+  <img alt="Version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-5b6ee1?style=flat-square">
+  <img alt="Status: early alpha" src="https://img.shields.io/badge/status-early%20alpha-d69e2e?style=flat-square">
+  <img alt="No AI features" src="https://img.shields.io/badge/AI-none-2f9a72?style=flat-square">
+</p>
+
+<p align="center">
+  <a href="ScreenCraft.dmg"><b>Download for macOS</b></a> ·
+  <a href="ScreenCraft-Setup.exe"><b>Download for Windows</b></a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
+
+<p align="center">
+  <a href="#screenshots">Screenshots</a> ·
+  <a href="#what-it-does">Features</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#using-it">Using it</a> ·
+  <a href="#shortcuts">Shortcuts</a> ·
+  <a href="#how-it-is-built">How it is built</a> ·
+  <a href="#development">Development</a> ·
+  <a href="#license">License</a>
+</p>
+
+<br>
 
 > **Not affiliated.** ScreenCraft is an independent, open project that is
 > *inspired by* the idea behind [Screen Studio](https://screen.studio). It is not
