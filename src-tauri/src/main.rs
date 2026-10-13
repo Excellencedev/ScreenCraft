@@ -1,10 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(target_os = "macos")]
 mod ax;
 mod capture;
 mod commands;
 mod compress;
+#[cfg(target_os = "macos")]
 mod inputlog;
+#[cfg(target_os = "macos")]
 mod jpegio;
 mod levelmic;
 mod proxy;
@@ -23,8 +26,13 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 fn main() {
-    let toggle = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::Digit2);
-    tauri::Builder::default()
+    // ⌘⇧2 on macOS, Ctrl+Shift+2 elsewhere
+    #[cfg(target_os = "macos")]
+    let primary = Modifiers::SUPER;
+    #[cfg(not(target_os = "macos"))]
+    let primary = Modifiers::CONTROL;
+    let toggle = Shortcut::new(Some(primary | Modifiers::SHIFT), Code::Digit2);
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(
@@ -77,7 +85,10 @@ fn main() {
             } else {
                 respond(None);
             }
-        })
+        });
+    // The app menu bar is a macOS thing; on Windows it would be attached to every window.
+    #[cfg(target_os = "macos")]
+    let builder = builder
         .menu(|handle| {
             use tauri::menu::{Menu, MenuItem, MenuItemKind};
             let menu = Menu::default(handle)?;
@@ -99,7 +110,8 @@ fn main() {
             if event.id() == "sc-quit" {
                 windows::request_quit(app);
             }
-        })
+        });
+    builder
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 windows::on_window_destroyed(window.app_handle(), window.label());

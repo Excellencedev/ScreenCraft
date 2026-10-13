@@ -1,4 +1,4 @@
-import { invoke, listen, dialog } from "./tauri.js";
+import { invoke, listen, dialog, baseName } from "./tauri.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -77,7 +77,7 @@ async function loadFile(path) {
   try {
     const p = await invoke("probe_video", { path });
     src = { ...p, path };
-    $("srcName").textContent = path.split("/").pop();
+    $("srcName").textContent = baseName(path);
     $("srcInfo").textContent = `${p.width}×${p.height} · ${p.fps.toFixed(0)} fps · ${fmtDur(p.durationS)} · ${fmtSize(p.fileSize)} · ${Math.round(p.videoKbps)} kbps${p.hasAudio ? " · audio" : ""}`;
     $("btnStart").disabled = false;
     $("btnReveal").hidden = true;
@@ -100,7 +100,7 @@ async function chooseFile() {
 
 async function start() {
   if (!src || running) return;
-  const base = src.path.split("/").pop().replace(/\.[^.]+$/, "");
+  const base = baseName(src.path).replace(/\.[^.]+$/, "");
   const out = await dialog.save({ defaultPath: `${base} (compressed).mp4`, filters: [{ name: "MP4", extensions: ["mp4"] }] });
   if (!out) return;
   running = true;

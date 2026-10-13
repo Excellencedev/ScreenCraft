@@ -1,6 +1,6 @@
 // Background music: clips of audio files placed on the edited timeline.
 // scene.musicClips = [{ id, file, name, offsetMs, inMs, durMs, fileDurMs }]
-import { invoke, dialog, convertFileSrc } from "../tauri.js";
+import { invoke, dialog, convertFileSrc, baseName } from "../tauri.js";
 import { S, P, dir, uid, hooks } from "./state.js";
 import { getMusicBuffer } from "./audio.js";
 import { change } from "./history.js";
@@ -80,7 +80,7 @@ export async function addMusic() {
   });
   const path = Array.isArray(picked) ? picked[0] : picked;
   if (!path) return;
-  const base = path.split("/").pop();
+  const base = baseName(path);
   const ext = (base.split(".").pop() || "mp3").toLowerCase();
   const file = `music-${Date.now()}.${ext}`;
   await invoke("copy_file", { src: path, dst: `${dir}/${file}` });

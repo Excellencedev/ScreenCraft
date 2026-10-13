@@ -1,8 +1,6 @@
 //! Audio device listing and the live level meter.
 
 use crate::state::{AppState, CmdResult};
-use objc2_av_foundation::AVCaptureDevice;
-use objc2_foundation::NSString;
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
@@ -12,12 +10,22 @@ pub struct Device {
     name: String,
 }
 
+#[cfg(target_os = "macos")]
 fn devices(media: &str) -> Vec<Device> {
+    use objc2_av_foundation::AVCaptureDevice;
+    use objc2_foundation::NSString;
     #[allow(deprecated)]
     let list = unsafe { AVCaptureDevice::devicesWithMediaType(&NSString::from_str(media)) };
     list.iter()
         .map(|d| Device { id: unsafe { d.uniqueID() }.to_string(), name: unsafe { d.localizedName() }.to_string() })
         .collect()
+}
+
+/// Native device listing is not implemented on Windows yet; the recorder falls back
+/// to the system default devices.
+#[cfg(windows)]
+fn devices(_media: &str) -> Vec<Device> {
+    Vec::new()
 }
 
 #[tauri::command]

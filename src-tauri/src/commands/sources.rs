@@ -1,5 +1,4 @@
 use crate::state::CmdResult;
-use screencapturekit::prelude::*;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -32,8 +31,10 @@ pub struct Sources {
     windows: Vec<WindowInfo>,
 }
 
+#[cfg(target_os = "macos")]
 #[tauri::command]
 pub fn list_sources() -> CmdResult<Sources> {
+    use screencapturekit::prelude::*;
     let content = SCShareableContent::get().map_err(|e| format!("{e} (Screen Recording permission needed)"))?;
     let me = std::process::id() as i32;
     let displays = content
@@ -79,4 +80,25 @@ pub fn list_sources() -> CmdResult<Sources> {
         })
         .collect();
     Ok(Sources { displays, windows })
+}
+
+/// Displays come from Tauri's monitor list (in logical pixels, like the macOS points);
+/// window capture is not implemented on Windows yet, so no windows are offered.
+#[cfg(windows)]
+#[tauri::command]
+pub fn list_sources(app: tauri::AppHandle) -> CmdResult<Sources> {
+    let displays = crate::windows::display_frames(&app)?
+        .into_iter()
+        .enumerate()
+        .map(|(i, d)| DisplayInfo {
+            id: d.id,
+            name: if d.is_main { "Main Display".into() } else { format!("Display {}", i + 1) },
+            x: d.x,
+            y: d.y,
+            width: d.width,
+            height: d.height,
+            is_main: d.is_main,
+        })
+        .collect();
+    Ok(Sources { displays, windows: Vec::new() })
 }

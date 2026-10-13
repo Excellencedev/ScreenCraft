@@ -29,12 +29,25 @@ pub struct AppState {
 
 pub type CmdResult<T> = Result<T, String>;
 
-fn home() -> PathBuf {
-    PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".into()))
+pub fn home() -> PathBuf {
+    #[cfg(windows)]
+    let var = "USERPROFILE";
+    #[cfg(not(windows))]
+    let var = "HOME";
+    PathBuf::from(std::env::var(var).unwrap_or_else(|_| ".".into()))
 }
 
+#[cfg(target_os = "macos")]
 pub fn settings_path() -> PathBuf {
     home().join("Library/Application Support/ScreenCraft/settings.json")
+}
+
+#[cfg(windows)]
+pub fn settings_path() -> PathBuf {
+    std::env::var("APPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| home().join("AppData/Roaming"))
+        .join("ScreenCraft/settings.json")
 }
 
 pub fn load_settings() -> Settings {
@@ -70,7 +83,10 @@ pub fn timestamp() -> String {
     unsafe {
         let t = libc::time(std::ptr::null_mut());
         let mut tm: libc::tm = std::mem::zeroed();
+        #[cfg(unix)]
         libc::localtime_r(&t, &mut tm);
+        #[cfg(windows)]
+        libc::localtime_s(&mut tm, &t);
         format!(
             "{:04}-{:02}-{:02} {:02}.{:02}.{:02}",
             tm.tm_year + 1900,

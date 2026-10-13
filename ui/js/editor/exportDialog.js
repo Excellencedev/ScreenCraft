@@ -18,8 +18,8 @@ const COMPRESS = {
 };
 
 const fmtMB = (b) => (b / 1e6).toFixed(b < 1e7 ? 2 : 1) + " MB";
-const dirname = (p) => p.slice(0, p.lastIndexOf("/"));
-const stripExt = (p) => p.replace(/\.[^./]+$/, "");
+const dirname = (p) => p.slice(0, Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\")));
+const stripExt = (p) => p.replace(/\.[^./\\]+$/, "");
 
 const AUDIO_KBPS = { aac160: 160, aac128: 128, aac96: 96 };
 

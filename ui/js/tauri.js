@@ -8,3 +8,7 @@ export const currentWindow = () => T.window.getCurrentWindow();
 export const LogicalSize = T.window.LogicalSize;
 export const LogicalPosition = T.window.LogicalPosition;
 export const dialog = T.dialog;
+// Custom schemes are served as http://<scheme>.localhost by WebView2 on Windows.
+export const SC_BASE = /Windows/.test(navigator.userAgent) ? "http://sc.localhost" : "sc://localhost";
+/** Last component of a file path, with either separator. */
+export const baseName = (p) => p.split(/[\\/]/).pop();

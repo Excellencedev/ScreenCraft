@@ -107,6 +107,20 @@ macOS applies Screen Recording and Input Monitoring after the app restarts; the
 window offers a restart button. The app is signed ad hoc with a stable identity, so
 permissions persist across rebuilds.
 
+### Windows (work in progress)
+
+A Windows port is under way on the `windows-port` branch. The app builds and its
+windows open (recorder bar, permissions, compressor), but recording, the preview
+proxy, export frames and compression are still stubs that report "not available on
+Windows yet". Needs [Rust](https://rustup.rs) with the MSVC toolchain and the
+WebView2 runtime (preinstalled on Windows 11).
+
+```powershell
+cargo run -p screencraft
+```
+
+The recording shortcut is **Ctrl+Shift+2** on Windows.
+
 ## Using it
 
 1. Pick **Display / Window / Area**, choose camera and audio sources, press **Record**
