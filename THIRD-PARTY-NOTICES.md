@@ -6,7 +6,7 @@ and is used under its own license. Nothing here changes the terms under which th
 offered.
 
 This file is the authoritative list. The same text is published at
-<https://getscreencraft.pages.dev/third-party-notices>.
+<https://screencraft.mdnlabs.dev/third-party-notices>.
 
 ---
 

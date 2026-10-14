@@ -11,7 +11,7 @@ responsibly, what has been done, and what remains for the maintainer or for anyo
 | Item | Status |
 | --- | --- |
 | Project license | MIT, see [LICENSE](LICENSE). Copyright line names the maintainer. |
-| Warranty / liability disclaimer | Included in the MIT text, repeated in the README and on the website's [Terms](https://getscreencraft.pages.dev/terms). |
+| Warranty / liability disclaimer | Included in the MIT text, repeated in the README and on the website's [Terms](https://screencraft.mdnlabs.dev/terms). |
 | Contributions | Contributors keep their copyright and license their contribution under MIT by submitting it ("inbound = outbound"). There is no CLA. |
 
 ## 2. Third-party code and models
@@ -45,8 +45,8 @@ of distribution for the whole binary.
   processor for that content.
 - The website uses **no cookies**, stores only the visitor's theme/language preference in local storage
   (a user-requested preference, never transmitted), and uses Cloudflare Web Analytics (cookieless,
-  aggregate). A cookie banner is therefore not required. See [Privacy](https://getscreencraft.pages.dev/privacy)
-  and [Cookies](https://getscreencraft.pages.dev/cookies).
+  aggregate). A cookie banner is therefore not required. See [Privacy](https://screencraft.mdnlabs.dev/privacy)
+  and [Cookies](https://screencraft.mdnlabs.dev/cookies).
 - If you ever add analytics, crash reporting, accounts, update checks that send identifiers, or a
   cloud feature, you must update the privacy policy first and may need consent (ePrivacy/GDPR).
 - The keyboard log stores only shortcuts and special keys, never plain typing. Keep it that way; storing
@@ -56,7 +56,7 @@ of distribution for the whole binary.
 
 Recording screens, microphones and cameras is regulated: many jurisdictions require consent of some or
 all parties to record audio (wiretapping laws), and workplaces/schools may have policies. ScreenCraft's
-[Terms](https://getscreencraft.pages.dev/terms) and docs tell users they are responsible for consent and for
+[Terms](https://screencraft.mdnlabs.dev/terms) and docs tell users they are responsible for consent and for
 the rights to anything they record or add (music, logos, third-party footage).
 
 ## 6. Platform requirements
