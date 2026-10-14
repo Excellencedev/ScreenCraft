@@ -38,7 +38,7 @@
     <div class="ver" id="ver">Version</div>
   </div>
 
-  <section>
+  <section id="updates">
     <h2>Updates</h2>
     <div class="card update" id="updateCard" hidden>
       <p><b id="uTitle">A new version is available</b></p>
@@ -62,9 +62,9 @@
     <h2>Privacy</h2>
     <div class="card">
       <p><b>ScreenCraft works on your computer.</b> Your recordings, screen, camera, microphone, cursor data and captions are never uploaded. There are no accounts, no analytics and no telemetry.</p>
-      <p style="margin-top:10px">Two things use the network, and only these:</p>
+      <p style="margin-top:10px" id="privNet">Two things use the network, and only these:</p>
       <ul>
-        <li><b>Update check.</b> At startup (you can turn it off above) ScreenCraft requests one small file from screencraft.mdnlabs.dev to see whether a newer version exists. The request contains the app version and nothing else about you. The site is served by Cloudflare, which, like any web host, sees the IP address of a request.</li>
+        <li id="privUpdate"><b>Update check.</b> At startup (you can turn it off above) ScreenCraft requests one small file from screencraft.mdnlabs.dev to see whether a newer version exists. The request contains the app version and nothing else about you. The site is served by Cloudflare, which, like any web host, sees the IP address of a request.</li>
         <li><b>Caption models.</b> Only if you ask to generate captions, a speech model file is downloaded once from Hugging Face. Your audio is never sent anywhere; recognition runs on your machine.</li>
       </ul>
       <div class="links">

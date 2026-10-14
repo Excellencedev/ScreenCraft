@@ -227,3 +227,7 @@ body.resizing * { cursor: inherit !important; }
 .block.clip .pill-x { color: #2d1405; background: rgba(45,20,5,.16); }
 .block.ramp { background: repeating-linear-gradient(135deg, #c98a63 0 10px, #be7d57 10px 20px); }
 .block.tiny .pill-x { display: none; }
+
+#btnAbout { position: relative; }
+.upd-dot { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: #ff5566; box-shadow: 0 0 0 2px var(--bg, #0b1019); }
+.upd-dot[hidden] { display: none; }

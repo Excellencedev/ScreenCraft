@@ -230,6 +230,7 @@ fn main() {
             windows::dock_bar,
             windows::set_tray_recording,
             updates::update_prefs,
+            updates::update_found,
             updates::set_update_check,
             updates::dismiss_update,
             updates::check_for_update,

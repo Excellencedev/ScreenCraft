@@ -1,5 +1,5 @@
 // Editor entry point: boot + event wiring. Everything else lives in sibling modules.
-import { invoke, listen, currentWindow, FILE_MANAGER } from "../tauri.js";
+import { invoke, listen, currentWindow, FILE_MANAGER, IS_WINDOWS } from "../tauri.js";
 import { $, S, P, dir, hooks, media, clamp } from "./state.js";
 import { outDuration, srcToOut } from "./timemap.js";
 import { change, undo, redo, updateUndo, saveNow } from "./history.js";
@@ -239,6 +239,12 @@ function bindUI() {
   $("btnZoomHere").onclick = addZoomAtPlayhead;
   $("btnDuplicate").onclick = duplicateSelected;
   $("btnAutoZoom").onclick = autoZoom;
+  // About, privacy & updates (the update check is macOS-only for now)
+  if (IS_WINDOWS) $("btnAbout").hidden = true;
+  else {
+    $("btnAbout").onclick = () => invoke("show_about").catch(() => {});
+    invoke("update_found").then((u) => { if (u) { $("updDot").hidden = false; $("btnAbout").title = `ScreenCraft ${u.latest} is available`; } }).catch(() => {});
+  }
   // the X and GitHub links open in the system browser
   document.querySelectorAll(".ext-link").forEach((b) => {
     b.onclick = () => invoke("plugin:opener|open_url", { url: b.dataset.url }).catch(() => {});

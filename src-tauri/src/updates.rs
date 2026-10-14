@@ -41,6 +41,7 @@ pub struct UpdateInfo {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePrefs {
+    pub supported: bool,
     pub enabled: bool,
     pub version: String,
     pub dismissed: Option<String>,
@@ -97,13 +98,19 @@ pub fn current_version(app: &AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
+/// The update check is macOS-only for now.
+pub const SUPPORTED: bool = cfg!(target_os = "macos");
+
+/// What the startup check found, so windows can show a badge without asking the network again.
+static FOUND: std::sync::Mutex<Option<UpdateInfo>> = std::sync::Mutex::new(None);
+
 pub fn enabled(state: &AppState) -> bool {
     state.settings.lock().unwrap().update_check.unwrap_or(true)
 }
 
 /// Blocking check used at startup. None when disabled or nothing newer.
 pub fn startup_check(app: &AppHandle, state: &AppState) -> Option<UpdateInfo> {
-    if !enabled(state) {
+    if !SUPPORTED || !enabled(state) {
         return None;
     }
     let info = fetch(&current_version(app)).ok()?;
@@ -114,15 +121,32 @@ pub fn startup_check(app: &AppHandle, state: &AppState) -> Option<UpdateInfo> {
     if dismissed.as_deref() == Some(info.latest.as_str()) {
         return None;
     }
+    *FOUND.lock().unwrap() = Some(UpdateInfo { notes: info.notes.clone(), current: info.current.clone(), latest: info.latest.clone(), download: info.download.clone(), page: info.page.clone(), available: true, error: None });
     Some(info)
 }
 
 #[tauri::command]
 pub fn update_prefs(app: AppHandle, state: State<AppState>) -> UpdatePrefs {
     UpdatePrefs {
+        supported: SUPPORTED,
         enabled: enabled(&state),
         version: current_version(&app),
         dismissed: state.settings.lock().unwrap().dismissed_update.clone(),
+    }
+}
+
+/// A newer version found at startup that the user has not dismissed (None otherwise).
+#[tauri::command]
+pub fn update_found(state: State<AppState>) -> Option<UpdateInfo> {
+    let found = FOUND.lock().unwrap().clone_info()?;
+    let dismissed = state.settings.lock().unwrap().dismissed_update.clone();
+    if dismissed.as_deref() == Some(found.latest.as_str()) { None } else { Some(found) }
+}
+
+trait CloneInfo { fn clone_info(&self) -> Option<UpdateInfo>; }
+impl CloneInfo for Option<UpdateInfo> {
+    fn clone_info(&self) -> Option<UpdateInfo> {
+        self.as_ref().map(|i| UpdateInfo { available: i.available, current: i.current.clone(), latest: i.latest.clone(), notes: i.notes.clone(), download: i.download.clone(), page: i.page.clone(), error: None })
     }
 }
 
@@ -144,6 +168,9 @@ pub fn dismiss_update(state: State<AppState>, version: String) {
 #[tauri::command]
 pub async fn check_for_update(app: AppHandle) -> CmdResult<UpdateInfo> {
     let current = current_version(&app);
+    if !SUPPORTED {
+        return Ok(UpdateInfo { current, ..Default::default() });
+    }
     tauri::async_runtime::spawn_blocking(move || match fetch(&current) {
         Ok(i) => Ok(i),
         Err(e) => Ok(UpdateInfo { current, error: Some(e), ..Default::default() }),

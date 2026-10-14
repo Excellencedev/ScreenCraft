@@ -45,6 +45,13 @@ $("tCheck").onclick = async () => {
 (async () => {
   const p = await invoke("update_prefs");
   $("ver").textContent = `Version ${p.version}`;
+  if (!p.supported) {
+    // update notifications are macOS-only for now: nothing to check, nothing sent
+    $("updates").hidden = true;
+    $("privUpdate").hidden = true;
+    $("privNet").textContent = "One thing uses the network, and only when you ask:";
+    return;
+  }
   $("tCheck").classList.toggle("on", p.enabled);
   $("tCheck").setAttribute("aria-checked", String(p.enabled));
   // opening this window is itself a request to know, so look straight away
