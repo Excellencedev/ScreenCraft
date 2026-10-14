@@ -270,13 +270,19 @@ export function drawSubtitles(ctx, W, H, p, tSrc, s) {
   const lh = fs * 1.16;
   const blockH = lines.length * lh;
   const cx = W / 2, cy = H * (st.y ?? 0.833);
-  // pop in: a quick overshoot from 80% to 100%
+  // Captions that follow each other swap instantly (no re-pop per line, which reads as
+  // flicker). Only a line that starts after a pause eases in, and every line fades out softly.
   let k = 1;
-  if (st.pop) {
-    const t = clamp01((tSrc - cap.sourceStartMs) / 150);
-    k = 0.8 + 0.2 * (1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2));
-    ctx.globalAlpha = Math.min(1, t * 3);
+  const prevEnd = list.reduce((m, c) => (c !== cap && c.sourceEndMs <= cap.sourceStartMs + 1 ? Math.max(m, c.sourceEndMs) : m), -1e9);
+  const continuing = cap.sourceStartMs - prevEnd < 120;
+  if (st.pop && !continuing) {
+    const t = clamp01((tSrc - cap.sourceStartMs) / 140);
+    k = 0.92 + 0.08 * (1 - Math.pow(1 - t, 3));
+    ctx.globalAlpha = t;
   }
+  const nextStart = list.reduce((m, c) => (c !== cap && c.sourceStartMs >= cap.sourceEndMs - 1 ? Math.min(m, c.sourceStartMs) : m), 1e9);
+  const leaving = nextStart - cap.sourceEndMs >= 120;
+  if (leaving) ctx.globalAlpha *= clamp01((cap.sourceEndMs - tSrc) / 110);
   ctx.translate(cx, cy);
   ctx.scale(k, k);
   if (st.background) {

@@ -17,6 +17,7 @@ const MODELS: &[(&str, &str, u64)] = &[
     ("base.en", "ggml-base.en.bin", 147_964_211),
     ("small.en", "ggml-small.en.bin", 487_614_201),
     ("base", "ggml-base.bin", 147_951_465),
+    ("large-v3-turbo-q5_0", "ggml-large-v3-turbo-q5_0.bin", 574_041_195),
 ];
 const BASE_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
 
@@ -59,6 +60,13 @@ fn download(app: &AppHandle, id: &str) -> Result<PathBuf, String> {
     let dest = model_path(app, file)?;
     if dest.exists() {
         return Ok(dest);
+    }
+    // ClipCraft keeps the same ggml files; reuse them instead of downloading again
+    if let Ok(home) = std::env::var("HOME") {
+        let sib = PathBuf::from(home).join("Library/Application Support/dev.clipcraft.app/models").join(file);
+        if sib.exists() && (std::fs::hard_link(&sib, &dest).is_ok() || std::fs::copy(&sib, &dest).is_ok()) {
+            return Ok(dest);
+        }
     }
     let part = dest.with_extension("part");
     let resp = ureq::get(&format!("{BASE_URL}{file}")).call().map_err(|e| format!("download failed: {e}"))?;
@@ -154,30 +162,105 @@ fn recognize(
     params.set_print_timestamps(false);
     params.set_suppress_blank(true);
     params.set_suppress_nst(true);
-    // short, caption-sized segments instead of whole sentences
+    // one segment per word with token timestamps: exact word times let us cut clean caption
+    // lines ourselves. No context keeps one wrong segment from derailing the rest.
+    params.set_no_context(true);
     params.set_token_timestamps(true);
-    params.set_max_len(38);
+    params.set_max_len(1);
     params.set_split_on_word(true);
+    params.set_initial_prompt("Hello, and welcome. Today, we're going to talk about something important.");
     params.set_progress_callback_safe(on_progress);
 
     state.full(params, pcm).map_err(|e| format!("transcription failed: {e}"))?;
 
-    let mut out = Vec::new();
+    let mut words: Vec<(String, f64, f64)> = Vec::new();
     for seg in state.as_iter() {
         let text = seg.to_str_lossy().map_err(|e| e.to_string())?.trim().to_string();
         // whisper emits markers like [BLANK_AUDIO] / (music) for non-speech
-        if text.is_empty() || (text.starts_with('[') && text.ends_with(']')) || (text.starts_with('(') && text.ends_with(')')) {
+        if text.is_empty()
+            || text.starts_with("[_")
+            || (text.starts_with('[') && text.ends_with(']'))
+            || (text.starts_with('(') && text.ends_with(')'))
+            || text.starts_with('♪')
+        {
             continue;
         }
-        // timestamps are centiseconds on the microphone clock; the project uses the source clock
-        let s = seg.start_timestamp() as f64 * 10.0 - offset_ms;
+        // centiseconds on the microphone clock; the project uses the source clock
+        let s = (seg.start_timestamp() as f64 * 10.0 - offset_ms).max(0.0);
         let e = seg.end_timestamp() as f64 * 10.0 - offset_ms;
         if e <= 0.0 {
             continue;
         }
-        out.push(Caption { text, start_ms: s.max(0.0), end_ms: e.max(s.max(0.0) + 200.0) });
+        words.push((text, s, e));
     }
-    Ok(out)
+    Ok(chunk(clean(words)))
+}
+
+/// Trim, drop empties, and make the times monotone without overlaps.
+fn clean(raw: Vec<(String, f64, f64)>) -> Vec<(String, f64, f64)> {
+    let mut out: Vec<(String, f64, f64)> = Vec::with_capacity(raw.len());
+    for (text, mut t0, mut t1) in raw {
+        if let Some(prev) = out.last_mut() {
+            if t0 < prev.1 {
+                t0 = prev.1;
+            }
+            if t0 < prev.2 {
+                if t0 >= prev.1 + 40.0 {
+                    prev.2 = t0;
+                } else {
+                    t0 = prev.2;
+                }
+            }
+        }
+        t1 = t1.max(t0 + 40.0);
+        out.push((text, t0, t1));
+    }
+    out
+}
+
+/// Group words into short on-screen lines: at most 3 words / 24 characters, broken at sentence
+/// ends, commas and pauses, and held briefly so lines never flicker.
+fn chunk(words: Vec<(String, f64, f64)>) -> Vec<Caption> {
+    const MAX_WORDS: usize = 3;
+    let mut out: Vec<Caption> = Vec::new();
+    let mut cur: Vec<(String, f64, f64)> = Vec::new();
+    let mut chars = 0usize;
+    let flush = |cur: &mut Vec<(String, f64, f64)>, out: &mut Vec<Caption>, chars: &mut usize| {
+        if cur.is_empty() {
+            return;
+        }
+        let text = cur.iter().map(|w| w.0.as_str()).collect::<Vec<_>>().join(" ");
+        out.push(Caption { text, start_ms: cur[0].1, end_ms: cur[cur.len() - 1].2 });
+        cur.clear();
+        *chars = 0;
+    };
+    let mut last_end: Option<f64> = None;
+    for (text, t0, t1) in words {
+        let gap = last_end.map(|e| t0 - e).unwrap_or(0.0);
+        let n = text.chars().count();
+        if !cur.is_empty() && (gap > 450.0 || cur.len() >= MAX_WORDS || chars + n > 24) {
+            flush(&mut cur, &mut out, &mut chars);
+        }
+        chars += n + 1;
+        last_end = Some(t1);
+        let t = text.trim_end_matches(['"', '\'', ')', '”', '’']).to_string();
+        cur.push((text, t0, t1));
+        let hard = t.ends_with('.') || t.ends_with('?') || t.ends_with('!');
+        let soft = t.ends_with(',') || t.ends_with(';') || t.ends_with(':') || t.ends_with('—');
+        if hard || (soft && cur.len() >= 2) {
+            flush(&mut cur, &mut out, &mut chars);
+        }
+    }
+    flush(&mut cur, &mut out, &mut chars);
+    // hold each line until the next starts when the gap is short, else a beat longer
+    for i in 0..out.len() {
+        let hold = out[i].end_ms + 320.0;
+        out[i].end_ms = match out.get(i + 1).map(|c| c.start_ms) {
+            Some(n) if n - out[i].end_ms < 320.0 => n,
+            _ => hold,
+        };
+    }
+    out
 }
 
 fn transcribe(app: &AppHandle, dir: &Path, project: &Project, model: &str, language: &str) -> Result<Vec<Caption>, String> {

@@ -65,13 +65,14 @@ async function exportSrt() {
 }
 
 const WHISPER_MODELS = [
+  ["small.en", "Accurate · English · 488 MB"],
+  ["large-v3-turbo-q5_0", "Most accurate · multilingual · 574 MB"],
   ["base.en", "Balanced · English · 148 MB"],
   ["tiny.en", "Fastest · English · 78 MB"],
-  ["small.en", "Most accurate · English · 488 MB"],
   ["base", "Multilingual · 148 MB"],
 ];
 const STAGE = { audio: "Reading audio…", model: "Loading model…", transcribe: "Transcribing", download: "Downloading model", done: "Done" };
-const whisper = { model: "base.en", language: "auto", busy: false, msg: "", have: {} };
+const whisper = { model: "small.en", language: "auto", busy: false, msg: "", have: {} };
 
 async function generateCaptions(rerender) {
   if (whisper.busy) return;
@@ -121,7 +122,7 @@ export function panelCaptions(p) {
   sel.onchange = () => { whisper.model = sel.value; hooks.renderPanel(); };
   sel.onkeydown = (e) => e.stopPropagation();
   p.append(pick);
-  if (whisper.model === "base") {
+  if (!whisper.model.endsWith(".en")) {
     p.append(segmented("Language", [["auto", "Auto"], ["en", "English"], ["es", "Spanish"], ["fr", "French"], ["de", "German"]], () => whisper.language, (v) => (whisper.language = v), { track: false }));
   }
   const gen = el(`<button class="btn-line" ${whisper.busy ? "disabled" : ""}>${whisper.busy ? "Working…" : "Generate captions"}</button>`);
