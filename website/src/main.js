@@ -43,7 +43,7 @@ function applyLang(lang) {
     if (v != null) el.innerHTML = v;
   });
   wrapWords(document.querySelector('.hero h1'));
-  translatePage(lang);
+  translatePage(lang).then(wrapKeys);
   document.querySelectorAll('[data-i18n-os]').forEach((el) => {
     el.textContent = dict[isMac ? 'dl.mac' : 'dl.win'];
   });
@@ -100,6 +100,19 @@ async function translatePage(l) {
     }
     const en = el.dataset.en;
     el.innerHTML = dict && en in dict ? dict[en] : en;
+  });
+}
+
+// the key list's description may hold inline <kbd>, so group it into one grid cell
+function wrapKeys() {
+  document.querySelectorAll('.keys li').forEach((li) => {
+    if (li.dataset.en == null) li.dataset.en = keyOf(li);   // remember the English text before wrapping
+    const first = li.firstElementChild;
+    if (!first || li.querySelector(':scope > .d')) return;
+    const d = document.createElement('span');
+    d.className = 'd';
+    while (first.nextSibling) d.append(first.nextSibling);
+    li.append(d);
   });
 }
 

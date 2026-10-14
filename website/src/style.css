@@ -433,3 +433,6 @@ html { overflow-x: clip; }
 .compare thead th:nth-child(2) { color: var(--good); font-size: 20px; letter-spacing: -.01em; padding-top: 18px; padding-bottom: 18px; }
 .compare thead th:nth-child(3) { font-size: 16px; color: var(--muted); }
 .compare td:nth-child(2) { color: var(--good); font-weight: 600; background: color-mix(in srgb, var(--good) 8%, transparent); }
+
+.keys li .d { display: block; }
+.keys li .d kbd { margin: 0 2px; }
