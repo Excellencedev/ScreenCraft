@@ -5,7 +5,8 @@
 
 use crate::state::{save_settings, AppState, CmdResult};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, State};
+use std::io::{Read, Write};
+use tauri::{AppHandle, Emitter, State};
 
 /// The same static file, served by the same Cloudflare Pages project on both names; the second
 /// is a fallback for networks that block the custom domain.
@@ -174,6 +175,66 @@ pub async fn check_for_update(app: AppHandle) -> CmdResult<UpdateInfo> {
     tauri::async_runtime::spawn_blocking(move || match fetch(&current) {
         Ok(i) => Ok(i),
         Err(e) => Ok(UpdateInfo { current, error: Some(e), ..Default::default() }),
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// User-initiated download of the new installer, done by the app itself (not a browser), so
+/// macOS does not tag it with the quarantine flag and the new copy opens without the
+/// "Apple could not verify..." prompt. Nothing is installed: the disk image is saved to
+/// Downloads and opened, and the user drags the app across themselves.
+#[tauri::command]
+pub async fn download_update(app: AppHandle, url: String, version: String) -> CmdResult<String> {
+    let ok = |u: &str| (u.starts_with(ALLOWED_PREFIX) || u.starts_with(ALLOWED_FALLBACK)) && u.ends_with(".dmg");
+    if !ok(&url) {
+        return Err("unexpected download address".into());
+    }
+    let safe: String = version.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '.').collect();
+    tauri::async_runtime::spawn_blocking(move || {
+        let dest_dir = crate::state::home().join("Downloads");
+        std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
+        let dest = dest_dir.join(format!("ScreenCraft {safe}.dmg"));
+        let part = dest.with_extension("dmg.part");
+        // the custom domain first, the pages.dev name if the network blocks it
+        let candidates = [url.clone(), url.replace(ALLOWED_PREFIX, ALLOWED_FALLBACK)];
+        let mut last = String::new();
+        let mut resp = None;
+        for u in candidates.iter() {
+            match ureq::get(u).set("User-Agent", "ScreenCraft-updater").timeout(std::time::Duration::from_secs(30)).call() {
+                Ok(r) => { resp = Some(r); break; }
+                Err(e) => last = e.to_string(),
+            }
+        }
+        let resp = resp.ok_or_else(|| format!("download failed: {last}"))?;
+        let total = resp.header("content-length").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+        let mut reader = resp.into_reader();
+        let mut out = std::fs::File::create(&part).map_err(|e| e.to_string())?;
+        let mut buf = vec![0u8; 256 * 1024];
+        let (mut done, mut last_pct) = (0u64, -1i64);
+        loop {
+            let n = reader.read(&mut buf).map_err(|e| format!("download interrupted: {e}"))?;
+            if n == 0 { break; }
+            out.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+            done += n as u64;
+            if total > 0 {
+                let pct = (done as f64 / total as f64 * 100.0).min(100.0);
+                if pct as i64 != last_pct {
+                    last_pct = pct as i64;
+                    let _ = app.emit("update-download", pct);
+                }
+            }
+        }
+        out.flush().map_err(|e| e.to_string())?;
+        drop(out);
+        if done < 1_000_000 {
+            let _ = std::fs::remove_file(&part);
+            return Err("the download was incomplete".into());
+        }
+        std::fs::rename(&part, &dest).map_err(|e| e.to_string())?;
+        #[cfg(target_os = "macos")]
+        let _ = std::process::Command::new("open").arg(&dest).spawn();
+        Ok(dest.to_string_lossy().into_owned())
     })
     .await
     .map_err(|e| e.to_string())?

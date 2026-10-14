@@ -1,4 +1,4 @@
-import { invoke } from "./tauri.js";
+import { invoke, listen } from "./tauri.js";
 
 const $ = (id) => document.getElementById(id);
 let info = null;
@@ -30,7 +30,23 @@ async function check() {
 }
 
 $("bCheck").onclick = check;
-$("bDownload").onclick = () => info && open(info.download || info.page);
+$("bDownload").onclick = async () => {
+  if (!info) return;
+  const btn = $("bDownload");
+  btn.disabled = true;
+  const off = await listen("update-download", (e) => { btn.textContent = `Downloading ${Math.round(e.payload)}%`; });
+  btn.textContent = "Downloading…";
+  try {
+    const path = await invoke("download_update", { url: info.download, version: info.latest });
+    btn.textContent = "Downloaded";
+    $("uHelp").textContent = `Saved to ${path} and opened. Quit ScreenCraft, drag it onto Applications and replace the old copy, then start it again.`;
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = "Download";
+    $("uHelp").textContent = `The download did not finish (${err}). You can get it from the website instead.`;
+    open(info.page);
+  } finally { off?.(); }
+};
 $("bLater").onclick = async () => {
   if (info) await invoke("dismiss_update", { version: info.latest });
   $("updateCard").hidden = true;

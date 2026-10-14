@@ -43,7 +43,7 @@
     <div class="card update" id="updateCard" hidden>
       <p><b id="uTitle">A new version is available</b></p>
       <ul id="uNotes"></ul>
-      <p class="muted" style="margin-top:10px">Download opens your browser. ScreenCraft never installs anything by itself: you decide when to replace it.</p>
+      <p class="muted" style="margin-top:10px" id="uHelp">Download saves the new version to your Downloads folder and opens it. ScreenCraft never installs anything by itself: you drag it across when you are ready.</p>
       <div class="actions">
         <button class="primary" id="bDownload">Download</button>
         <button class="btn" id="bLater">Later</button>
@@ -64,7 +64,7 @@
       <p><b>ScreenCraft works on your computer.</b> Your recordings, screen, camera, microphone, cursor data and captions are never uploaded. There are no accounts, no analytics and no telemetry.</p>
       <p style="margin-top:10px" id="privNet">Two things use the network, and only these:</p>
       <ul>
-        <li id="privUpdate"><b>Update check.</b> At startup (you can turn it off above) ScreenCraft requests one small file from screencraft.mdnlabs.dev to see whether a newer version exists. The request contains the app version and nothing else about you. The site is served by Cloudflare, which, like any web host, sees the IP address of a request.</li>
+        <li id="privUpdate"><b>Update check.</b> At startup (you can turn it off above) ScreenCraft requests one small file from screencraft.mdnlabs.dev to see whether a newer version exists. The request contains the app version and nothing else about you. The site is served by Cloudflare, which, like any web host, sees the IP address of a request. If you press Download, ScreenCraft fetches the installer from the same site and saves it to your Downloads folder.</li>
         <li><b>Caption models.</b> Only if you ask to generate captions, a speech model file is downloaded once from Hugging Face. Your audio is never sent anywhere; recognition runs on your machine.</li>
       </ul>
       <div class="links">

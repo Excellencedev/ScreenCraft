@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.3.4
+
+- **Updates open without the "could not verify" warning.** Download in About, Privacy & Updates now
+  fetches the installer itself (to Downloads) and opens it, so macOS does not quarantine it the
+  way a browser download is. Nothing is installed automatically; you still drag it across.
+
 ## 0.3.3
 
 - **Update-flow test release.** No functional changes from 0.3.2; published to check that the update

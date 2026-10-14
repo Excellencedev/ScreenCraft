@@ -231,6 +231,7 @@ fn main() {
             windows::set_tray_recording,
             updates::update_prefs,
             updates::update_found,
+            updates::download_update,
             updates::set_update_check,
             updates::dismiss_update,
             updates::check_for_update,
