@@ -19,20 +19,26 @@
   <div class="hero-bg" aria-hidden="true"><i></i><i></i><i></i></div>
   <div class="wrap">
     <h1 data-i18n="hero.title">Perfect Demos on Take 1.</h1>
-    <div class="hero-grid">
-      <div class="hero-copy">
-        <p class="sub" data-i18n="hero.sub">ScreenCraft zooms into what you click and type, smooths the cursor and frames the result. Free, open source, and it never leaves your computer.</p>
-        <div class="cta">
-          <a class="btn" data-os-cta data-mac="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg" data-win="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft-Setup.exe" href="/download"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4.500-4.500M12 15l4.500-4.500M4 20h16"/></svg><span data-i18n-os="dl.btn">Download</span></a>
-          <a class="btn btn-quiet" href="/docs/" data-i18n="hero.docs">Read the docs</a>
-        </div>
-        <p class="trust" data-i18n="hero.trust">macOS and Windows. MIT license. No account, no watermark.</p>
-      </div>
-      <canvas class="scene scene-hero" data-scene="hero" aria-hidden="true"></canvas>
+    <p class="sub" data-i18n="hero.sub">ScreenCraft zooms into what you click and type, smooths the cursor and frames the result. Free, open source, and it never leaves your computer.</p>
+    <div class="cta">
+      <a class="btn" data-os-cta data-mac="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg" data-win="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft-Setup.exe" href="/download"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4.500-4.500M12 15l4.500-4.500M4 20h16"/></svg><span data-i18n-os="dl.btn">Download</span></a>
+      <a class="btn btn-quiet" href="/docs/" data-i18n="hero.docs">Read the docs</a>
     </div>
+    <p class="trust" data-i18n="hero.trust">macOS and Windows. MIT license. No account, no watermark.</p>
     <div class="hero-video">
       <video src="/video/demo.mp4" poster="/video/poster.jpg" width="1280" height="728" autoplay muted loop playsinline preload="auto" aria-label="A ScreenCraft recording: automatic zooms follow the typing, with the camera in a corner bubble"></video>
     </div>
+  </div>
+</section>
+
+<section class="sec steps" id="how">
+  <div class="wrap">
+    <h2>From record to share in three steps</h2>
+    <ol class="steplist">
+      <li><span class="n">1</span><div><h3>Record</h3><p>Pick a display, a window or an area you drag out. Switch on the camera and microphone if you want them. Your cursor and shortcuts are logged on the side and never baked into the footage, so everything stays editable.</p></div></li>
+      <li><span class="n">2</span><div><h3>Adjust</h3><p>Zooms are already placed from your clicks and typing. Restyle the background and cursor, cut and speed up the slow parts, add captions and annotations, and pick a camera layout. The preview is the render.</p></div></li>
+      <li><span class="n">3</span><div><h3>Export</h3><p>Render an MP4 or GIF on your own machine with hardware encoding. No upload, no queue, no watermark. Compress afterwards if you need a smaller file.</p></div></li>
+    </ol>
   </div>
 </section>
 
@@ -68,6 +74,87 @@
       <div><dt data-i18n="more.audio.t">Audio</dt><dd data-i18n="more.audio.d">Mic levelling, music that ducks under your voice, and optional click and key sounds.</dd></div>
       <div><dt data-i18n="more.look.t">Look</dt><dd data-i18n="more.look.d">Wallpapers with subtle motion, device frames, padding, corners, shadow and any aspect ratio.</dd></div>
     </dl>
+    <p class="more-link"><a href="/features">See every feature</a></p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <h2>What people make with it</h2>
+    <dl class="deflist">
+      <div><dt>Product demos</dt><dd>Zooms land on the thing you are talking about, so viewers never hunt for the cursor.</dd></div>
+      <div><dt>Tutorials and courses</dt><dd>Speed up the waiting, caption the narration locally, and keep the lesson tight.</dd></div>
+      <div><dt>Bug reports</dt><dd>Show exactly what happened, with keys on screen and an annotation on the broken part.</dd></div>
+      <div><dt>Changelog videos</dt><dd>Record the new feature once, re-export it for the site, the docs and social.</dd></div>
+      <div><dt>Onboarding clips</dt><dd>Short walkthroughs with a camera bubble, so a real person is in the corner.</dd></div>
+      <div><dt>Vertical clips</dt><dd>Switch the aspect ratio to 9:16 or 1:1 and the zooms and captions reframe themselves.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <h2>Why record locally</h2>
+    <div class="compare-wrap">
+      <table class="compare">
+        <thead><tr><th></th><th>ScreenCraft</th><th>Typical paid recorder apps</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Price</th><td>Free, MIT licensed</td><td>Subscription or one-off fee</td></tr>
+          <tr><th scope="row">Watermark</th><td>Never</td><td>Often on free tiers</td></tr>
+          <tr><th scope="row">Account</th><td>None</td><td>Usually required</td></tr>
+          <tr><th scope="row">Where footage goes</th><td>Stays on your computer</td><td>Often uploaded for sharing or rendering</td></tr>
+          <tr><th scope="row">Captions</th><td>On-device, whisper.cpp</td><td>Often cloud transcription</td></tr>
+          <tr><th scope="row">Source code</th><td>Open on GitHub</td><td>Closed</td></tr>
+          <tr><th scope="row">Platforms</th><td>macOS and Windows</td><td>Varies</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="fine">A general comparison, not a claim about any one product. Check any tool's current terms before you choose.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <h2>Quick keys in the editor</h2>
+    <ul class="keys">
+      <li><span><kbd>Space</kbd></span> Play and pause. Hold it to play at 2x.</li>
+      <li><span><kbd>Q</kbd> <kbd>E</kbd></span> Jump to the start or the end.</li>
+      <li><span><kbd>A</kbd> <kbd>D</kbd></span> Previous or next zoom.</li>
+      <li><span><kbd>Ctrl/Cmd</kbd> <kbd>D</kbd></span> Duplicate the selected block.</li>
+      <li><span><kbd>Ctrl/Cmd</kbd> <kbd>Z</kbd></span> Undo. Add <kbd>Shift</kbd> to redo.</li>
+      <li><span><kbd>Ctrl/Cmd</kbd> <kbd>Shift</kbd> <kbd>2</kbd></span> Start or stop recording from anywhere.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <h2>What's new</h2>
+    <div class="whatsnew"><!--@whatsnew--></div>
+    <p class="more-link"><a href="/changelog">Full changelog</a></p>
+  </div>
+</section>
+
+<section class="sec" id="faq">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <div class="faq">
+      <details><summary>Is it really free?</summary><p>Yes. ScreenCraft is MIT licensed. There is no paid tier, no account and no watermark.</p></details>
+      <details><summary>Does it upload my recordings?</summary><p>No. Recording, editing, captions and export all happen on your computer. The only network request the app makes is the optional download of a speech model, and only when you ask for captions.</p></details>
+      <details><summary>How do the automatic captions work?</summary><p>They run whisper.cpp, an open-source build of OpenAI's Whisper, on your own machine. You choose a model size, it downloads once, and your audio never leaves the computer.</p></details>
+      <details><summary>Why does my system warn me when I open it?</summary><p>The builds are not signed with a paid certificate yet. On macOS right-click the app and choose Open. On Windows choose More info, then Run anyway. The source is public if you would rather build it yourself.</p></details>
+      <details><summary>Which systems does it support?</summary><p>macOS 14 or later (Apple Silicon and Intel) and Windows 10 or 11. There is no Linux build yet.</p></details>
+      <details><summary>Can I use it for commercial work?</summary><p>Yes. The MIT license allows commercial use, and what you record and export is yours. You are responsible for having the right to record whatever is on screen.</p></details>
+      <details><summary>Is it related to Screen Studio?</summary><p>No. ScreenCraft is an independent project and shares no code or assets with any other product.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap oss">
+    <h2>Built in the open</h2>
+    <p>The whole app, installers and this website live in one public repository. Read it, file an issue, or send a fix.</p>
+    <div class="cta"><a class="btn btn-quiet" href="https://github.com/MarshallNickolauson/ScreenCraft" rel="noopener">View on GitHub</a><a class="btn btn-quiet" href="https://github.com/MarshallNickolauson/ScreenCraft/issues" rel="noopener">Report an issue</a><a class="btn btn-quiet" href="/third-party-notices">Third-party notices</a></div>
   </div>
 </section>
 

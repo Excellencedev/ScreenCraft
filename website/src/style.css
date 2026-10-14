@@ -334,3 +334,62 @@ html { overflow-x: clip; }
 .frame.panel { display: grid; place-items: center; padding: clamp(24px, 5vw, 56px); background:
   radial-gradient(70% 80% at 30% 20%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%), var(--bg-2); }
 .frame.panel img { width: min(100%, 440px); height: auto; aspect-ratio: auto; border-radius: 10px; box-shadow: 0 24px 60px -24px rgba(0, 0, 0, .7); }
+
+/* ---- hero, centred ---- */
+.hero { text-align: center; }
+.hero h1 { margin-inline: auto; text-align: center; }
+.hero .sub { margin-inline: auto; max-width: 52ch; }
+.hero .cta { justify-content: center; }
+.hero .trust { text-align: center; }
+.hero .hero-video { margin-top: clamp(36px, 5vw, 64px); max-width: 1100px; margin-inline: auto; }
+
+/* ---- steps ---- */
+.steps > .wrap > h2, .sec > .wrap > h2 { font-size: clamp(26px, 3.2vw, 40px); }
+.steplist { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.steplist li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 20px; padding: 28px 0 32px; border-bottom: 1px solid var(--line); }
+.steplist .n { font-family: var(--mono); font-size: 15px; color: var(--accent-text); border: 1px solid var(--line-2); width: 40px; height: 40px; border-radius: 8px; display: grid; place-items: center; margin-top: 2px; }
+.steplist h3 { font-size: 22px; margin-bottom: 6px; }
+.steplist p { color: var(--muted); max-width: 62ch; margin: 0; }
+
+/* ---- shared small pieces ---- */
+.more-link { margin: 28px 0 0; font-weight: 600; }
+.fine { color: var(--faint); font-size: 14px; margin-top: 14px; }
+.compare-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.compare { width: 100%; border-collapse: collapse; min-width: 560px; }
+.compare th, .compare td { text-align: left; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.compare tbody tr:last-child th, .compare tbody tr:last-child td { border-bottom: 0; }
+.compare thead th { color: var(--faint); font-weight: 600; font-size: 14px; background: var(--bg-2); }
+.compare thead th:nth-child(2) { color: var(--text); }
+.compare tbody th { font-weight: 600; width: 22%; }
+.compare td { color: var(--muted); }
+.compare td:nth-child(2) { color: var(--text); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.keys { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--line); }
+.keys li { display: grid; grid-template-columns: minmax(150px, 5fr) minmax(0, 8fr); gap: 20px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); color: var(--muted); }
+.keys li span { display: flex; gap: 6px; flex-wrap: wrap; }
+.whatsnew h3 { font-size: 20px; margin: 0 0 10px; }
+.whatsnew ul { margin: 0 0 28px; padding-left: 20px; color: var(--muted); }
+.whatsnew li { margin: 6px 0; max-width: 78ch; }
+.whatsnew a { overflow-wrap: anywhere; }
+.faq { border-top: 1px solid var(--line); }
+.faq details { border-bottom: 1px solid var(--line); }
+.faq summary { cursor: pointer; padding: 20px 36px 20px 0; font-weight: 600; font-size: 18px; list-style: none; position: relative; letter-spacing: -.01em; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: ""; position: absolute; right: 6px; top: 50%; width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: translateY(-70%) rotate(45deg); transition: transform .25s; }
+.faq details[open] summary::after { transform: translateY(-30%) rotate(-135deg); }
+.faq details p { color: var(--muted); max-width: 70ch; margin: 0 0 22px; }
+.oss { text-align: center; }
+.oss h2 { margin-inline: auto; }
+.oss p { color: var(--muted); max-width: 54ch; margin: 0 auto 24px; font-size: 18px; }
+.oss .cta { justify-content: center; }
+.prose.wide { max-width: 940px; margin: 0 auto; padding: 56px 0 40px; }
+.prose.wide .deflist { margin-bottom: 8px; }
+.prose.wide h2 { margin-top: 2.2em; }
+.prose .deflist dt { color: var(--text); }
+.prose .btn { color: var(--accent-ink); }
+.prose .btn:hover { text-decoration: none; }
+.prose.solo h2 { font-size: 22px; margin-top: 1.8em; }
+.prose.solo ul { padding-left: 20px; }
+@media (max-width: 880px) {
+  .steplist li { grid-template-columns: 1fr; gap: 12px; }
+  .keys li { grid-template-columns: 1fr; gap: 8px; }
+}

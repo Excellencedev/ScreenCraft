@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projects and files — ScreenCraft</title>
+<meta name="description" content="Where recordings live and how editing is saved.">
+<link rel="icon" href="/img/icon.png">
+<script src="/theme.js"></script>
+</head>
+<body>
+<!--@header-->
+<main id="main">
+<div class="wrap docs"><!--@docs-nav--><article class="prose">
+<h1>Projects and files</h1>
+<p class="lead">Every recording is a folder, and everything you change is stored beside the original footage.</p>
+<h2>Where they are</h2>
+<p>Projects live in <code>~/ScreenCraft Projects</code> on macOS and <code>%USERPROFILE%\ScreenCraft Projects</code> on Windows. Each is a <code>.screencraft</code> folder containing the screen video, optional camera and microphone files, an input log and a <code>project.json</code>.</p>
+<h2>Non-destructive</h2>
+<p>Edits are saved as data in <code>project.json</code>. The recorded footage is never modified, so you can always return to the raw recording.</p>
+<h2>Saving</h2>
+<p>Changes stay in memory until you save. An asterisk in the title shows unsaved edits, and closing the window asks what to do with them.</p>
+<h2>Disk space</h2>
+<p>The preview proxy is large for long recordings (roughly 2 to 3 MB per second). Delete the <code>proxy-*</code> files in a project folder to reclaim space; they are rebuilt when needed.</p>
+<h2>Sharing a project</h2>
+<p>Copy the whole <code>.screencraft</code> folder. Note that it contains your recording and any camera footage.</p>
+</article></div>
+</main>
+<!--@footer-->
+</body>
+</html>

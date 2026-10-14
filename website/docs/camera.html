@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Camera layouts — ScreenCraft</title>
+<meta name="description" content="Control the camera bubble and layouts.">
+<link rel="icon" href="/img/icon.png">
+<script src="/theme.js"></script>
+</head>
+<body>
+<!--@header-->
+<main id="main">
+<div class="wrap docs"><!--@docs-nav--><article class="prose">
+<h1>Camera layouts</h1>
+<p class="lead">The camera is recorded as its own track, so you decide how it appears after the fact.</p>
+<h2>Layouts</h2>
+<table><tr><th>Layout</th><th>What it does</th></tr>
+<tr><td>Bubble</td><td>A small camera in a corner of the frame.</td></tr>
+<tr><td>Large</td><td>A bigger bubble, for moments when you are talking.</td></tr>
+<tr><td>Camera only</td><td>The camera fills the frame and the screen fades out.</td></tr>
+<tr><td>Side by side</td><td>Screen and camera next to each other, camera on the right or left.</td></tr>
+<tr><td>Hidden</td><td>Camera off for that stretch.</td></tr></table>
+<h2>The camera track</h2>
+<p>Layouts live on the Camera track. Add a block at the playhead, drag its ends to change the length, and pick its layout. Where blocks meet, the change eases over about half a second.</p>
+<h2>Per-block settings</h2>
+<p>Every block can override the project's camera look: size, roundness, shape (square, 4:3, 16:9, 3:4), position on a nine-point grid, mirroring, border and shadow. Position can sit flush against the frame edge.</p>
+<h2>While zoomed</h2>
+<p>The bubble scales down as the screen zooms in so it stays out of the way. The amount is set with "Scale while zoomed".</p>
+</article></div>
+</main>
+<!--@footer-->
+</body>
+</html>

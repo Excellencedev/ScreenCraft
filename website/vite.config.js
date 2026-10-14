@@ -27,6 +27,8 @@ const partials = {
         .replace('<!--@header-->', partial('header'))
         .replace('<!--@footer-->', partial('footer'))
         .replace('<!--@docs-nav-->', partial('docs-nav'))
+        .replace('<!--@changelog-->', () => marked.parse(readFileSync(join(root, '../CHANGELOG.md'), 'utf8').replace(/^# Changelog\s*/, '')))
+        .replace('<!--@whatsnew-->', () => marked.parse(readFileSync(join(root, '../CHANGELOG.md'), 'utf8').split(/\n(?=## )/).slice(1, 3).join('\n').replace(/^## /gm, '### ')))
         .replace('<!--@notices-->', () => marked.parse(readFileSync(join(root, '../THIRD-PARTY-NOTICES.md'), 'utf8')));
     },
   },

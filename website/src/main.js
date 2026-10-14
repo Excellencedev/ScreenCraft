@@ -129,6 +129,6 @@ if (!reduceMotion && 'IntersectionObserver' in window) {
 // three.js scenes load after first paint so they never delay the page
 const canvases = document.querySelectorAll('canvas[data-scene]');
 if (canvases.length && !reduceMotion) {
-  const start = () => import('./scene.js').then((m) => canvases.forEach((c) => m.mountScene(c, c.dataset.scene))).catch(() => {});
+  const start = () => import('./scene.js').then((m) => canvases.forEach((c) => m.mountScene(c))).catch(() => {});
   if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 1500 }); else setTimeout(start, 400);
 }
