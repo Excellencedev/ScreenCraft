@@ -7,6 +7,8 @@
 - **Updates are easier to spot.** When a newer version is found at startup, the editor's Updates
   button turns green and names the version.
 - **Report a bug** from the editor: a bug icon next to GitHub opens the repo's issues page.
+- **Area picking fixes.** Esc while an area is chosen (before recording) opens the selector again so
+  you can redraw it, and ScreenCraft always starts on Display instead of a stale Area or Window.
 - **whisper.cpp now comes from our fork** (a git submodule), which is what builds the caption engine.
   Clone with `--recurse-submodules`.
 

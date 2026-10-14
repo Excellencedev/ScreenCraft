@@ -182,6 +182,7 @@ await listen("stop-record", () => finishRecording());
 addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (document.body.classList.contains("confirm")) cancelDiscard();
+  else if (state.phase === "idle" && state.mode === "area" && !isMenuOpen()) chooseMode("area"); // draw the area again
   else if (state.phase === "countdown") finishRecording();
   else if (isMenuOpen()) closeMenu();
 });

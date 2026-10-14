@@ -1,4 +1,4 @@
-import { emit, invoke } from "./tauri.js";
+import { emit, invoke, currentWindow } from "./tauri.js";
 const q = new URLSearchParams(location.search);
 const ox = parseFloat(q.get("x") || "0"), oy = parseFloat(q.get("y") || "0");
 const did = q.get("d") ? Number(q.get("d")) : null;
@@ -35,3 +35,6 @@ addEventListener("keydown", async (e) => {
     closeAll();
   }
 });
+
+// with an overlay on every display, the one under the pointer takes the keyboard (Esc)
+addEventListener("mouseenter", () => currentWindow().setFocus().catch?.(() => {}));

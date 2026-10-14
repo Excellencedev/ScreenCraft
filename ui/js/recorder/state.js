@@ -29,7 +29,8 @@ const prefs = (() => {
 })();
 
 export const state = {
-  mode: prefs.mode || "display",
+  // an area or window pick does not survive a restart, so always start on the display
+  mode: prefs.mode === "area" || prefs.mode === "window" ? "display" : prefs.mode || "display",
   displayId: null,
   windowId: null,
   windowTitle: "",
