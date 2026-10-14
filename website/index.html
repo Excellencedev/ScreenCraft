@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ScreenCraft — Beautiful screen recordings, free and open source</title>
+<meta name="description" content="ScreenCraft is a free, open-source screen recorder and editor for macOS and Windows. Automatic zooms, smooth cursor, camera layouts, captions, annotations. No account, no watermark, nothing uploaded.">
+<meta property="og:title" content="ScreenCraft — Beautiful screen recordings, free and open source">
+<meta property="og:description" content="Automatic zooms, smooth cursor, camera layouts and captions. Records and exports on your own machine.">
+<meta property="og:image" content="/img/editor.jpg">
+<meta name="theme-color" content="#070a11">
+<link rel="icon" href="/img/icon.png">
+</head>
+<body>
+<!--@header-->
+<main id="main">
+<section class="hero">
+  <div class="wrap">
+    <div class="pill"><i></i> Free · Open source · MIT licensed</div>
+    <h1>Beautiful screen recordings,<br><span class="grad">on the first take.</span></h1>
+    <p class="sub">Automatic zooms that follow your cursor and typing, a smooth cursor, camera layouts, captions and a finished-looking frame. Record, adjust, export — all on your own machine.</p>
+    <div class="cta">
+      <a class="btn" data-os-cta data-mac="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg" data-win="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft-Setup.exe" href="/download">Download</a>
+      <a class="btn btn-ghost" href="/download">All downloads</a>
+    </div>
+    <p class="trust"><b>No account. No watermark. No upload.</b> macOS &amp; Windows.</p>
+    <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src="/img/editor.jpg" alt="The ScreenCraft editor with zoom regions on the timeline" width="1600" height="1000"></div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head reveal"><div class="eyebrow">Features</div><h2>Five things you will actually do</h2><p>Record, then shape the result in a real timeline editor.</p></div>
+    <div class="tabs reveal" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="p-zoom">Zoom</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="p-cursor">Cursor</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="p-timeline">Timeline</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="p-style">Style</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="p-export">Export</button>
+    </div>
+    <div class="tabpanel on reveal" id="p-zoom">
+      <div><h3>Zooms that direct attention</h3><p>Clicks and typing generate zoom regions automatically. They glide with spring physics and follow the text caret, so the viewer always sees what you are doing.</p><ul><li>Auto-generated from clicks and typing</li><li>Drag, resize, multi-select and group-move</li><li>Per-region zoom level</li></ul></div>
+      <img src="/img/editor-zoom.jpg" alt="Paused inside a zoom region" loading="lazy">
+    </div>
+    <div class="tabpanel reveal" id="p-cursor">
+      <div><h3>A cursor you can restyle</h3><p>The system cursor is never baked in. Clicks and keys are logged separately and redrawn, so you can change size, style, smoothing and click effects after the fact.</p><ul><li>Smoothing and motion-blur controls</li><li>Click ripples and sounds</li><li>Hides while you type, returns when you move</li></ul></div>
+      <img src="/img/editor-cursor.jpg" alt="Cursor and camera motion settings" loading="lazy">
+    </div>
+    <div class="tabpanel reveal" id="p-timeline">
+      <div><h3>A real timeline</h3><p>Split, trim, reorder, speed up idle stretches, add speed ramps, freeze frames and cross-dissolve transitions. Annotations, camera layouts, captions and music live on their own tracks.</p><ul><li>Idle detection that finds dead air</li><li>Speed ramps and freezes</li><li>Timeline zoom and resizable panes</li></ul></div>
+      <img src="/img/editor.jpg" alt="Timeline with zoom blocks" loading="lazy">
+    </div>
+    <div class="tabpanel reveal" id="p-style">
+      <div><h3>A finished frame</h3><p>Wallpapers, animated backgrounds, padding, rounded corners, shadows, device frames and any aspect ratio. Save your look as a preset.</p><ul><li>Laptop, monitor and tablet frames</li><li>Subtly animated backgrounds</li><li>Watermark and presets</li></ul></div>
+      <img src="/img/recorder.jpg" alt="The ScreenCraft recorder" loading="lazy">
+    </div>
+    <div class="tabpanel reveal" id="p-export">
+      <div><h3>Export where you want</h3><p>H.264 or HEVC MP4, or GIF, rendered locally with hardware encoding. Optional compression after export for smaller files.</p><ul><li>Up to your source resolution at 60 fps</li><li>No watermark, ever</li><li>Standalone compressor included</li></ul></div>
+      <img src="/img/export.jpg" alt="Export dialog" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap split">
+    <div class="reveal"><div class="eyebrow">Depth</div><h2>Good-looking from the first take.</h2><p>Defaults tuned so a raw recording already looks like a finished demo, then every detail is yours to change.</p>
+      <ul><li>Auto-zoom on clicks and typing</li><li>Wallpaper, padding, shadow, corner radius</li><li>Device frames and animated backgrounds</li></ul></div>
+    <div class="stage reveal"><canvas data-bg></canvas></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap split">
+    <div class="stage reveal" style="display:grid;place-items:center"><canvas data-bg></canvas><div style="position:relative;display:flex;gap:14px;align-items:flex-end"><div style="width:190px;height:120px;border-radius:12px;background:#182132;border:1px solid #2a374d"></div><div style="width:84px;height:84px;border-radius:50%;background:linear-gradient(135deg,#6aaee8,#3b82c4);border:3px solid #fff3"></div></div></div>
+    <div class="reveal"><div class="eyebrow">Camera</div><h2>Your camera, your screen, or both.</h2><p>Add a webcam bubble, go full camera, or switch layouts mid-recording from the camera track. Every block has its own settings, and changes ease smoothly.</p>
+      <ul><li>Bubble, large, camera only, side-by-side</li><li>Nine anchor points, flush to the edge</li><li>Independent settings per block</li></ul></div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="sec-head reveal"><div class="eyebrow">Everything else</div><h2>Recorder, annotations, captions, audio</h2></div>
+    <div class="grid3">
+      <div class="card reveal"><div class="ico">●</div><h3>Native recorder</h3><p>Display, window or dragged area, with microphone, system audio and camera, using each OS's own capture APIs.</p></div>
+      <div class="card reveal"><div class="ico">✎</div><h3>Annotations</h3><p>Text, arrows, boxes, highlight, blur, pixelate and spotlight, pinned to the recording or the frame.</p></div>
+      <div class="card reveal"><div class="ico">❝</div><h3>Local captions</h3><p>On-device transcription powered by whisper.cpp, with TikTok-style animated subtitles and SRT import/export.</p></div>
+      <div class="card reveal"><div class="ico">♪</div><h3>Audio tools</h3><p>Music with fades and ducking under speech, mic levelling, click and key sounds, hold-Space 2× playback.</p></div>
+      <div class="card reveal"><div class="ico">⌘</div><h3>Shortcut display</h3><p>Show shortcuts and special keys on screen. Ordinary typing is never stored.</p></div>
+      <div class="card reveal"><div class="ico">⏩</div><h3>Pace &amp; transitions</h3><p>Speed-up idle gaps, ramps, freeze frames and a true cross-dissolve.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head reveal"><div class="eyebrow">Principles</div><h2>Free, local, and yours</h2></div>
+    <div class="grid3">
+      <div class="card reveal"><h3>MIT licensed</h3><p>Free forever. Read the code, change it, ship it. Every dependency's license is listed in the third-party notices.</p></div>
+      <div class="card reveal"><h3>Nothing leaves your machine</h3><p>No account, no telemetry, no cloud rendering. Recordings, captions and exports all stay on disk.</p></div>
+      <div class="card reveal"><h3>Built in Rust</h3><p>A Rust core with a thin native shell. Fast capture, fast export, small download.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="ctab reveal"><h2>Make your next demo look great.</h2><p>Free for macOS and Windows. No sign-up.</p>
+      <div class="cta"><a class="btn" href="/download">Download ScreenCraft</a><a class="btn btn-ghost" href="/docs/">Read the docs</a></div></div>
+  </div>
+</section>
+</main>
+<!--@footer-->
+</body>
+</html>

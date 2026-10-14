@@ -475,6 +475,8 @@ pub struct Background {
     /// Path or data URL of a user supplied image.
     pub image: Option<String>,
     pub blur: f64,
+    /// Subtle motion for wallpapers: "none" | "drift" | "bokeh" | "waves" | "dust".
+    pub motion: String,
 }
 
 impl Default for Background {
@@ -488,6 +490,7 @@ impl Default for Background {
             gradient_angle: 135.0,
             image: None,
             blur: 0.0,
+            motion: "none".into(),
         }
     }
 }
@@ -500,6 +503,8 @@ pub struct Styles {
     pub shadow: Shadow,
     pub inset: Inset,
     pub background: Background,
+    /// Device frame around the screen: "none" | "laptop" | "monitor" | "tablet" | "phone" | "browser".
+    pub device: String,
 }
 
 impl Default for Styles {
@@ -510,6 +515,7 @@ impl Default for Styles {
             shadow: Shadow::default(),
             inset: Inset::default(),
             background: Background::default(),
+            device: "none".into(),
         }
     }
 }

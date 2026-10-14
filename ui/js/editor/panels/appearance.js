@@ -2,7 +2,8 @@ import { P, hooks } from "../state.js";
 import { invoke, dialog } from "../../tauri.js";
 import { change } from "../history.js";
 import { h3, el, slider, toggle, segmented, colorField } from "../widgets.js";
-import { WALLPAPERS, drawWallpaper } from "../../wallpapers.js";
+import { WALLPAPERS, MOTIONS, drawWallpaper } from "../../wallpapers.js";
+import { DEVICES } from "../../devices.js";
 
 function swatch(name) {
   const c = document.createElement("canvas");
@@ -28,6 +29,7 @@ export function panelAppearance(p) {
     const rnd = el('<button class="btn-line">Pick random wallpaper</button>');
     rnd.onclick = () => change(null, () => (bg.wallpaper = WALLPAPERS[Math.floor(Math.random() * WALLPAPERS.length)]), { panel: true, track: false });
     p.append(rnd);
+    p.append(segmented("Motion", MOTIONS, () => bg.motion || "none", (v) => (bg.motion = v), { track: false }));
   } else if (bg.kind === "gradient") {
     p.append(colorField("From", () => bg.gradientFrom, (v) => (bg.gradientFrom = v)));
     p.append(colorField("To", () => bg.gradientTo, (v) => (bg.gradientTo = v)));
@@ -54,6 +56,8 @@ export function panelAppearance(p) {
     };
     p.append(b);
   }
+  p.append(h3("Device frame"));
+  p.append(segmented("Frame", DEVICES, () => st.device || "none", (v) => (st.device = v), { track: false }));
   if (bg.kind !== "color") p.append(slider("Background blur", 0, 40, 1, () => bg.blur, (v) => (bg.blur = v), {}));
   p.append(slider("Padding", 0, 0.3, 0.005, () => st.paddingRatio, (v) => (st.paddingRatio = v), { fmt: (v) => Math.round(v * 100) + "%" }));
   p.append(slider("Screen Corners", 0, 60, 1, () => st.cornerRadius, (v) => (st.cornerRadius = v)));

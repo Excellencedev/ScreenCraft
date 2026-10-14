@@ -1,4 +1,5 @@
 import { drawBackground } from "./wallpapers.js";
+import { deviceInsets, drawDevice } from "./devices.js";
 import { drawCursor } from "./cursors.js";
 import { drawAnnotations, drawKeys, drawSubtitles, drawWatermark, applyTransition } from "./overlays.js";
 
@@ -25,9 +26,11 @@ export function contentRect(p, W, H) {
   const pad = p.config.styles.paddingRatio * Math.min(W, H);
   const aw = W - 2 * pad, ah = H - 2 * pad;
   const a = contentAspect(p);
-  let w = aw, h = aw / a;
-  if (h > ah) { h = ah; w = ah * a; }
-  return { x: (W - w) / 2, y: (H - h) / 2, w, h };
+  const dv = deviceInsets(p.config.styles.device);
+  // the screen's height h, with the device frame around it fitting the padded area
+  const h = Math.min(ah / (1 + dv.top + dv.bottom), aw / (a + 2 * dv.side));
+  const w = h * a;
+  return { x: (W - w) / 2, y: (H - (1 + dv.top + dv.bottom) * h) / 2 + dv.top * h, w, h };
 }
 
 /** Approximate gaussian blur: shrink in halves, then grow back with smoothing. */
@@ -80,11 +83,12 @@ function camScale(cc, p, zoom) {
  * Background + drop shadow only change when the style or output size does, so
  * they are rendered once into an offscreen layer and blitted every frame.
  */
-function staticLayer(p, W, H, src, shadowRect) {
+function staticLayer(p, W, H, src, shadowRect, tMs = 0) {
   const st = p.config.styles;
   const bg = st.background;
   const sh = shadowRect ? [shadowRect.x, shadowRect.y, shadowRect.w, shadowRect.h].map((v) => Math.round(v)) : null;
-  const key = JSON.stringify([W, H, contentAspect(p), st.paddingRatio, st.cornerRadius, st.shadow, sh, { ...bg, image: bg.image ? bg.image.length : 0 }]);
+  const moving = bg.kind === "wallpaper" && bg.motion && bg.motion !== "none";
+  const key = JSON.stringify([W, H, contentAspect(p), st.paddingRatio, st.cornerRadius, st.shadow, st.device || "none", sh, moving ? Math.round(tMs / 40) : 0, { ...bg, image: bg.image ? bg.image.length : 0 }]);
   const cache = (src.cache ??= {});
   if (cache.key === key && cache.canvas) return cache.canvas;
   const c = cache.canvas && cache.canvas.width === W && cache.canvas.height === H ? cache.canvas : document.createElement("canvas");
@@ -97,10 +101,10 @@ function staticLayer(p, W, H, src, shadowRect) {
     const tmp = document.createElement("canvas");
     tmp.width = W;
     tmp.height = H;
-    drawBackground(tmp.getContext("2d"), W, H, bg, src.bgImage);
+    drawBackground(tmp.getContext("2d"), W, H, bg, src.bgImage, tMs / 1000);
     blurInto(ctx, tmp, bg.blur * s, W, H);
   } else {
-    drawBackground(ctx, W, H, bg, src.bgImage);
+    drawBackground(ctx, W, H, bg, src.bgImage, tMs / 1000);
   }
   if (st.shadow.intensity > 0) {
     const r = shadowRect || contentRect(p, W, H);
@@ -112,9 +116,15 @@ function staticLayer(p, W, H, src, shadowRect) {
     ctx.shadowOffsetX = st.shadow.directional ? Math.cos(ang) * d * 0.5 : 0;
     ctx.shadowOffsetY = st.shadow.directional ? Math.sin(ang) * d * 0.5 : d * 0.3;
     ctx.fillStyle = "#000";
-    rr(ctx, r.x, r.y, r.w, r.h, st.cornerRadius * s);
+    const dv = deviceInsets(st.device);
+    if (dv.side + dv.top + dv.bottom > 0) rr(ctx, r.x - dv.side * r.h, r.y - dv.top * r.h, r.w + 2 * dv.side * r.h, r.h * (1 + dv.top + dv.bottom), st.cornerRadius * s + dv.side * r.h);
+    else rr(ctx, r.x, r.y, r.w, r.h, st.cornerRadius * s);
     ctx.fill();
     ctx.restore();
+  }
+  if (st.device && st.device !== "none") {
+    const r = shadowRect || contentRect(p, W, H);
+    drawDevice(ctx, st.device, r.x, r.y, r.w, r.h, st.cornerRadius * s, s);
   }
   cache.key = key;
   cache.canvas = c;
@@ -210,7 +220,7 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
   const sr = geo.sr;
 
   // background + shadow (cached layer; the shadow follows the screen's rectangle)
-  ctx.drawImage(staticLayer(p, W, H, src, gCur.sr === r ? null : gCur.sr), 0, 0);
+  ctx.drawImage(staticLayer(p, W, H, src, gCur.sr === r ? null : gCur.sr, tOutMs), 0, 0);
   src.bounds?.clear();
 
   // screen
@@ -360,7 +370,7 @@ export function paintFrame(ctx, W, H, p, cam, tOutMs, clicks, src) {
   drawSubtitles(ctx, W, H, p, cam.tSrc ?? 0, s);
   if (cam.transKind) {
     applyTransition(ctx, W, H, cam.transKind, cam.transP, (src.cache ??= {}), () =>
-      ctx.drawImage(staticLayer(p, W, H, src, gCur.sr === r ? null : gCur.sr), 0, 0));
+      ctx.drawImage(staticLayer(p, W, H, src, gCur.sr === r ? null : gCur.sr, tOutMs), 0, 0));
   }
 }
 

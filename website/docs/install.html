@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install — ScreenCraft</title>
+<meta name="description" content="Install ScreenCraft on macOS and Windows.">
+<link rel="icon" href="/img/icon.png">
+</head>
+<body>
+<!--@header-->
+<main id="main">
+<div class="wrap docs"><!--@docs-nav--><article class="prose">
+<h1>Install</h1>
+<h2>macOS</h2>
+<ol><li>Download <a href="/download">ScreenCraft.dmg</a>, open it, and drag the app to Applications.</li>
+<li>The build is ad-hoc signed and not notarized. Right-click the app, choose <b>Open</b>, and confirm the first time.</li>
+<li>Grant <b>Screen Recording</b> in System Settings → Privacy &amp; Security, then relaunch. Microphone, Camera and Accessibility are optional and only requested for those features.</li></ol>
+<h2>Windows</h2>
+<ol><li>Run <code>ScreenCraft-Setup.exe</code> (per-user install, no administrator rights).</li>
+<li>If SmartScreen warns about an unsigned app, choose <b>More info → Run anyway</b>.</li></ol>
+<h2>Build from source</h2>
+<p>Install Rust (stable) and run:</p>
+<pre><code>git clone https://github.com/MarshallNickolauson/ScreenCraft
+cd ScreenCraft
+./scripts/bundle.sh --install     # macOS
+scripts\build-windows.ps1         # Windows</code></pre>
+</article></div>
+</main>
+<!--@footer-->
+</body>
+</html>

@@ -17,24 +17,73 @@ const SPECS = {
 };
 export const WALLPAPERS = Object.keys(SPECS);
 
-export function drawWallpaper(ctx, W, H, name) {
+export const MOTIONS = [["none", "Still"], ["drift", "Drift"], ["bokeh", "Bokeh"], ["waves", "Waves"], ["dust", "Dust"]];
+
+// deterministic pseudo-random in [0,1) so every frame of a loop agrees (preview == export)
+const rnd = (i, k) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
+
+export function drawWallpaper(ctx, W, H, name, t = 0, motion = "none") {
   const spec = SPECS[name] || SPECS.aurora;
+  const moving = motion && motion !== "none";
   const g = ctx.createLinearGradient(0, 0, W, H);
   g.addColorStop(0, spec.base[0]);
   g.addColorStop(1, spec.base[1]);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
   const m = Math.max(W, H);
-  for (const [color, x, y, r] of spec.blobs) {
+  spec.blobs.forEach(([color, x0, y0, r], i) => {
+    // a slow lissajous wander, a few percent of the frame
+    const x = x0 + (moving ? Math.sin(t * 0.22 + i * 2.1) * 0.07 : 0);
+    const y = y0 + (moving ? Math.cos(t * 0.17 + i * 1.7) * 0.07 : 0);
     const rg = ctx.createRadialGradient(x * W, y * H, 0, x * W, y * H, r * m);
     rg.addColorStop(0, color + "e6");
     rg.addColorStop(1, color + "00");
     ctx.fillStyle = rg;
     ctx.fillRect(0, 0, W, H);
+  });
+  if (!moving) return;
+  const hi = spec.blobs[0][0];
+  if (motion === "bokeh") {
+    for (let i = 0; i < 16; i++) {
+      const sp = 0.012 + rnd(i, 1) * 0.02;
+      const y = 1.15 - ((t * sp + rnd(i, 2)) % 1.3);
+      const x = rnd(i, 3) + Math.sin(t * 0.3 + i) * 0.02;
+      const r = (0.02 + rnd(i, 4) * 0.05) * m;
+      const g = ctx.createRadialGradient(x * W, y * H, 0, x * W, y * H, r);
+      g.addColorStop(0, "rgba(255,255,255,.16)");
+      g.addColorStop(0.7, "rgba(255,255,255,.07)");
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(x * W - r, y * H - r, r * 2, r * 2);
+    }
+  } else if (motion === "waves") {
+    for (let k = 0; k < 3; k++) {
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      for (let px = 0; px <= W; px += W / 48) {
+        const u = px / W;
+        ctx.lineTo(px, H * (0.78 + k * 0.07) + Math.sin(u * (3 + k) * Math.PI + t * (0.35 + k * 0.12) + k) * H * 0.035);
+      }
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(255,255,255,${0.05 - k * 0.01})`;
+      ctx.fill();
+    }
+  } else if (motion === "dust") {
+    ctx.fillStyle = hi;
+    for (let i = 0; i < 70; i++) {
+      const x = (rnd(i, 1) + t * (0.004 + rnd(i, 2) * 0.006)) % 1;
+      const y = (rnd(i, 3) + Math.sin(t * 0.2 + i) * 0.015 + 1) % 1;
+      ctx.globalAlpha = 0.18 + 0.32 * (0.5 + 0.5 * Math.sin(t * (0.6 + rnd(i, 4)) + i));
+      ctx.beginPath();
+      ctx.arc(x * W, y * H, (0.7 + rnd(i, 5) * 1.6) * (H / 540), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   }
 }
 
-export function drawBackground(ctx, W, H, bg, imageEl) {
+export function drawBackground(ctx, W, H, bg, imageEl, t = 0) {
   switch (bg.kind) {
     case "color":
       ctx.fillStyle = bg.color;
@@ -63,6 +112,6 @@ export function drawBackground(ctx, W, H, bg, imageEl) {
       ctx.fillRect(0, 0, W, H);
       break;
     default:
-      drawWallpaper(ctx, W, H, bg.wallpaper);
+      drawWallpaper(ctx, W, H, bg.wallpaper, t, bg.motion);
   }
 }
