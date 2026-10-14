@@ -134,7 +134,13 @@ meters, resolution and frame rate, and the project list.
 
 ### macOS
 
-Download [`ScreenCraft.dmg`](https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg) from the root of this repository, open
+**One-line install (no macOS security prompt):**
+
+```bash
+curl -fsSL https://screencraft.mdnlabs.dev/install.sh | bash
+```
+
+Or download [`ScreenCraft.dmg`](https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg) from the root of this repository, open
 it and drag **ScreenCraft** onto **Applications**. The app is only ad-hoc signed (not
 notarised), so macOS blocks it the first time: open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to ScreenCraft (or run `xattr -dr com.apple.quarantine /Applications/ScreenCraft.app`).
 

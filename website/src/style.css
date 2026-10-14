@@ -530,3 +530,10 @@ html { overflow-x: clip; }
 
 /* editor demo: no visible heading (kept for screen readers) */
 .pg-sec > .wrap > h2 { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* one-line installer */
+.cmd-l { margin: 18px 0 8px; color: var(--muted); font-size: 14.5px; }
+.cmd { display: flex; align-items: stretch; gap: 8px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--bg-2); padding: 6px 6px 6px 14px; }
+.cmd code { flex: 1; min-width: 0; align-self: center; font-family: var(--mono); font-size: 13px; overflow-x: auto; white-space: nowrap; color: var(--text); }
+.cmd-copy { flex: none; height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line-2); background: transparent; color: var(--text); font: inherit; font-size: 13.5px; cursor: pointer; }
+.cmd-copy:hover { background: var(--surface); }

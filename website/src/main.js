@@ -232,3 +232,11 @@ if (canvases.length && !reduceMotion) {
   const start = () => import('./scene.js').then((m) => canvases.forEach((c) => m.mountScene(c))).catch(() => {});
   if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 1500 }); else setTimeout(start, 400);
 }
+
+// copy buttons (the one-line installer)
+document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+  const el = document.querySelector(b.dataset.copy);
+  if (!el) return;
+  try { await navigator.clipboard.writeText(el.textContent.trim()); b.textContent = '✓'; } catch { return; }
+  setTimeout(() => { b.textContent = b.dataset.label || 'Copy'; }, 1500);
+}));
