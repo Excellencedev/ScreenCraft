@@ -34,10 +34,14 @@
     <p class="pg-lead" data-i18n="try.p">A small, working version of ScreenCraft's editor. Drag the zoom blocks, click the track to add one, scrub the timeline and restyle the frame.</p>
     <div class="pg" id="playground">
       <div class="pg-main">
-        <div class="pg-view">
-          <canvas aria-hidden="true"></canvas>
-          <img class="pg-fallback" src="/img/editor-zoom.jpg" width="1600" height="967" alt="The ScreenCraft editor with a zoomed preview and zoom blocks on the timeline" loading="lazy">
-        </div>
+        <aside class="pg-side">
+          <nav class="pg-rail" aria-hidden="true">
+            <span class="on"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M21 21l-5-5M11 8v6M8 11h6"/></svg></span>
+            <span><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 11l5-3v8l-5-3z"/><rect x="3" y="7" width="13" height="10" rx="2"/></svg></span>
+            <span><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2.500"/><path d="M8 21h8"/></svg></span>
+            <span><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg></span>
+            <span><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+          </nav>
         <div class="pg-panel">
           <fieldset class="pg-f"><legend data-i18n="try.bg">Wallpaper</legend>
             <div class="pg-sw">
@@ -54,11 +58,20 @@
           <label class="pg-t"><span data-i18n="try.caps">Captions</span><input type="checkbox" data-ctl="captions" checked></label>
           <label class="pg-t"><span data-i18n="try.smooth">Smooth cursor</span><input type="checkbox" data-ctl="smooth" checked></label>
         </div>
+        </aside>
+        <div class="pg-stage">
+        <div class="pg-view">
+          <canvas aria-hidden="true"></canvas>
+          <img class="pg-fallback" src="/img/editor-zoom.jpg" width="1600" height="967" alt="The ScreenCraft editor with a zoomed preview and zoom blocks on the timeline" loading="lazy">
+        </div>
+          <div class="pg-transport">
+            <button type="button" class="pg-play" data-play data-state="playing" aria-label="Pause"><svg class="i-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg><svg class="i-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.500v13a1 1 0 0 0 1.500.9l11-6.500a1 1 0 0 0 0-1.800l-11-6.500A1 1 0 0 0 8 5.500Z"/></svg></button>
+            <span class="pg-time mono" data-time>0:00.0</span>
+          </div>
+        </div>
       </div>
       <div class="pg-tl">
         <div class="pg-bar">
-          <button type="button" class="pg-play" data-play data-state="playing" aria-label="Pause"><svg class="i-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg><svg class="i-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.500v13a1 1 0 0 0 1.500.9l11-6.500a1 1 0 0 0 0-1.800l-11-6.500A1 1 0 0 0 8 5.500Z"/></svg></button>
-          <span class="pg-time mono" data-time>0:00.0</span>
           <span class="pg-hint" data-i18n="try.hint">Click an empty spot on the Zoom track to add a zoom. Select a block to remove it.</span>
           <button type="button" class="pg-btn" data-remove disabled data-i18n="try.remove">Remove zoom</button>
           <button type="button" class="pg-btn" data-reset data-i18n="try.reset">Reset</button>

@@ -19,8 +19,8 @@ const WALLPAPERS = {
 };
 
 const KEYS = [                                   // scripted cursor: time, x, y (0..1), click
-  { t: 0, x: .56, y: .52 }, { t: 1.6, x: .15, y: .34, click: 1 }, { t: 3.4, x: .40, y: .40 },
-  { t: 6.0, x: .52, y: .43 }, { t: 7.4, x: .84, y: .085, click: 1 }, { t: 9.0, x: .56, y: .78 },
+  { t: 0, x: .56, y: .52 }, { t: 1.6, x: .15, y: .34, click: 1 }, { t: 3.4, x: .42, y: .40 },
+  { t: 6.0, x: .46, y: .40 }, { t: 7.4, x: .84, y: .085, click: 1 }, { t: 9.0, x: .56, y: .78 },
   { t: 11.0, x: .70, y: .83 }, { t: 12, x: .56, y: .52 },
 ];
 const WORDS = [['Zooms', .6], ['follow', 1.1], ['what', 1.7], ['you', 2.1], ['do.', 2.5], ['Typing', 4.5], ['is', 5.0], ['tracked', 5.3], ['too.', 5.9], ['Export', 8.4], ['in', 9.0], ['one', 9.3], ['click.', 9.7]];
@@ -35,7 +35,18 @@ function cssVar(name, fallback) {
 }
 
 /** The fake screen being "recorded": a code editor with a sidebar, toolbar and output panel. */
-function drawScreen(g) {
+const TYPED = [['const ', '#c586c0'], ['tax', '#9cdcfe'], [' = ', '#d4d4d4'], ['total', '#9cdcfe'], [' * ', '#d4d4d4'], ['0.08', '#b5cea8'], [';', '#d4d4d4']];
+const TYPED_LEN = TYPED.reduce((n, [t]) => n + t.length, 0);
+const TYPE_FROM = 3.4, TYPE_TO = 5.6;
+
+/** The first `n` characters of the line being typed, as colour runs. */
+function typedRuns(n) {
+  const out = []; let left = n;
+  for (const [t, c] of TYPED) { if (left <= 0) break; out.push([t.slice(0, left), c]); left -= t.length; }
+  return out;
+}
+
+function drawScreen(g, typed = 0, caret = false) {
   const W = SCREEN_W, H = SCREEN_H;
   g.fillStyle = '#0d1320'; g.fillRect(0, 0, W, H);
   // title bar
@@ -62,7 +73,7 @@ function drawScreen(g) {
     [['const ', '#c586c0'], ['total', '#9cdcfe'], [' = ', '#d4d4d4'], ['cart', '#9cdcfe'], ['.items', '#d4d4d4']],
     [['  .map(', '#d4d4d4'], ['i', '#9cdcfe'], [' => ', '#c586c0'], ['i.price', '#9cdcfe'], [' * ', '#d4d4d4'], ['i.qty', '#9cdcfe'], [')', '#d4d4d4']],
     [['  .reduce(', '#d4d4d4'], ['(a, b)', '#9cdcfe'], [' => ', '#c586c0'], ['a + b', '#9cdcfe'], [', ', '#d4d4d4'], ['0', '#b5cea8'], [')', '#d4d4d4']],
-    [['', '#d4d4d4']],
+    typedRuns(typed),
     [['export async function ', '#c586c0'], ['checkout', '#dcdcaa'], ['() {', '#d4d4d4']],
     [['  const ', '#c586c0'], ['order', '#9cdcfe'], [' = await ', '#c586c0'], ['api', '#9cdcfe'], ['.create({ total })', '#d4d4d4']],
     [['  return ', '#c586c0'], ['order', '#9cdcfe'], ['.id', '#d4d4d4']],
@@ -75,6 +86,7 @@ function drawScreen(g) {
     let x = W * .22 + 54;
     g.font = '500 28px ui-monospace, Menlo, Consolas, monospace';
     ln.forEach(([t, c]) => { g.fillStyle = c; g.fillText(t, x, y); x += g.measureText(t).width; });
+    if (i === 3 && caret) { g.fillStyle = '#e8eefc'; g.fillRect(x + 2, y - 18, 3, 36); }
   });
   // output
   g.fillStyle = '#0a101b'; g.fillRect(W * .2, H * .64, W * .8, H * .36);
@@ -132,6 +144,7 @@ export function mountPlayground(root) {
 
   const screenCanvas = document.createElement('canvas'); screenCanvas.width = SCREEN_W; screenCanvas.height = SCREEN_H;
   drawScreen(screenCanvas.getContext('2d'));
+  let typedKey = '0';
   const screenTex = tex(screenCanvas);
   const maskCanvas = document.createElement('canvas');
   const maskTex = new CanvasTexture(maskCanvas);
@@ -264,6 +277,11 @@ export function mountPlayground(root) {
 
   function frame() {
     const t = S.t;
+    // typing: the line in the editor fills in while the second zoom is on it
+    const n = t < TYPE_FROM ? 0 : Math.min(TYPED_LEN, Math.floor((t - TYPE_FROM) / (TYPE_TO - TYPE_FROM) * TYPED_LEN));
+    const caret = t > TYPE_FROM - 0.4 && t < TYPE_TO + 1.2 && (n < TYPED_LEN || Math.floor(t * 2) % 2 === 0);
+    const tk = n + (caret ? 'c' : '');
+    if (tk !== typedKey) { typedKey = tk; drawScreen(screenCanvas.getContext('2d'), n, caret); screenTex.needsUpdate = true; }
     const amt = zoomAmount(t);
     const z = 1 + (S.level - 1) * amt;
     const c = cursorAt(t);

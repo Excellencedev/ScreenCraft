@@ -503,3 +503,22 @@ html { overflow-x: clip; }
 .pg-head::before { content: ""; position: absolute; top: -2px; left: -5px; width: 12px; height: 12px; border-radius: 3px; background: #fff; }
 @media (max-width: 900px) { .pg-main { grid-template-columns: 1fr; } .pg-view { border-right: 0; border-bottom: 1px solid var(--line); } .pg-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; } .pg-f { grid-column: 1 / -1; } }
 @media (max-width: 520px) { .pg-grid { grid-template-columns: 52px minmax(0, 1fr); } .pg-headwrap { left: 52px; } .pg-panel { grid-template-columns: 1fr; } .pg-hint { display: none; } }
+
+/* editor demo: inspector on the left, stage on the right, like the app */
+.pg { background: #0b1019; border-color: #1d2738; }
+.pg-main { grid-template-columns: 270px minmax(0, 1fr); }
+.pg-side { display: grid; grid-template-rows: auto minmax(0, 1fr); border-right: 1px solid #1d2738; background: #0f1623; }
+.pg-rail { display: flex; gap: 2px; padding: 8px 10px 0; border-bottom: 1px solid #1d2738; }
+.pg-rail span { flex: 1; height: 36px; display: grid; place-items: center; color: #7f8ba1; border-radius: 7px 7px 0 0; position: relative; }
+.pg-rail span.on { color: #fff; background: #0b1019; }
+.pg-rail span.on::after { content: ""; position: absolute; left: 20%; right: 20%; bottom: 0; height: 2px; border-radius: 2px; background: #6aaee8; }
+.pg-panel { background: #0b1019; }
+.pg-stage { display: flex; flex-direction: column; min-width: 0; background: radial-gradient(ellipse at 50% 30%, #0e1624 0%, #0b1019 70%); }
+.pg-view { border-right: 0; background: transparent; }
+.pg-transport { display: flex; align-items: center; justify-content: center; gap: 10px; width: fit-content; margin: 8px auto 12px; padding: 5px 12px; border-radius: 12px; background: #0f1623; border: 1px solid #1d2738; }
+.pg-play { background: var(--accent); border-color: transparent; color: #fff; width: 36px; height: 32px; border-radius: 8px; }
+.pg-play:hover { background: color-mix(in srgb, var(--accent) 85%, #fff); }
+.pg-time { min-width: 56px; text-align: center; }
+.pg-tl { background: #0f1623; border-top: 1px solid #1d2738; }
+@media (max-width: 900px) { .pg-main { grid-template-columns: 1fr; } .pg-side { order: 2; border-right: 0; border-top: 1px solid #1d2738; } .pg-stage { order: 1; } .pg-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; } }
+@media (max-width: 520px) { .pg-panel { grid-template-columns: 1fr; } }
