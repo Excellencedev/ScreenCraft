@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.1
+
 - **Recording controls.** The record bar is now locked bottom-centre on the main display. While recording, the
   timer and Stop move freely (and sit just outside an area's border); a trash button scraps the
   whole recording after a confirmation. Area recordings get a red, pulsing outline with a REC tag,
