@@ -28,6 +28,8 @@ RequestExecutionLevel user
 SetCompressor /SOLID lzma
 BrandingText "ScreenCraft ${VERSION}"
 
+Icon "${ICON_PATH}"
+UninstallIcon "${ICON_PATH}"
 !define MUI_ICON "${ICON_PATH}"
 !define MUI_UNICON "${ICON_PATH}"
 !define MUI_ABORTWARNING
