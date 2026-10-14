@@ -5,7 +5,6 @@ import { panelCamera } from "./camera.js";
 import { panelZoom } from "./zoom.js";
 import { panelAudio } from "./audio.js";
 import { panelCrop } from "./crop.js";
-import { panelSoon } from "./soon.js";
 import { panelAnnotate } from "./annotate.js";
 import { panelPace } from "./pace.js";
 import { panelCaptions } from "./captions.js";
@@ -21,7 +20,6 @@ const TABS = [
   ["annotate", "Annotate", '<path d="M5 6h14M12 6v13M9 19h6"/>', panelAnnotate],
   ["captions", "Captions", '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M7 12h3M12 12h5M7 15.5h6"/>', panelCaptions],
   ["pace", "Pace & transitions", '<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>', panelPace],
-  ["soon", "Coming soon", '<path d="M12 3l2.4 5.2 5.6.7-4.1 3.9 1 5.6L12 15.7 7.1 18.4l1-5.6L4 8.9l5.6-.7z"/>', panelSoon],
 ];
 
 function renderRail() {

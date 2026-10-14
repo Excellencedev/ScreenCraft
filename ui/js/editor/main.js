@@ -239,6 +239,10 @@ function bindUI() {
   $("btnZoomHere").onclick = addZoomAtPlayhead;
   $("btnDuplicate").onclick = duplicateSelected;
   $("btnAutoZoom").onclick = autoZoom;
+  // the X and GitHub links open in the system browser
+  document.querySelectorAll(".ext-link").forEach((b) => {
+    b.onclick = () => invoke("plugin:opener|open_url", { url: b.dataset.url }).catch(() => {});
+  });
   $("btnFolder").onclick = async (e) => {
     const anchor = e.currentTarget; // currentTarget is cleared once we await
     const list = await invoke("recent_projects");
