@@ -90,6 +90,8 @@ async function generateCaptions(rerender) {
     } else {
       change(null, () => {
         P().scene.subtitles = P().scene.subtitles || [];
+        // first captions in a project: start from the TikTok look
+        if (!P().scene.subtitles.length) Object.assign(P().config.subtitles, SUBTITLE_PRESETS.tiktok);
         for (const c of caps) P().scene.subtitles.push({ id: uid(), text: c.text, sourceStartMs: c.startMs, sourceEndMs: c.endMs, wordStarts: c.wordStarts || [] });
         S.selected = null;
       }, { panel: true, timeline: true, track: false });
@@ -107,6 +109,8 @@ async function generateCaptions(rerender) {
 
 export function panelCaptions(p) {
   const st = P().config.subtitles;
+  // presets that no longer exist (TikTok red, Highlight) fall back to TikTok
+  if (!SUBTITLE_PRESETS[st.style]) Object.assign(st, SUBTITLE_PRESETS.tiktok);
   const list = (P().scene.subtitles || []).slice().sort((a, b) => a.sourceStartMs - b.sourceStartMs);
   p.append(h3("Captions"));
   p.append(el('<div class="muted">Type captions or import an SRT file. They sit in the middle of the bottom third of the video, like TikTok.</div>'));
