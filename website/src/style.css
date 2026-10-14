@@ -323,3 +323,9 @@ html { overflow-x: clip; }
   .hero .scene-hero.live { opacity: .95; }
   .hero h1 { font-size: clamp(34px, 11vw, 60px); }
 }
+
+/* hero video is just the video, with rounded corners */
+.hero .hero-video { margin-top: clamp(40px, 6vw, 72px); border: 0; border-radius: clamp(12px, 1.6vw, 22px); overflow: hidden; box-shadow: var(--shadow); background: #000; }
+.hero-video video { display: block; width: 100%; height: auto; }
+/* screenshots show only the app window; the frame's radius trims the window's own corners */
+.row .frame { border: 0; border-radius: 12px; box-shadow: var(--shadow); background: transparent; }
