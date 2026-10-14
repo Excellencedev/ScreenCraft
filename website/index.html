@@ -25,18 +25,6 @@
       <a class="btn btn-quiet" href="/docs/" data-i18n="hero.docs">Read the docs</a>
     </div>
     <p class="trust" data-i18n="hero.trust">macOS and Windows. MIT license. No account, no watermark.</p>
-    <div class="recbar" aria-label="The ScreenCraft recorder bar">
-      <canvas data-recbar aria-hidden="true"></canvas>
-      <img class="recbar-fallback" src="/img/recorder-bar.jpg" width="1100" height="76" alt="The ScreenCraft recorder bar: capture mode, camera, microphone and system audio inputs, output settings and a Record button">
-    </div>
-    <div class="hero-video" id="heroVideo">
-      <video id="demoVideo" src="/video/demo.mp4" poster="/video/poster.jpg" width="1280" height="728" autoplay muted loop playsinline preload="auto" aria-label="A ScreenCraft recording: automatic zooms follow the typing, with the camera in a corner bubble"></video>
-      <div class="vctl">
-        <button type="button" class="vplay" aria-label="Pause" data-state="playing"><svg class="i-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg><svg class="i-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.500 4.640A1 1 0 008 5.500z"/></svg></button>
-        <input class="vscrub" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek through the demo">
-        <span class="vtime" aria-hidden="true">0:00</span>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -87,6 +75,10 @@
           <div class="pg-headwrap"><div class="pg-head" data-head></div></div>
         </div>
       </div>
+    </div>
+    <div class="recbar" aria-label="The ScreenCraft recorder bar">
+      <canvas data-recbar aria-hidden="true"></canvas>
+      <img class="recbar-fallback" src="/img/recorder-bar.jpg" width="1100" height="76" alt="The ScreenCraft recorder bar: capture mode, camera, microphone and system audio inputs, output settings and a Record button">
     </div>
   </div>
 </section>
