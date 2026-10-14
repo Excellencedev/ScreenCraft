@@ -4,6 +4,7 @@
 #   - Rust with the MSVC toolchain  (https://rustup.rs, and the "Desktop development
 #     with C++" workload from the Visual Studio Build Tools)
 #   - NSIS                          (winget install NSIS.NSIS)
+#   - CMake                         (winget install Kitware.CMake) - builds whisper.cpp for captions
 #
 # Usage (from the repository root, in PowerShell):
 #   powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1
