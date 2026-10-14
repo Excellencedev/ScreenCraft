@@ -43,6 +43,7 @@ function applyLang(lang) {
     if (v != null) el.innerHTML = v;
   });
   wrapWords(document.querySelector('.hero h1'));
+  translatePage(lang);
   document.querySelectorAll('[data-i18n-os]').forEach((el) => {
     el.textContent = dict[isMac ? 'dl.mac' : 'dl.win'];
   });
@@ -78,6 +79,30 @@ function wrapWords(h) {
   }
 }
 
+// longer page text (new sections, features, docs) is translated by exact English text, from a
+// per-language file that is only fetched when that language is chosen
+const loaders = import.meta.glob('./lang/*.json');
+const dicts = {};
+const PAGE_SEL = 'main h1, main h2, main h3, main h4, main p, main li, main dt, main dd, main th, main td, main summary, .docs-nav a, .docs-nav h5';
+const keyOf = (el) => el.innerHTML.replace(/\s+/g, ' ').trim();
+async function translatePage(l) {
+  let dict = null;
+  if (l !== 'en') {
+    const load = loaders[`./lang/${l}.json`];
+    if (load) dict = dicts[l] ||= (await load()).default;
+  }
+  document.querySelectorAll(PAGE_SEL).forEach((el) => {
+    if (el.dataset.i18n || el.closest('[data-i18n]') || el.closest('.whatsnew') || el.closest('pre')) return;
+    if (el.dataset.en == null) {
+      const k = keyOf(el);
+      if (!dict || !(k in dict)) return;
+      el.dataset.en = k;
+    }
+    const en = el.dataset.en;
+    el.innerHTML = dict && en in dict ? dict[en] : en;
+  });
+}
+
 const saved = store.get('sc-lang');
 let lang = LANGS.includes(saved) ? saved : detect();
 document.querySelectorAll('[data-lang-select]').forEach((sel) => sel.addEventListener('change', () => {
@@ -101,7 +126,9 @@ fetch('/api/stars').then((r) => r.json()).then(({ stars }) => {
 
 // scroll reveals: tag the pieces, stagger siblings, reveal as they enter
 if (!reduceMotion && 'IntersectionObserver' in window) {
-  const groups = ['.row-text > *', '.row > .frame, .row > .caption-demo', '.deflist > div', '.stance-text', '.closer .wrap > *', '.page-head > *', '.osrow > .os', '.note'];
+  const groups = ['.row-text > *', '.row > .frame, .row > .caption-demo', '.deflist > div', '.stance-text', '.closer .wrap > *', '.page-head > *', '.osrow > .os', '.note',
+    '.sec > .wrap > h2', '.flow > *', '.compare-wrap', '.fine', '.keys li', '.whatsnew > *', '.more-link', '.faq details', '.oss > *', '.recbar', '.hero-video',
+    '.prose > h1, .prose > h2, .prose > h3, .prose > p, .prose > ul, .prose > ol, .prose > table, .prose > pre, .prose > .grid2'];
   groups.forEach((sel) => {
     document.querySelectorAll(sel).forEach((el, i, all) => {
       el.setAttribute('data-reveal', '');
