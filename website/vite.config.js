@@ -4,6 +4,7 @@ import { resolve, join } from 'node:path';
 import { marked } from 'marked';
 
 const root = import.meta.dirname;
+const appVersion = JSON.parse(readFileSync(join(root, '../src-tauri/tauri.conf.json'), 'utf8')).version;
 const partial = (n) => readFileSync(join(root, 'src/partials', n + '.html'), 'utf8');
 
 // Every .html file (outside node_modules/dist) becomes a page.
@@ -24,6 +25,7 @@ const partials = {
     order: 'pre',
     handler(html) {
       return html
+        .replaceAll('/downloads/ScreenCraft.dmg', `/downloads/ScreenCraft-${appVersion}.dmg`)
         .replace('<!--@header-->', partial('header'))
         .replace('<!--@footer-->', partial('footer'))
         .replace('<!--@docs-nav-->', partial('docs-nav'))

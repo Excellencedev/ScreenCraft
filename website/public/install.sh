@@ -7,7 +7,14 @@
 # it only downloads the disk image from this website and copies the app out of it.
 set -euo pipefail
 
-URLS=("https://screencraft.mdnlabs.dev/downloads/ScreenCraft.dmg" "https://getscreencraft.pages.dev/downloads/ScreenCraft.dmg")
+SITES=("https://screencraft.mdnlabs.dev" "https://getscreencraft.pages.dev")
+URLS=()
+# the manifest names the exact, versioned file for the newest release
+for s in "${SITES[@]}"; do
+  u="$(curl -fsSL -m 10 "$s/latest.json" 2>/dev/null | sed -n 's/.*"mac": *"\([^"]*\)".*/\1/p' | head -1 || true)"
+  [ -n "$u" ] && URLS+=("$u")
+done
+URLS+=("https://screencraft.mdnlabs.dev/downloads/ScreenCraft.dmg" "https://getscreencraft.pages.dev/downloads/ScreenCraft.dmg")
 
 if [ "$(uname -s)" != "Darwin" ]; then
   echo "This installer is for macOS. Windows users: https://screencraft.mdnlabs.dev/download" >&2

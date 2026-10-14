@@ -7,10 +7,10 @@
 
 /downloads/*
   Content-Disposition: attachment
-  Cache-Control: public, max-age=3600
+  Cache-Control: no-cache
 
 /latest.json
-  Cache-Control: public, max-age=300
+  Cache-Control: no-cache
   Access-Control-Allow-Origin: *
 
 /install.sh
