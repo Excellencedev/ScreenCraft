@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "vite build && wrangler pages deploy dist --project-name getscreencraft"
+    "deploy": "vite build && wrangler pages deploy dist --project-name getscreencraft",
+    "prebuild": "node scripts/copy-downloads.mjs",
+    "predev": "node scripts/copy-downloads.mjs"
   },
   "devDependencies": {
     "marked": "^18.1.1",

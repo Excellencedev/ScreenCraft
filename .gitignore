@@ -5,3 +5,4 @@ node_modules/
 # third-party reverse-engineering toolkit used for research (own git history)
 reference/
 src-tauri/gen/
+website/public/downloads/
