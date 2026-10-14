@@ -15,8 +15,12 @@
 <p>ScreenCraft can transcribe your recording's audio <b>on your own computer</b> using <a href="https://github.com/ggml-org/whisper.cpp" target="_blank" rel="noopener noreferrer">whisper.cpp</a>, an open-source implementation of OpenAI's Whisper speech-recognition model. No audio is sent anywhere.</p>
 <h2>How it works</h2>
 <ol><li>Open the <b>Captions</b> panel and choose <b>Generate captions</b>.</li>
-<li>The first time, ScreenCraft downloads the Whisper model you pick (78 MB for tiny, 148 MB for base, 488 MB for small) from Hugging Face. This is the only network request the feature makes. The model is cached locally.</li>
-<li>Captions appear on the caption track. Edit the text and timing freely, change the style, or export an SRT.</li></ol>
+<li>The first time, ScreenCraft downloads the Whisper model you pick (78 MB for tiny, 148 MB for base, 488 MB for small, 574 MB for the most accurate multilingual model) from Hugging Face. This is the only network request the feature makes. The model is cached locally.</li>
+<li>Captions appear on the caption track, cut into short lines timed word by word. Edit the text and timing freely, change the style, or export an SRT.</li></ol>
+<h2>Style</h2>
+<p>The default <b>TikTok</b> preset is white capitals with a black stroke, and the word being spoken is highlighted. Turn the highlight on or off and pick its colour on any preset, and set the stroke width from 0 to 30 px.</p>
+<h2>Select several captions</h2>
+<p>⌘/Ctrl-click adds or removes a caption, Shift-click selects a range and ⌘/Ctrl + A selects all. Drag one to move them together, or press Delete to remove them.</p>
 <h2>Credits</h2>
 <p>Speech recognition is powered by whisper.cpp (MIT) and the OpenAI Whisper model weights (MIT). See the <a href="/third-party-notices">third-party notices</a>.</p>
 </article></div>
