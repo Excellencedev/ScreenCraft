@@ -3,6 +3,7 @@
 export const LANGS = ['en', 'fr', 'es', 'pt-BR', 'ja', 'zh-CN', 'zh-TW', 'de'];
 
 const en = {
+  'f.cam.t': "Your camera, your way", 'f.cam.p': "Keep the camera in a corner bubble, make it large, or go camera-only. Size, shape, mirroring and position are all editable per block, and everything eases between them. The cursor is redrawn too, so it stays smooth and hides while you type.",
   'p.all': "Free under the MIT license. No account, no telemetry, no cloud rendering. Everything is recorded, edited and exported on your own machine, by a native Rust core.",
   skip: 'Skip to content', lang: 'Language',
   'nav.docs': 'Docs', 'nav.features': 'Features', 'nav.faq': 'FAQ', 'nav.downloads': 'Downloads',
@@ -47,6 +48,7 @@ const en = {
 };
 
 const fr = {
+  'f.cam.t': "Votre caméra, à votre façon", 'f.cam.p': "Gardez la caméra dans une bulle, agrandissez-la ou passez en caméra seule. Taille, forme, miroir et position se règlent par bloc, avec des transitions fluides. Le curseur est redessiné : il reste fluide et se masque pendant la saisie.",
   'p.all': "Gratuit sous licence MIT. Sans compte, sans télémétrie, sans rendu cloud. Tout est enregistré, monté et exporté sur votre machine, par un cœur Rust natif.",
   skip: 'Aller au contenu', lang: 'Langue',
   'nav.docs': 'Documentation', 'nav.features': 'Fonctionnalités', 'nav.faq': 'FAQ', 'nav.downloads': 'Téléchargements',
@@ -91,6 +93,7 @@ const fr = {
 };
 
 const es = {
+  'f.cam.t': "Tu cámara, a tu manera", 'f.cam.p': "Deja la cámara en una burbuja, agrándala o usa solo cámara. Tamaño, forma, espejo y posición se ajustan por bloque, con transiciones suaves. El cursor se redibuja: se mantiene fluido y se oculta al escribir.",
   'p.all': "Gratis bajo la licencia MIT. Sin cuenta, sin telemetría, sin renderizado en la nube. Todo se graba, edita y exporta en tu equipo, con un núcleo nativo en Rust.",
   skip: 'Saltar al contenido', lang: 'Idioma',
   'nav.docs': 'Documentación', 'nav.features': 'Funciones', 'nav.faq': 'Preguntas', 'nav.downloads': 'Descargas',
@@ -135,6 +138,7 @@ const es = {
 };
 
 const ptBR = {
+  'f.cam.t': "Sua câmera, do seu jeito", 'f.cam.p': "Mantenha a câmera em um balão, deixe-a grande ou use só a câmera. Tamanho, forma, espelhamento e posição são editáveis por bloco, com transições suaves. O cursor é redesenhado: fica fluido e some ao digitar.",
   'p.all': "Grátis sob a licença MIT. Sem conta, sem telemetria, sem renderização na nuvem. Tudo é gravado, editado e exportado na sua máquina, por um núcleo nativo em Rust.",
   skip: 'Pular para o conteúdo', lang: 'Idioma',
   'nav.docs': 'Documentação', 'nav.features': 'Recursos', 'nav.faq': 'Perguntas', 'nav.downloads': 'Downloads',
@@ -179,6 +183,7 @@ const ptBR = {
 };
 
 const ja = {
+  'f.cam.t': "カメラを思いのままに", 'f.cam.p': "カメラは角の丸いバブルにも、大きくも、カメラのみにも。サイズ、形、ミラー、位置はブロックごとに編集でき、切り替わりも滑らかです。カーソルも描き直されるので動きはなめらかで、入力中は隠れます。",
   'p.all': "MIT ライセンスで無料。アカウント、テレメトリ、クラウドレンダリングはありません。録画、編集、書き出しのすべてが、ネイティブな Rust コアによってお使いのマシン上で行われます。",
   skip: '本文へスキップ', lang: '言語',
   'nav.docs': 'ドキュメント', 'nav.features': '機能', 'nav.faq': 'FAQ', 'nav.downloads': 'ダウンロード',
@@ -223,6 +228,7 @@ const ja = {
 };
 
 const zhCN = {
+  'f.cam.t': "摄像头，随你布局", 'f.cam.p': "摄像头可以放在角落气泡里、放大，或只显示摄像头。大小、形状、镜像和位置都可按片段单独设置，切换平滑过渡。光标会被重新绘制，保持流畅并在输入时隐藏。",
   'p.all': "MIT 许可证下免费。无账号、无遥测、无云端渲染。录制、编辑和导出全部由原生 Rust 内核在你的设备上完成。",
   skip: '跳到内容', lang: '语言',
   'nav.docs': '文档', 'nav.features': '功能', 'nav.faq': '常见问题', 'nav.downloads': '下载',
@@ -267,6 +273,7 @@ const zhCN = {
 };
 
 const zhTW = {
+  'f.cam.t': "相機，隨你安排", 'f.cam.p': "相機可放在角落泡泡、放大，或只顯示相機。大小、形狀、鏡像與位置都能依區段單獨設定，切換平順過渡。游標會重新繪製，保持流暢並在輸入時隱藏。",
   'p.all': "以 MIT 授權免費提供。無帳號、無遙測、無雲端算圖。錄製、編輯與匯出全部由原生 Rust 核心在你的裝置上完成。",
   skip: '跳至內容', lang: '語言',
   'nav.docs': '文件', 'nav.features': '功能', 'nav.faq': '常見問題', 'nav.downloads': '下載',
@@ -311,6 +318,7 @@ const zhTW = {
 };
 
 const de = {
+  'f.cam.t': "Deine Kamera, wie du sie willst", 'f.cam.p': "Kamera als Blase in der Ecke, groß oder nur Kamera. Größe, Form, Spiegelung und Position sind pro Block einstellbar, mit weichen Übergängen. Der Cursor wird neu gezeichnet: er bleibt flüssig und verschwindet beim Tippen.",
   'p.all': "Kostenlos unter der MIT-Lizenz. Kein Konto, keine Telemetrie, kein Cloud-Rendering. Aufnahme, Schnitt und Export laufen auf deinem Rechner, mit einem nativen Rust-Kern.",
   skip: 'Zum Inhalt springen', lang: 'Sprache',
   'nav.docs': 'Dokumentation', 'nav.features': 'Funktionen', 'nav.faq': 'FAQ', 'nav.downloads': 'Downloads',

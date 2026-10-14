@@ -17,16 +17,22 @@
 <main id="main">
 <section class="hero">
   <div class="hero-bg" aria-hidden="true"><i></i><i></i><i></i></div>
-  <canvas class="scene scene-hero" data-scene="hero" aria-hidden="true"></canvas>
   <div class="wrap">
     <h1 data-i18n="hero.title">Perfect Demos on Take 1.</h1>
-    <p class="sub" data-i18n="hero.sub">ScreenCraft zooms into what you click and type, smooths the cursor and frames the result. Free, open source, and it never leaves your computer.</p>
-    <div class="cta">
-      <a class="btn" data-os-cta data-mac="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg" data-win="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft-Setup.exe" href="/download"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4.500-4.500M12 15l4.500-4.500M4 20h16"/></svg><span data-i18n-os="dl.btn">Download</span></a>
-      <a class="btn btn-quiet" href="/docs/" data-i18n="hero.docs">Read the docs</a>
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <p class="sub" data-i18n="hero.sub">ScreenCraft zooms into what you click and type, smooths the cursor and frames the result. Free, open source, and it never leaves your computer.</p>
+        <div class="cta">
+          <a class="btn" data-os-cta data-mac="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg" data-win="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft-Setup.exe" href="/download"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4.500-4.500M12 15l4.500-4.500M4 20h16"/></svg><span data-i18n-os="dl.btn">Download</span></a>
+          <a class="btn btn-quiet" href="/docs/" data-i18n="hero.docs">Read the docs</a>
+        </div>
+        <p class="trust" data-i18n="hero.trust">macOS and Windows. MIT license. No account, no watermark.</p>
+      </div>
+      <canvas class="scene scene-hero" data-scene="hero" aria-hidden="true"></canvas>
     </div>
-    <p class="trust" data-i18n="hero.trust">macOS and Windows. MIT license. No account, no watermark.</p>
-    <div class="frame"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="/img/editor.jpg" width="1400" height="846" alt="The ScreenCraft editor: preview on top, timeline with zoom blocks below" fetchpriority="high"></div>
+    <div class="frame hero-video"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div>
+      <video src="/video/demo.mp4" poster="/video/poster.jpg" width="1280" height="720" autoplay muted loop playsinline preload="auto" aria-label="A ScreenCraft recording: automatic zooms follow the typing, with the camera in a corner bubble"></video>
+    </div>
   </div>
 </section>
 
@@ -34,11 +40,11 @@
   <div class="wrap rows">
     <div class="row">
       <div class="row-text"><h2 data-i18n="f.zoom.t">Zooms that follow what you do</h2><p data-i18n="f.zoom.p">Clicks and typing become zoom regions automatically. The camera glides to the cursor and tracks the text caret while you type. Move, resize or delete any of them.</p></div>
-      <div class="frame"><img src="/img/editor-zoom.jpg" width="1400" height="846" alt="A zoom region framing part of the screen" loading="lazy"></div>
+      <div class="frame"><img src="/img/editor-zoom.jpg" width="1600" height="963" alt="The ScreenCraft editor with the zoom panel open, a zoomed preview and zoom blocks on the timeline" loading="lazy"></div>
     </div>
     <div class="row flip">
-      <div class="row-text"><h2 data-i18n="f.cursor.t">A cursor you can restyle</h2><p data-i18n="f.cursor.p">The system cursor is never baked in, so size, style, smoothing and click effects are all editable after you record. It hides while you type and returns when you move the mouse.</p></div>
-      <div class="frame"><img src="/img/editor-cursor.jpg" width="1400" height="846" alt="Cursor and camera motion settings" loading="lazy"></div>
+      <div class="row-text"><h2 data-i18n="f.cam.t">Your camera, your way</h2><p data-i18n="f.cam.p">Keep the camera in a corner bubble, make it large, or go camera-only. Size, shape, mirroring and position are all editable per block, and everything eases between them. The cursor is redrawn too, so it stays smooth and hides while you type.</p></div>
+      <div class="frame"><img src="/img/editor-camera.jpg" width="1600" height="963" alt="The camera panel with size, roundness, shape and position controls" loading="lazy"></div>
     </div>
     <div class="row">
       <div class="row-text"><h2 data-i18n="f.captions.t">Captions made on your computer</h2><p data-i18n="f.captions.p">Generate captions with whisper.cpp. The model downloads once; your audio is never uploaded. Style them TikTok-style, edit the text and timing, or export an SRT.</p></div>
@@ -46,7 +52,7 @@
     </div>
     <div class="row flip">
       <div class="row-text"><h2 data-i18n="f.export.t">Export without a watermark</h2><p data-i18n="f.export.p">H.264 or HEVC MP4, or GIF, rendered locally with hardware encoding. Add a device frame or a gently moving background, then compress if you need a smaller file.</p></div>
-      <div class="frame"><img src="/img/export.jpg" width="1400" height="846" alt="The export dialog" loading="lazy"></div>
+      <div class="frame"><img src="/img/result.jpg" width="1600" height="900" alt="A finished recording: wallpaper background, rounded screen, camera bubble and a zoom on the typed text" loading="lazy"></div>
     </div>
   </div>
 </section>
