@@ -18,9 +18,10 @@
     <div class="os" id="macos">
       <h2>macOS</h2>
       <div class="meta" data-i18n="dl.mac.meta">Apple Silicon and Intel · macOS 14 or later · .dmg</div>
-      <a class="btn" href="/downloads/ScreenCraft.dmg" data-i18n="dl.mac">Download for macOS</a>
       <p class="cmd-l" data-i18n="dl.mac.cmd">Or install with one command. It skips the macOS security prompt and opens ScreenCraft for you:</p>
       <div class="cmd"><code id="installCmd">curl -fsSL https://screencraft.mdnlabs.dev/install.sh | bash</code><button type="button" class="cmd-copy" data-copy="#installCmd" aria-label="Copy command">Copy</button></div>
+      <p class="cmd-l" data-i18n="dl.mac.alt">Prefer the disk image? macOS will ask you to approve it once (steps below):</p>
+      <a class="btn btn-quiet" href="/downloads/ScreenCraft.dmg" data-i18n="dl.mac">Download for macOS</a>
       <ol>
         <li data-i18n="dl.mac.s1">Open <code>ScreenCraft.dmg</code> and drag ScreenCraft to Applications.</li>
         <li data-i18n="dl.mac.s2">The app is not notarized, so macOS blocks it the first time. Open <b>System Settings → Privacy &amp; Security</b>, scroll down, click <b>Open Anyway</b> next to ScreenCraft, then confirm. (Or run <code>xattr -dr com.apple.quarantine /Applications/ScreenCraft.app</code> in Terminal.)</li>
