@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.3.2
+
+- **Updates are easier to spot.** When a newer version is found at startup, the editor's Updates
+  button turns green and names the version.
+- **Report a bug** from the editor: a bug icon next to GitHub opens the repo's issues page.
+- **whisper.cpp now comes from our fork** (a git submodule), which is what builds the caption engine.
+  Clone with `--recurse-submodules`.
+
 ## 0.3.1
 
 - **Recording controls.** The record bar is now locked bottom-centre on the main display. While recording, the

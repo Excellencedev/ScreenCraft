@@ -3363,7 +3363,7 @@ dependencies = [
 
 [[package]]
 name = "screencraft"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "core-foundation",
  "core-graphics",
@@ -3392,7 +3392,7 @@ dependencies = [
 
 [[package]]
 name = "screencraft-core"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -5085,8 +5085,6 @@ dependencies = [
 [[package]]
 name = "whisper-rs-sys"
 version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6986c0fe081241d391f09b9a071fbcbb59720c3563628c3c829057cf69f2a56f"
 dependencies = [
  "bindgen",
  "cfg-if",

@@ -243,7 +243,12 @@ function bindUI() {
   if (IS_WINDOWS) $("btnAbout").hidden = true;
   else {
     $("btnAbout").onclick = () => invoke("show_about").catch(() => {});
-    invoke("update_found").then((u) => { if (u) { $("updDot").hidden = false; $("btnAbout").title = `ScreenCraft ${u.latest} is available`; } }).catch(() => {});
+    invoke("update_found").then((u) => {
+      if (!u) return;
+      $("btnAbout").classList.add("has-update");
+      $("btnAbout").title = `ScreenCraft ${u.latest} is available`;
+      $("btnAbout").lastChild.textContent = ` Update ${u.latest}`;
+    }).catch(() => {});
   }
   // the X and GitHub links open in the system browser
   document.querySelectorAll(".ext-link").forEach((b) => {

@@ -16,7 +16,7 @@ This file is the authoritative list. The same text is published at
 - **Used by**: *Captions → Generate captions* (on-device speech recognition)
 - **License**: **MIT**, Copyright (c) 2023-2026 The ggml authors
 - **Upstream**: <https://github.com/ggml-org/whisper.cpp>
-- **Corresponding source**: the version vendored by the `whisper-rs-sys` crate (0.15.x), available at <https://crates.io/crates/whisper-rs-sys>
+- **Corresponding source**: built from our fork, <https://github.com/MarshallNickolauson/whisper.cpp>, which is a git submodule at `third_party/whisper-rs-sys/whisper.cpp` in this repository (the `whisper-rs-sys` build script is vendored alongside it, with a small patch to read the newer version declaration)
 - **Why it ships**: it runs the Whisper model on the user's own machine so no audio is uploaded
 
 ## ggml (tensor library inside whisper.cpp)

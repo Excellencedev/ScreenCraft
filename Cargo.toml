@@ -1,12 +1,18 @@
 [workspace]
 resolver = "2"
 members = ["crates/core", "src-tauri"]
+exclude = ["third_party"]
 
 [workspace.package]
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 license = "MIT"
 
 [profile.release]
 lto = "thin"
 codegen-units = 4
+
+# whisper.cpp comes from our fork (git submodule at third_party/whisper-rs-sys/whisper.cpp),
+# built through the whisper-rs-sys build script. Everything else is unmodified whisper-rs.
+[patch.crates-io]
+whisper-rs-sys = { path = "third_party/whisper-rs-sys" }

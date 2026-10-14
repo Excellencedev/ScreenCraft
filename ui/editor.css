@@ -233,3 +233,7 @@ body.resizing * { cursor: inherit !important; }
 .upd-dot[hidden] { display: none; }
 
 .ext-link.line svg { fill: none; stroke: currentColor; stroke-width: 1.7; }
+
+#btnAbout.has-update { color: #5fd38d; border-color: rgba(95,211,141,.55); background: rgba(95,211,141,.10); font-weight: 600; }
+#btnAbout.has-update:hover { background: rgba(95,211,141,.18); }
+#btnAbout.has-update svg { stroke: #5fd38d; }

@@ -45,6 +45,10 @@ if (-not $env:LIBCLANG_PATH) {
 }
 if (-not $env:LIBCLANG_PATH) { throw "libclang not found - install LLVM first (winget install LLVM.LLVM)" }
 
+# whisper.cpp comes from our fork, a git submodule under third_party/
+git submodule update --init --recursive
+if ($LASTEXITCODE -ne 0) { throw "git submodule update failed" }
+
 cargo build --release -p screencraft
 if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
 

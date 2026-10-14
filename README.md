@@ -180,7 +180,7 @@ with C++* workload from the
 from the repository root:
 
 ```powershell
-git clone https://github.com/MarshallNickolauson/ScreenCraft.git
+git clone --recurse-submodules https://github.com/MarshallNickolauson/ScreenCraft.git
 cd ScreenCraft
 powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1
 ```
