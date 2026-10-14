@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.3.3
+
+- **Update-flow test release.** No functional changes from 0.3.2; published to check that the update
+  notification and download flow works end to end.
+
 ## 0.3.2
 
 - **Updates are easier to spot.** When a newer version is found at startup, the editor's Updates
