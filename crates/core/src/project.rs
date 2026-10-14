@@ -189,11 +189,14 @@ pub struct Subtitle {
     pub source_start_ms: f64,
     pub source_end_ms: f64,
     pub text: String,
+    /// Source time each word of `text` starts at (generated captions); empty when unknown,
+    /// in which case the words are spread evenly over the caption.
+    pub word_starts: Vec<f64>,
 }
 
 impl Default for Subtitle {
     fn default() -> Self {
-        Self { id: String::new(), source_start_ms: 0.0, source_end_ms: 0.0, text: String::new() }
+        Self { id: String::new(), source_start_ms: 0.0, source_end_ms: 0.0, text: String::new(), word_starts: Vec::new() }
     }
 }
 
@@ -218,6 +221,8 @@ pub struct SubtitleStyle {
     pub width: f64,
     /// Pop the caption in with a small scale bounce.
     pub pop: bool,
+    /// Colour of the word being spoken; empty for no highlight.
+    pub highlight: String,
 }
 
 impl Default for SubtitleStyle {
@@ -235,6 +240,7 @@ impl Default for SubtitleStyle {
             y: 0.833,
             width: 0.34,
             pop: true,
+            highlight: "#ffe14a".into(),
         }
     }
 }

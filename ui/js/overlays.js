@@ -292,15 +292,47 @@ export function drawSubtitles(ctx, W, H, p, tSrc, s) {
     ctx.fill();
   }
   const ow = (st.outlineWidth || 0) * s;
+  // which word is being spoken: generated captions carry word start times, otherwise the
+  // words share the caption's duration in proportion to their length
+  const toks = text.split(/\s+/).filter(Boolean);
+  let active = -1;
+  if (st.highlight && toks.length) {
+    const ws = cap.wordStarts;
+    if (ws && ws.length === toks.length) {
+      for (let i = 0; i < ws.length; i++) if (ws[i] <= tSrc) active = i;
+    } else {
+      const total = toks.reduce((n, w) => n + w.length + 1, 0);
+      const f = clamp01((tSrc - cap.sourceStartMs) / Math.max(1, cap.sourceEndMs - cap.sourceStartMs));
+      let acc = 0;
+      active = toks.length - 1;
+      for (let i = 0; i < toks.length; i++) {
+        acc += (toks[i].length + 1) / total;
+        if (f < acc) { active = i; break; }
+      }
+    }
+  }
+  ctx.textAlign = "left";
+  const space = ctx.measureText(" ").width;
+  let wi = 0;
   lines.forEach((l, i) => {
     const y = -blockH / 2 + lh * (i + 0.5);
+    const ws = l.split(/\s+/).filter(Boolean);
+    const widths = ws.map((w) => ctx.measureText(w).width);
+    const total = widths.reduce((a, b) => a + b, 0) + space * Math.max(0, ws.length - 1);
+    let x = -total / 2;
+    const first = wi;
     if (ow > 0) {
       ctx.strokeStyle = st.outlineColor || "#000";
       ctx.lineWidth = ow * 2;
-      ctx.strokeText(l, 0, y);
+      ws.forEach((w, k) => { ctx.strokeText(w, x, y); x += widths[k] + space; });
     }
-    ctx.fillStyle = st.color || "#fff";
-    ctx.fillText(l, 0, y);
+    x = -total / 2;
+    ws.forEach((w, k) => {
+      ctx.fillStyle = first + k === active ? st.highlight : st.color || "#fff";
+      ctx.fillText(w, x, y);
+      x += widths[k] + space;
+    });
+    wi += ws.length;
   });
   ctx.restore();
 }

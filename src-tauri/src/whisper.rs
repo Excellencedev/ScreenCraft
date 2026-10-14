@@ -115,6 +115,8 @@ pub struct Caption {
     pub text: String,
     pub start_ms: f64,
     pub end_ms: f64,
+    /// start of each word in `text`, same clock as `start_ms`
+    pub word_starts: Vec<f64>,
 }
 
 /// Box-average downsample to 16 kHz, the rate whisper expects.
@@ -230,7 +232,8 @@ fn chunk(words: Vec<(String, f64, f64)>) -> Vec<Caption> {
             return;
         }
         let text = cur.iter().map(|w| w.0.as_str()).collect::<Vec<_>>().join(" ");
-        out.push(Caption { text, start_ms: cur[0].1, end_ms: cur[cur.len() - 1].2 });
+        let word_starts = cur.iter().map(|w| w.1).collect();
+        out.push(Caption { text, start_ms: cur[0].1, end_ms: cur[cur.len() - 1].2, word_starts });
         cur.clear();
         *chars = 0;
     };

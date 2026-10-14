@@ -9,13 +9,11 @@ import { parseSubtitles, writeSrt } from "../srt.js";
 
 /** Style presets; position and width are left as the user set them. */
 export const SUBTITLE_PRESETS = {
-  tiktok: { style: "tiktok", size: 56, color: "#ffffff", outlineColor: "#000000", outlineWidth: 9, background: "", uppercase: false, pop: true },
-  "tiktok-red": { style: "tiktok-red", size: 56, color: "#000000", outlineColor: "#fe2c55", outlineWidth: 9, background: "", uppercase: false, pop: true },
-  highlight: { style: "highlight", size: 56, color: "#ffe14a", outlineColor: "#000000", outlineWidth: 9, background: "", uppercase: true, pop: true },
-  classic: { style: "classic", size: 46, color: "#ffffff", outlineColor: "#000000", outlineWidth: 0, background: "#000000b3", uppercase: false, pop: false },
-  minimal: { style: "minimal", size: 42, color: "#ffffff", outlineColor: "#000000", outlineWidth: 3, background: "", uppercase: false, pop: false },
+  tiktok: { style: "tiktok", size: 56, color: "#ffffff", outlineColor: "#000000", outlineWidth: 9, background: "", uppercase: false, pop: true, highlight: "#ffe14a" },
+  classic: { style: "classic", size: 46, color: "#ffffff", outlineColor: "#000000", outlineWidth: 0, background: "#000000b3", uppercase: false, pop: false, highlight: "" },
+  minimal: { style: "minimal", size: 42, color: "#ffffff", outlineColor: "#000000", outlineWidth: 3, background: "", uppercase: false, pop: false, highlight: "" },
 };
-const PRESET_NAMES = [["tiktok", "TikTok"], ["tiktok-red", "TikTok red"], ["highlight", "Highlight"], ["classic", "Classic"], ["minimal", "Minimal"]];
+const PRESET_NAMES = [["tiktok", "TikTok"], ["classic", "Classic"], ["minimal", "Minimal"]];
 
 async function importSrt() {
   const picked = await dialog.open({ multiple: false, filters: [{ name: "Subtitles", extensions: ["srt", "vtt"] }] });
@@ -92,7 +90,7 @@ async function generateCaptions(rerender) {
     } else {
       change(null, () => {
         P().scene.subtitles = P().scene.subtitles || [];
-        for (const c of caps) P().scene.subtitles.push({ id: uid(), text: c.text, sourceStartMs: c.startMs, sourceEndMs: c.endMs });
+        for (const c of caps) P().scene.subtitles.push({ id: uid(), text: c.text, sourceStartMs: c.startMs, sourceEndMs: c.endMs, wordStarts: c.wordStarts || [] });
         S.selected = null;
       }, { panel: true, timeline: true, track: false });
     }
@@ -186,8 +184,10 @@ export function panelCaptions(p) {
   p.append(slider("Height", 0.15, 0.95, 0.01, () => st.y, (v) => (st.y = v), { fmt: (v) => Math.round(v * 100) + "%", ...opt, key: "sub-y" }));
   p.append(slider("Width", 0.2, 0.95, 0.01, () => st.width, (v) => (st.width = v), { fmt: (v) => Math.round(v * 100) + "%", ...opt, key: "sub-w" }));
   p.append(colorField("Text color", () => st.color, (v) => (st.color = v)));
-  p.append(slider("Outline", 0, 20, 1, () => st.outlineWidth, (v) => (st.outlineWidth = v), { fmt: (v) => v + " px", ...opt, key: "sub-ow" }));
-  if (st.outlineWidth > 0) p.append(colorField("Outline color", () => st.outlineColor, (v) => (st.outlineColor = v)));
+  p.append(toggle("Highlight spoken word", "Colours each word as it is said.", () => !!st.highlight, (v) => (st.highlight = v ? "#ffe14a" : ""), { track: false, panel: true }));
+  if (st.highlight) p.append(colorField("Highlight color", () => st.highlight, (v) => (st.highlight = v)));
+  p.append(slider("Stroke width", 0, 30, 1, () => st.outlineWidth, (v) => (st.outlineWidth = v), { fmt: (v) => v + " px", ...opt, key: "sub-ow" }));
+  if (st.outlineWidth > 0) p.append(colorField("Stroke color", () => st.outlineColor, (v) => (st.outlineColor = v)));
   p.append(toggle("Capital letters", null, () => st.uppercase, (v) => (st.uppercase = v), opt));
   p.append(toggle("Pop in", "A quick bounce when each caption appears.", () => st.pop, (v) => (st.pop = v), opt));
   const hasBox = !!st.background;
