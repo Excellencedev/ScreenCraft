@@ -59,7 +59,7 @@ This file is the authoritative list. The same text is published at
 
 ## Tauri and the web view
 
-- **Tauri 2** and its plugins: **MIT OR Apache-2.0** — <https://tauri.app>
+- **Tauri 2** and its plugins: **MIT OR Apache-2.0**, <https://tauri.app>
 - **WKWebView** (macOS): part of the operating system, used under Apple's system terms.
 - **Microsoft Edge WebView2 Runtime** (Windows): not bundled. If missing, the installer runs Microsoft's own bootstrapper, which is subject to Microsoft's WebView2 license terms (<https://developer.microsoft.com/microsoft-edge/webview2/>).
 
