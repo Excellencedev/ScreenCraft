@@ -231,14 +231,14 @@ impl Default for SubtitleStyle {
         // middle cell of the bottom row of a 3x3 grid.
         Self {
             style: "tiktok".into(),
-            size: 56.0,
+            size: 70.0,
             color: "#ffffff".into(),
             outline_color: "#000000".into(),
-            outline_width: 9.0,
+            outline_width: 7.0,
             background: String::new(),
-            uppercase: false,
-            y: 0.833,
-            width: 0.34,
+            uppercase: true,
+            y: 0.8,
+            width: 0.6,
             pop: true,
             highlight: "#ffe14a".into(),
         }

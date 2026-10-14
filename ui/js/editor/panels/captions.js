@@ -7,9 +7,9 @@ import { addCaptionAtPlayhead, deleteSelected } from "../timeline.js";
 import { outToSrc, srcToOut } from "../timemap.js";
 import { parseSubtitles, writeSrt } from "../srt.js";
 
-/** Style presets; position and width are left as the user set them. */
+/** Style presets; position and width are left as the user set them, except TikTok's own. */
 export const SUBTITLE_PRESETS = {
-  tiktok: { style: "tiktok", size: 56, color: "#ffffff", outlineColor: "#000000", outlineWidth: 9, background: "", uppercase: false, pop: true, highlight: "#ffe14a" },
+  tiktok: { style: "tiktok", size: 70, color: "#ffffff", outlineColor: "#000000", outlineWidth: 7, background: "", uppercase: true, pop: true, highlight: "#ffe14a", y: 0.8, width: 0.6 },
   classic: { style: "classic", size: 46, color: "#ffffff", outlineColor: "#000000", outlineWidth: 0, background: "#000000b3", uppercase: false, pop: false, highlight: "" },
   minimal: { style: "minimal", size: 42, color: "#ffffff", outlineColor: "#000000", outlineWidth: 3, background: "", uppercase: false, pop: false, highlight: "" },
 };
