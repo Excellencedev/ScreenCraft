@@ -15,6 +15,29 @@ param([string]$Out = "ScreenCraft-Setup.exe")
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 
+# Load the Visual Studio C++ environment (INCLUDE/LIB/PATH) so bindgen's clang finds stdbool.h
+# and friends even when this isn't a "Developer PowerShell".
+if (-not $env:INCLUDE) {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vswhere) {
+        $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        $vcvars = if ($vs) { Join-Path $vs "VC\Auxiliary\Build\vcvars64.bat" } else { $null }
+        if ($vcvars -and (Test-Path $vcvars)) {
+            cmd /c "`"$vcvars`" >nul && set" | ForEach-Object {
+                if ($_ -match '^([^=]+)=(.*)$') { Set-Item -Path "env:$($Matches[1])" -Value $Matches[2] }
+            }
+        }
+    }
+}
+if (-not $env:INCLUDE) { throw "Visual C++ environment not found - install the 'Desktop development with C++' workload" }
+
+# CMake may be installed but not on this session's PATH yet.
+if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+    $cm = Join-Path $env:ProgramFiles "CMake\bin"
+    if (Test-Path (Join-Path $cm "cmake.exe")) { $env:PATH = "$cm;$env:PATH" }
+    else { throw "cmake not found - install it first (winget install Kitware.CMake), then open a new PowerShell" }
+}
+
 if (-not $env:LIBCLANG_PATH) {
     foreach ($dir in @("$env:ProgramFiles\LLVM\bin", "${env:ProgramFiles(x86)}\LLVM\bin")) {
         if (Test-Path (Join-Path $dir "libclang.dll")) { $env:LIBCLANG_PATH = $dir; break }
