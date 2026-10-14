@@ -5,6 +5,7 @@
 #     with C++" workload from the Visual Studio Build Tools)
 #   - NSIS                          (winget install NSIS.NSIS)
 #   - CMake                         (winget install Kitware.CMake) - builds whisper.cpp for captions
+#   - LLVM (libclang)               (winget install LLVM.LLVM) - bindgen for whisper.cpp
 #
 # Usage (from the repository root, in PowerShell):
 #   powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1
@@ -13,6 +14,13 @@ param([string]$Out = "ScreenCraft-Setup.exe")
 
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
+
+if (-not $env:LIBCLANG_PATH) {
+    foreach ($dir in @("$env:ProgramFiles\LLVM\bin", "${env:ProgramFiles(x86)}\LLVM\bin")) {
+        if (Test-Path (Join-Path $dir "libclang.dll")) { $env:LIBCLANG_PATH = $dir; break }
+    }
+}
+if (-not $env:LIBCLANG_PATH) { throw "libclang not found - install LLVM first (winget install LLVM.LLVM)" }
 
 cargo build --release -p screencraft
 if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }

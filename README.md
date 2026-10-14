@@ -175,7 +175,8 @@ in *Settings → Apps*, and fetches the WebView2 runtime from Microsoft if it is
 [Rust](https://rustup.rs) with the MSVC toolchain, which needs the *Desktop development
 with C++* workload from the
 [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/), and
-[NSIS](https://nsis.sourceforge.io) (`winget install NSIS.NSIS`). Then, in PowerShell,
+[NSIS](https://nsis.sourceforge.io) (`winget install NSIS.NSIS`), plus CMake and LLVM
+(`winget install Kitware.CMake LLVM.LLVM`) to build the captions engine. Then, in PowerShell,
 from the repository root:
 
 ```powershell
