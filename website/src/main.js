@@ -126,6 +126,51 @@ if (!reduceMotion && 'IntersectionObserver' in window) {
   setTimeout(() => document.querySelectorAll('[data-reveal]:not(.in)').forEach((el) => { if (el.getBoundingClientRect().top < innerHeight * 2) el.classList.add('in'); }), 4000);
 }
 
+// the demo video: click to pause, drag the bar to scrub
+(() => {
+  const v = document.getElementById('demoVideo');
+  if (!v) return;
+  const box = document.getElementById('heroVideo');
+  const btn = box.querySelector('.vplay'), scrub = box.querySelector('.vscrub'), time = box.querySelector('.vtime');
+  let dragging = false;
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const sync = () => {
+    btn.dataset.state = v.paused ? 'paused' : 'playing';
+    btn.setAttribute('aria-label', v.paused ? 'Play' : 'Pause');
+  };
+  const tick = () => {
+    if (!dragging && v.duration) scrub.value = String((v.currentTime / v.duration) * 1000);
+    time.textContent = `${fmt(v.currentTime)} / ${fmt(v.duration || 0)}`;
+    scrub.style.setProperty('--p', (Number(scrub.value) / 10) + '%');
+  };
+  const toggle = () => { if (v.paused) v.play().catch(() => {}); else v.pause(); };
+  btn.addEventListener('click', toggle);
+  v.addEventListener('click', toggle);
+  const cls = () => box.classList.toggle('paused', v.paused);
+  v.addEventListener('play', () => { sync(); cls(); }); v.addEventListener('pause', () => { sync(); cls(); });
+  v.addEventListener('timeupdate', tick); v.addEventListener('loadedmetadata', tick);
+  scrub.addEventListener('pointerdown', () => { dragging = true; });
+  addEventListener('pointerup', () => { dragging = false; });
+  scrub.addEventListener('input', () => {
+    if (v.duration) v.currentTime = (Number(scrub.value) / 1000) * v.duration;
+    tick();
+  });
+  sync(); tick();
+})();
+
+// the recorder bar, floated in three.js (falls back to the screenshot)
+(() => {
+  const c = document.querySelector('canvas[data-recbar]');
+  if (!c) return;
+  const wrap = c.parentElement;
+  if (reduceMotion) { return; }
+  const start = () => import('./recbar.js').then((m) => {
+    wrap.classList.add('is-3d');            // the canvas must be displayed before it can be measured
+    if (!m.mountRecBar(c)) wrap.classList.remove('is-3d');
+  }).catch(() => wrap.classList.remove('is-3d'));
+  if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 1200 }); else setTimeout(start, 300);
+})();
+
 // three.js scenes load after first paint so they never delay the page
 const canvases = document.querySelectorAll('canvas[data-scene]');
 if (canvases.length && !reduceMotion) {

@@ -100,14 +100,16 @@ export function mountScene(canvas) {
   }, { passive: true });
   new MutationObserver(recolor).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-  let visible = true, raf = 0;
+  let raf = 0;
   const t0 = performance.now();
-  new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible && !raf) raf = requestAnimationFrame(frame); }).observe(canvas);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && visible && !raf) raf = requestAnimationFrame(frame); });
+  // on screen? checked by geometry (cheap), polled while off screen, so it can never get stuck
+  const onScreen = () => { const r = canvas.getBoundingClientRect(); return r.bottom > -100 && r.top < innerHeight + 100; };
+  const wake = () => { if (document.hidden || !onScreen()) { setTimeout(wake, 300); return; } if (!raf) raf = requestAnimationFrame(frame); };
+  document.addEventListener('visibilitychange', wake);
 
   function frame(now) {
     raf = 0;
-    if (!visible || document.hidden) return;
+    if (document.hidden || !onScreen()) { setTimeout(wake, 300); return; }
     const t = (now - t0) / 1000;
     eased.lerp(pointer, 0.05);
     group.rotation.y = eased.x * 0.22;
