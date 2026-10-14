@@ -8,7 +8,7 @@ const en = {
   'p.all': "Free under the MIT license. No account, no telemetry, no cloud rendering. Everything is recorded, edited and exported on your own machine, by a native Rust core.",
   skip: 'Skip to content', lang: 'Language',
   'nav.docs': 'Docs', 'nav.features': 'Features', 'nav.faq': 'FAQ', 'nav.downloads': 'Downloads', 'nav.support': 'Support',
-  'hero.title': 'Perfect Demos on Take 1.',
+  'hero.title': 'Perfect demos on take 1.',
   'hero.sub': 'ScreenCraft zooms into what you click and type, smooths the cursor and frames the result. Free, open source, and it never leaves your computer.',
   'hero.docs': 'Read the docs', 'hero.trust': 'macOS and Windows. MIT license. No account, no watermark.',
   'f.zoom.t': 'Zooms that follow what you do',
