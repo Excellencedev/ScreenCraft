@@ -31,7 +31,30 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
+/// AppKit adds Dictation, Emoji & Symbols and AutoFill to any menu named "Edit". This is a
+/// recorder and editor, not a form, so turn those system additions off.
+#[cfg(target_os = "macos")]
+fn trim_edit_menu() {
+    use objc2::rc::Retained;
+    use objc2::runtime::AnyObject;
+    use objc2::{class, msg_send};
+    use objc2_foundation::NSString;
+    unsafe {
+        let defaults: Retained<AnyObject> = msg_send![class!(NSUserDefaults), standardUserDefaults];
+        for (key, on) in [
+            ("NSDisabledDictationMenuItem", true),
+            ("NSDisabledCharacterPaletteMenuItem", true),
+            ("NSAutoFillHeuristicControllerEnabled", false),
+        ] {
+            let k = NSString::from_str(key);
+            let _: () = msg_send![&*defaults, setBool: on, forKey: &*k];
+        }
+    }
+}
+
 fn main() {
+    #[cfg(target_os = "macos")]
+    trim_edit_menu();
     // ⌘⇧2 on macOS, Ctrl+Shift+2 elsewhere
     #[cfg(target_os = "macos")]
     let primary = Modifiers::SUPER;
