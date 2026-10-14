@@ -211,6 +211,21 @@ if (!reduceMotion && 'IntersectionObserver' in window) {
   if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 1200 }); else setTimeout(start, 300);
 })();
 
+// the interactive editor demo (three.js), loaded when the section gets close
+(() => {
+  const root = document.getElementById('playground');
+  if (!root) return;
+  let started = false;
+  const go = () => {
+    if (started) return; started = true;
+    import('./playground.js').then((m) => { if (!m.mountPlayground(root)) root.classList.remove('is-live'); }).catch(() => {});
+  };
+  const near = () => root.getBoundingClientRect().top < innerHeight * 2.2;
+  const check = () => { if (near()) { go(); removeEventListener('scroll', check); removeEventListener('resize', check); } };
+  addEventListener('scroll', check, { passive: true }); addEventListener('resize', check);
+  setTimeout(check, 600);
+})();
+
 // three.js scenes load after first paint so they never delay the page
 const canvases = document.querySelectorAll('canvas[data-scene]');
 if (canvases.length && !reduceMotion) {
