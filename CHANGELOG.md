@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Captions that read like ClipCraft's.** Generated captions are timed word by word and cut into
+  short lines (up to 3 words, broken at sentence ends, commas and pauses). Each line is held a
+  moment so nothing flickers, consecutive lines swap instantly, and only a line after a pause eases
+  in and fades out.
+- **Spoken-word highlight.** The word being said is coloured as it is spoken, in a colour of your
+  choice (on any preset). Imported or edited captions spread the words evenly across the line.
+- **More accurate recognition.** The default model is now small (English), and a most-accurate
+  multilingual model (large-v3-turbo) is available. Models already downloaded by ClipCraft are reused.
+- **TikTok preset reworked:** white text with a black stroke, caps on, 70 px, 60% wide, 80% height,
+  7 px stroke, spoken word highlighted. TikTok red and Highlight presets are gone; it is the default.
+- **Stroke width** is adjustable from 0 to 30 px, with its own colour.
+- **Select several captions** (⌘/Ctrl-click, Shift-click for a range, ⌘/Ctrl + A) to move or delete
+  them together.
+
 - **Bluetooth headphones stay in stereo while you record.** Opening a Bluetooth headset's microphone
   makes the headphones drop to call quality (16 kHz mono), which ruined what you heard and what was
   recorded. ScreenCraft now prefers the Mac's own microphone, never opens a headset microphone by
