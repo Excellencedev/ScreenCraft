@@ -17,6 +17,9 @@ document.querySelectorAll('.nav-links a, .docs-nav a').forEach((a) => {
   if (p.hash === '' && p.pathname === path) a.classList.add('active');
 });
 
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (!reduceMotion) document.documentElement.classList.add('anim');
+
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode: fine */ } },
@@ -39,6 +42,7 @@ function applyLang(lang) {
     const v = dict[el.dataset.i18n];
     if (v != null) el.innerHTML = v;
   });
+  wrapWords(document.querySelector('.hero h1'));
   document.querySelectorAll('[data-i18n-os]').forEach((el) => {
     el.textContent = dict[isMac ? 'dl.mac' : 'dl.win'];
   });
@@ -53,6 +57,27 @@ function applyLang(lang) {
     probe.remove();
   });
 }
+// split the headline into words so each can rise in turn (per character for CJK, which has no spaces)
+function wrapWords(h) {
+  if (!h || reduceMotion) return;
+  const text = h.textContent;
+  const seg = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter(root.lang || 'en', { granularity: 'word' }) : null;
+  const parts = seg ? [...seg.segment(text)].map((x) => x.segment) : text.split(/(\s+)/);
+  h.setAttribute('aria-label', text);
+  h.textContent = '';
+  let i = 0;
+  for (const part of parts) {
+    if (!part.trim()) { h.append(' '); continue; }
+    const w = document.createElement('span');
+    w.className = 'w'; w.setAttribute('aria-hidden', 'true');
+    const inner = document.createElement('span');
+    inner.style.setProperty('--i', i++);
+    inner.textContent = part;
+    w.append(inner);
+    h.append(w);
+  }
+}
+
 const saved = store.get('sc-lang');
 let lang = LANGS.includes(saved) ? saved : detect();
 document.querySelectorAll('[data-lang-select]').forEach((sel) => sel.addEventListener('change', () => {
@@ -73,3 +98,40 @@ fetch('/api/stars').then((r) => r.json()).then(({ stars }) => {
   const text = stars >= 1000 ? (stars / 1000).toFixed(stars >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k' : String(stars);
   document.querySelectorAll('.star-count').forEach((el) => { el.textContent = text; el.hidden = false; });
 }).catch(() => {});
+
+// scroll reveals: tag the pieces, stagger siblings, reveal as they enter
+if (!reduceMotion && 'IntersectionObserver' in window) {
+  const groups = ['.row-text > *', '.row > .frame, .row > .caption-demo', '.deflist > div', '.stance-text', '.closer .wrap > *', '.page-head > *', '.osrow > .os', '.note'];
+  groups.forEach((sel) => {
+    document.querySelectorAll(sel).forEach((el, i, all) => {
+      el.setAttribute('data-reveal', '');
+      const sibling = [...el.parentElement.children].indexOf(el);
+      el.style.setProperty('--d', Math.min(sibling, 5) * 0.09 + 's');
+    });
+  });
+  const io = new IntersectionObserver((entries) => entries.forEach((e) => {
+    // also reveal anything already scrolled past (anchor jumps, reloads mid-page)
+    if (e.isIntersecting || e.boundingClientRect.top < 0) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }), { threshold: 0.15, rootMargin: '0px 0px -6% 0px' });
+  document.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
+  // the observer only fires on a change of state, so an anchor jump straight past a block would
+  // leave it hidden for the way back; reveal anything already above the viewport on scroll
+  let ticking = false;
+  addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    setTimeout(() => {
+      ticking = false;
+      document.querySelectorAll('[data-reveal]:not(.in)').forEach((el) => {
+        if (el.getBoundingClientRect().bottom < 0) { el.classList.add('in'); io.unobserve(el); }
+      });
+    }, 50);
+  }, { passive: true });
+}
+
+// three.js scenes load after first paint so they never delay the page
+const canvases = document.querySelectorAll('canvas[data-scene]');
+if (canvases.length && !reduceMotion) {
+  const start = () => import('./scene.js').then((m) => canvases.forEach((c) => m.mountScene(c, c.dataset.scene))).catch(() => {});
+  if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 1500 }); else setTimeout(start, 400);
+}
