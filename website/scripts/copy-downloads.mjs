@@ -1,5 +1,5 @@
 // Serve the installers from the site itself: copy them from the repo root into public/downloads.
-import { copyFileSync, mkdirSync, existsSync } from 'node:fs';
+import { copyFileSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 
@@ -10,3 +10,19 @@ for (const f of ['ScreenCraft.dmg', 'ScreenCraft-Setup.exe']) {
   if (!existsSync(join(root, f))) throw new Error(`missing ${f} in the repository root`);
   copyFileSync(join(root, f), join(out, f));
 }
+
+// latest.json: what the app's notify-only update check reads. The version comes from the app's
+// own config, the notes from the matching section of CHANGELOG.md (bold bullet titles).
+const conf = JSON.parse(readFileSync(join(root, 'src-tauri', 'tauri.conf.json'), 'utf8'));
+const log = readFileSync(join(root, 'CHANGELOG.md'), 'utf8');
+const section = log.split(/\n(?=## )/).find((b) => b.startsWith(`## ${conf.version}`)) || '';
+const notes = [...section.matchAll(/^- \*\*(.+?)\*\*/gm)].map((m) => m[1].replace(/[.:]$/, '')).slice(0, 5);
+const base = 'https://screencraft.mdnlabs.dev';
+const manifest = {
+  version: conf.version,
+  notes,
+  mac: `${base}/downloads/ScreenCraft.dmg`,
+  windows: `${base}/downloads/ScreenCraft-Setup.exe`,
+  page: `${base}/download`,
+};
+writeFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'latest.json'), JSON.stringify(manifest, null, 2) + '\n');

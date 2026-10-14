@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>About ScreenCraft</title>
+<link rel="stylesheet" href="theme.css" />
+<style>
+  html, body { background: var(--bg); }
+  #wrap { padding: 44px 30px 22px; display: flex; flex-direction: column; gap: 16px; min-height: 100vh; box-sizing: border-box; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+  h2 { margin: 0 0 8px; font-size: 10.5px; font-weight: 600; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+  p, li { margin: 0; color: #c4cde0; line-height: 1.55; font-size: 13px; }
+  ul { margin: 6px 0 0; padding-left: 18px; }
+  .ver { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card.update { border-color: rgba(106,174,232,.55); background: rgba(59,130,196,.12); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  button.btn { background: var(--panel-2); border: 1px solid var(--line-2); padding: 7px 13px; border-radius: 7px; color: #e1e7f5; }
+  button.btn:hover { background: var(--raise); }
+  button.primary { background: var(--accent); color: #fff; padding: 8px 16px; border-radius: 7px; font-weight: 600; }
+  button.primary:hover { background: var(--accent-2); }
+  .toggle { width: 38px; height: 22px; border-radius: 99px; background: var(--line-2); position: relative; cursor: pointer; flex: none; border: 0; padding: 0; }
+  .toggle::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .18s; }
+  .toggle.on { background: var(--accent); }
+  .toggle.on::after { transform: translateX(16px); }
+  .muted { color: var(--muted); }
+  .links { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+  .links a { color: var(--accent-2); cursor: pointer; font-size: 12.5px; }
+  .err { color: #ff9aa6; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div>
+    <h1>ScreenCraft</h1>
+    <div class="ver" id="ver">Version</div>
+  </div>
+
+  <section>
+    <h2>Updates</h2>
+    <div class="card update" id="updateCard" hidden>
+      <p><b id="uTitle">A new version is available</b></p>
+      <ul id="uNotes"></ul>
+      <p class="muted" style="margin-top:10px">Download opens your browser. ScreenCraft never installs anything by itself: you decide when to replace it.</p>
+      <div class="actions">
+        <button class="primary" id="bDownload">Download</button>
+        <button class="btn" id="bLater">Later</button>
+      </div>
+    </div>
+    <div class="card" id="statusCard">
+      <div class="row"><p id="uStatus">Checking…</p><button class="btn" id="bCheck">Check now</button></div>
+      <div class="row" style="margin-top:14px">
+        <div><p>Check for updates when ScreenCraft starts</p><p class="muted" style="font-size:12px">Off means ScreenCraft never contacts the update server unless you press Check now.</p></div>
+        <button class="toggle" id="tCheck" role="switch" aria-checked="true" aria-label="Check for updates when ScreenCraft starts"></button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Privacy</h2>
+    <div class="card">
+      <p><b>ScreenCraft works on your computer.</b> Your recordings, screen, camera, microphone, cursor data and captions are never uploaded. There are no accounts, no analytics and no telemetry.</p>
+      <p style="margin-top:10px">Two things use the network, and only these:</p>
+      <ul>
+        <li><b>Update check.</b> At startup (you can turn it off above) ScreenCraft requests one small file from screencraft.mdnlabs.dev to see whether a newer version exists. The request contains the app version and nothing else about you. The site is served by Cloudflare, which, like any web host, sees the IP address of a request.</li>
+        <li><b>Caption models.</b> Only if you ask to generate captions, a speech model file is downloaded once from Hugging Face. Your audio is never sent anywhere; recognition runs on your machine.</li>
+      </ul>
+      <div class="links">
+        <a data-url="https://screencraft.mdnlabs.dev/privacy">Privacy policy</a>
+        <a data-url="https://screencraft.mdnlabs.dev/docs/privacy-and-data">What is stored and where</a>
+        <a data-url="https://screencraft.mdnlabs.dev/third-party-notices">Third-party notices</a>
+        <a data-url="https://github.com/MarshallNickolauson/ScreenCraft">Source code (MIT)</a>
+      </div>
+    </div>
+  </section>
+</div>
+<script type="module" src="js/about.js"></script>
+</body>
+</html>

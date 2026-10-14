@@ -186,6 +186,27 @@ pub fn show_permissions_window(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+pub fn show_about_window(app: &AppHandle) -> tauri::Result<()> {
+    if let Some(w) = app.get_webview_window("about") {
+        w.show()?;
+        w.set_focus()?;
+        return Ok(());
+    }
+    WebviewWindowBuilder::new(app, "about", WebviewUrl::App("about.html".into()))
+        .title("About ScreenCraft")
+        .inner_size(520.0, 700.0)
+        .resizable(false)
+        .accept_first_mouse(true)
+        .center()
+        .build()?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn show_about(app: AppHandle) -> Result<(), String> {
+    show_about_window(&app).map_err(|e| e.to_string())
+}
+
 fn url_escape(s: &str) -> String {
     s.replace('%', "%25").replace(' ', "%20").replace('&', "%26").replace('#', "%23")
 }

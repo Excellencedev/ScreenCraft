@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Update notifications (never automatic).** At startup ScreenCraft can check, with one small
+  request that sends only its version number, whether a newer version exists. If so, About, Privacy
+  & Updates tells you and offers the download page; nothing is downloaded or installed by itself.
+  Turn it off in that window, or press Check now to look on demand.
+- **About, Privacy & Updates** window (menu-bar icon and the ScreenCraft menu) with the privacy
+  notice, update status and the on/off switch.
 - **Captions that read like ClipCraft's.** Generated captions are timed word by word and cut into
   short lines (up to 3 words, broken at sentence ends, commas and pauses). Each line is held a
   moment so nothing flickers, consecutive lines swap instantly, and only a line after a pause eases

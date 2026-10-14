@@ -1,0 +1,155 @@
+//! Notify-only update check. ScreenCraft asks one small JSON file whether a newer version
+//! exists and, when it does, tells the user and offers the download page. It never downloads
+//! or installs anything by itself. The request carries no identifier beyond the app version in
+//! the User-Agent; it can be switched off in About & privacy.
+
+use crate::state::{save_settings, AppState, CmdResult};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, State};
+
+const MANIFEST_URL: &str = "https://screencraft.mdnlabs.dev/latest.json";
+const ALLOWED_PREFIX: &str = "https://screencraft.mdnlabs.dev/";
+
+#[derive(Deserialize)]
+struct Manifest {
+    version: String,
+    #[serde(default)]
+    notes: Vec<String>,
+    #[serde(default)]
+    mac: String,
+    #[serde(default)]
+    windows: String,
+    #[serde(default)]
+    page: String,
+}
+
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateInfo {
+    pub available: bool,
+    pub current: String,
+    pub latest: String,
+    pub notes: Vec<String>,
+    pub download: String,
+    pub page: String,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdatePrefs {
+    pub enabled: bool,
+    pub version: String,
+    pub dismissed: Option<String>,
+}
+
+fn parse(v: &str) -> Vec<u64> {
+    v.trim_start_matches('v').split(['.', '-', '+']).map_while(|p| p.parse::<u64>().ok()).collect()
+}
+
+fn newer(latest: &str, current: &str) -> bool {
+    let (a, b) = (parse(latest), parse(current));
+    for i in 0..a.len().max(b.len()) {
+        let (x, y) = (a.get(i).copied().unwrap_or(0), b.get(i).copied().unwrap_or(0));
+        if x != y {
+            return x > y;
+        }
+    }
+    false
+}
+
+fn fetch(current: &str) -> Result<UpdateInfo, String> {
+    let resp = ureq::get(MANIFEST_URL)
+        .set("User-Agent", &format!("ScreenCraft/{current}"))
+        .timeout(std::time::Duration::from_secs(8))
+        .call()
+        .map_err(|e| format!("could not reach the update server: {e}"))?;
+    let body = resp.into_string().map_err(|e| format!("unreadable update information: {e}"))?;
+    let m: Manifest = serde_json::from_str(&body).map_err(|e| format!("unreadable update information: {e}"))?;
+    let pick = if cfg!(windows) { &m.windows } else { &m.mac };
+    // only ever hand out links on our own site
+    let ok = |u: &str| u.starts_with(ALLOWED_PREFIX);
+    let page = if ok(&m.page) { m.page.clone() } else { format!("{ALLOWED_PREFIX}download") };
+    let download = if ok(pick) { pick.clone() } else { page.clone() };
+    Ok(UpdateInfo {
+        available: newer(&m.version, current),
+        current: current.to_string(),
+        latest: m.version,
+        notes: m.notes.into_iter().take(6).collect(),
+        download,
+        page,
+        error: None,
+    })
+}
+
+pub fn current_version(app: &AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+pub fn enabled(state: &AppState) -> bool {
+    state.settings.lock().unwrap().update_check.unwrap_or(true)
+}
+
+/// Blocking check used at startup. None when disabled or nothing newer.
+pub fn startup_check(app: &AppHandle, state: &AppState) -> Option<UpdateInfo> {
+    if !enabled(state) {
+        return None;
+    }
+    let info = fetch(&current_version(app)).ok()?;
+    if !info.available {
+        return None;
+    }
+    let dismissed = state.settings.lock().unwrap().dismissed_update.clone();
+    if dismissed.as_deref() == Some(info.latest.as_str()) {
+        return None;
+    }
+    Some(info)
+}
+
+#[tauri::command]
+pub fn update_prefs(app: AppHandle, state: State<AppState>) -> UpdatePrefs {
+    UpdatePrefs {
+        enabled: enabled(&state),
+        version: current_version(&app),
+        dismissed: state.settings.lock().unwrap().dismissed_update.clone(),
+    }
+}
+
+#[tauri::command]
+pub fn set_update_check(state: State<AppState>, enabled: bool) {
+    let mut s = state.settings.lock().unwrap();
+    s.update_check = Some(enabled);
+    save_settings(&s);
+}
+
+#[tauri::command]
+pub fn dismiss_update(state: State<AppState>, version: String) {
+    let mut s = state.settings.lock().unwrap();
+    s.dismissed_update = Some(version);
+    save_settings(&s);
+}
+
+/// "Check now": always runs, whatever the startup setting is, because the user asked.
+#[tauri::command]
+pub async fn check_for_update(app: AppHandle) -> CmdResult<UpdateInfo> {
+    let current = current_version(&app);
+    tauri::async_runtime::spawn_blocking(move || match fetch(&current) {
+        Ok(i) => Ok(i),
+        Err(e) => Ok(UpdateInfo { current, error: Some(e), ..Default::default() }),
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn compares_versions() {
+        assert!(newer("0.3.1", "0.3.0"));
+        assert!(newer("0.10.0", "0.9.9"));
+        assert!(newer("1.0", "0.9.9"));
+        assert!(!newer("0.3.0", "0.3.0"));
+        assert!(!newer("0.2.9", "0.3.0"));
+    }
+}

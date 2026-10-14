@@ -6,3 +6,4 @@ node_modules/
 reference/
 src-tauri/gen/
 website/public/downloads/
+website/public/latest.json

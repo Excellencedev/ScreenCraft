@@ -14,6 +14,10 @@ use std::sync::Mutex;
 pub struct Settings {
     /// Where new recordings are written. Defaults to ~/ScreenCraft Projects.
     pub projects_dir: Option<String>,
+    /// Ask the website at startup whether a newer version exists. None = on.
+    pub update_check: Option<bool>,
+    /// The newest version the user said "Later" to, so it is not announced again.
+    pub dismissed_update: Option<String>,
 }
 
 pub struct AppState {

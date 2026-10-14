@@ -10,6 +10,7 @@ mod inputlog;
 mod jpegio;
 mod levelmic;
 mod whisper;
+mod updates;
 #[cfg(windows)]
 mod mf;
 #[cfg(windows)]
@@ -50,6 +51,10 @@ fn trim_edit_menu() {
             let _: () = msg_send![&*defaults, setBool: on, forKey: &*k];
         }
     }
+}
+
+async fn tokio_sleep(secs: u64) {
+    let _ = tauri::async_runtime::spawn_blocking(move || std::thread::sleep(std::time::Duration::from_secs(secs))).await;
 }
 
 fn main() {
@@ -130,6 +135,8 @@ fn main() {
                             let _ = app_menu.remove(&last);
                         }
                     }
+                    let about = MenuItem::with_id(handle, "sc-about", "About, Privacy & Updates…", true, None::<&str>)?;
+                    app_menu.append(&about)?;
                     let quit = MenuItem::with_id(handle, "sc-quit", "Quit ScreenCraft", true, Some("CmdOrCtrl+Q"))?;
                     app_menu.append(&quit)?;
                 }
@@ -139,6 +146,8 @@ fn main() {
         .on_menu_event(|app, event| {
             if event.id() == "sc-quit" {
                 windows::request_quit(app);
+            } else if event.id() == "sc-about" {
+                let _ = windows::show_about_window(app);
             }
         });
     builder
@@ -216,6 +225,11 @@ fn main() {
             commands::devices::meter_stop,
             windows::show_recorder,
             windows::show_permissions,
+            windows::show_about,
+            updates::update_prefs,
+            updates::set_update_check,
+            updates::dismiss_update,
+            updates::check_for_update,
             windows::show_compressor,
             windows::open_editor,
             windows::open_area_picker,
@@ -228,9 +242,10 @@ fn main() {
             let new_rec = MenuItem::with_id(app, "new", "New Recording", true, Some("CmdOrCtrl+Shift+2"))?;
             let compress = MenuItem::with_id(app, "compress", "Compress Video…", true, None::<&str>)?;
             let perms = MenuItem::with_id(app, "perms", "Permissions…", true, None::<&str>)?;
+            let about = MenuItem::with_id(app, "about", "About, Privacy & Updates…", true, None::<&str>)?;
             let stop = MenuItem::with_id(app, "stop", "Stop Recording", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit ScreenCraft", true, Some("CmdOrCtrl+Q"))?;
-            let menu = Menu::with_items(app, &[&new_rec, &compress, &perms, &stop, &quit])?;
+            let menu = Menu::with_items(app, &[&new_rec, &compress, &perms, &about, &stop, &quit])?;
             TrayIconBuilder::with_id("tray")
                 .icon(app.default_window_icon().cloned().ok_or("no icon")?)
                 .menu(&menu)
@@ -243,6 +258,9 @@ fn main() {
                     }
                     "compress" => {
                         let _ = windows::show_compressor_window(app, None);
+                    }
+                    "about" => {
+                        let _ = windows::show_about_window(app);
                     }
                     "stop" => {
                         let _ = app.emit("stop-record", ());
@@ -259,6 +277,23 @@ fn main() {
                 windows::show_permissions_window(app.handle())?;
             }
             windows::prewarm_menu_window(app.handle());
+            // notify-only update check a few seconds after launch (skipped while recording)
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio_sleep(8).await;
+                let h2 = handle.clone();
+                let found = tauri::async_runtime::spawn_blocking(move || {
+                    let st = h2.state::<AppState>();
+                    let busy = st.recording_dir.lock().unwrap().is_some();
+                    if busy { None } else { updates::startup_check(&h2, &st) }
+                })
+                .await
+                .ok()
+                .flatten();
+                if found.is_some() {
+                    let _ = windows::show_about_window(&handle);
+                }
+            });
             Ok(())
         })
         .build(tauri::generate_context!())

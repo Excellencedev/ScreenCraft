@@ -40,7 +40,7 @@ of distribution for the whole binary.
 
 ## 4. Privacy law (GDPR, UK GDPR, CCPA/CPRA, etc.)
 
-- The app has **no accounts, telemetry or network features** except the user-initiated model download.
+- The app has **no accounts or telemetry**. Its only network features are the notify-only update check (version number only, can be turned off in About, Privacy & Updates) and the user-initiated model download.
   It processes recordings only on the user's device, so the maintainer is not a data controller or
   processor for that content.
 - The website uses **no cookies**, stores only the visitor's theme/language preference in local storage

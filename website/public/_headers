@@ -8,3 +8,7 @@
 /downloads/*
   Content-Disposition: attachment
   Cache-Control: public, max-age=3600
+
+/latest.json
+  Cache-Control: public, max-age=300
+  Access-Control-Allow-Origin: *

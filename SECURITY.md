@@ -16,6 +16,6 @@ Out of scope: third-party components (report those upstream), and social-enginee
 ## What the app does and does not do
 
 - Runs locally; no accounts, telemetry or background network access.
-- The only network request is the optional download of a Whisper model from Hugging Face.
+- Network requests: an optional, notify-only update check (one small JSON file from screencraft.mdnlabs.dev, sends only the app version, can be turned off, never installs anything) and the optional download of a Whisper model from Hugging Face.
 - Keyboard logging stores only shortcuts and special keys, never plain typing.
 - Recordings and projects live in `~/ScreenCraft Projects`; they are not encrypted.
