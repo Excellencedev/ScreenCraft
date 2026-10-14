@@ -14,9 +14,9 @@
   <img alt="Rust" src="https://img.shields.io/badge/core-Rust-b7410e?style=flat-square&logo=rust">
   <img alt="macOS · Windows" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows-native-0EA5C6?style=flat-square">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-3a3a3a?style=flat-square">
-  <img alt="Version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-5b6ee1?style=flat-square">
+  <img alt="Version 0.3.0" src="https://img.shields.io/badge/version-0.2.0-5b6ee1?style=flat-square">
   <img alt="Status: early alpha" src="https://img.shields.io/badge/status-early%20alpha-d69e2e?style=flat-square">
-  <img alt="No AI features" src="https://img.shields.io/badge/AI-none-2f9a72?style=flat-square">
+  <img alt="On-device captions" src="https://img.shields.io/badge/captions-on--device-2f9a72?style=flat-square">
 </p>
 
 <p align="center">
@@ -98,13 +98,15 @@ meters, resolution and frame rate, and the project list.
 - **Camera layouts:** a Camera track changes how the camera is shown over time: large
   bubble, camera only, side by side (either side) or camera off. Each block can have its own
   size, position, shape, mirror, border and shadow, and everything eases between blocks.
-- **Captions:** type them or import an SRT; the default is TikTok-style (heavy white text with
+- **Captions:** generate them **on your machine** with [whisper.cpp](https://github.com/ggml-org/whisper.cpp)
+  (the model is downloaded once on request; audio never leaves your computer), or type them or import an SRT; the default is TikTok-style (heavy white text with
   a black outline in the middle of the bottom third), with red, highlight, classic and
   minimal looks; export your captions back to SRT.
 - **Pace:** speed up idle stretches (found from clicks, typing, cursor motion and, if you
   like, when you talk), ease speed changes into smooth ramps, freeze a frame for a
   moment, and add cut transitions (true cross-dissolve, fade, flash, blur, slide, zoom).
-- **Look:** wallpapers, gradients, solid colours or your own image (with blur),
+- **Look:** wallpapers (optionally with subtle motion: drift, bokeh, waves, dust), gradients, solid colours
+  or your own image (with blur), **device frames** (laptop, monitor, tablet, phone, browser window),
   padding, corner radius, shadow, aspect ratio, crop, and a logo **watermark** (position, size,
   opacity).
 - **Cursor:** several styles, click effects, hide-when-idle, and it hides when you start typing and only comes back when you move the mouse.
@@ -256,7 +258,11 @@ cargo check -p screencraft         # type-check the app
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+This project is licensed under the MIT License. By using this software, you agree that the authors are not liable for any issues, damages, or claims arising from its use.
+
+See [LICENSE](LICENSE) for the full text, [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for the open-source
+components ScreenCraft uses (including whisper.cpp), and [COMPLIANCE.md](COMPLIANCE.md) for the legal and
+compliance guide. The [website](https://screencraft-9gr.pages.dev) has the privacy policy, terms and cookie policy.
 
 ## Known limitations
 
@@ -267,4 +273,5 @@ MIT, see [LICENSE](LICENSE).
 - Export is not real-time; long 60 fps projects take a while.
 - Typing focus depends on the focused app exposing its text caret through
   Accessibility; otherwise the position is estimated from keystrokes.
-- No code signing or notarisation, so you build it yourself.
+- No code signing or notarisation; macOS and Windows will warn on first launch.
+- Caption generation needs a one-off model download (78–488 MB) and runs on the CPU/GPU of your machine; accuracy depends on the model you pick and the audio quality.

@@ -1,5 +1,6 @@
 import { S, P, hooks, uid, fmt } from "../state.js";
-import { invoke, dialog, baseName } from "../../tauri.js";
+import { invoke, dialog, baseName, listen } from "../../tauri.js";
+import { dir } from "../state.js";
 import { change } from "../history.js";
 import { h3, el, slider, toggle, segmented, colorField } from "../widgets.js";
 import { addCaptionAtPlayhead, deleteSelected } from "../timeline.js";
@@ -63,11 +64,65 @@ async function exportSrt() {
   await invoke("export_end");
 }
 
+const WHISPER_MODELS = [
+  ["base.en", "Balanced · English · 148 MB"],
+  ["tiny.en", "Fastest · English · 78 MB"],
+  ["small.en", "Most accurate · English · 488 MB"],
+  ["base", "Multilingual · 148 MB"],
+];
+const STAGE = { audio: "Reading audio…", model: "Loading model…", transcribe: "Transcribing", download: "Downloading model", done: "Done" };
+const whisper = { model: "base.en", language: "auto", busy: false, msg: "", have: {} };
+
+async function generateCaptions(rerender) {
+  if (whisper.busy) return;
+  whisper.busy = true;
+  whisper.msg = "Starting…";
+  rerender();
+  const off = await listen("whisper-progress", (e) => {
+    const { stage, pct } = e.payload;
+    whisper.msg = `${STAGE[stage] || stage}${stage === "transcribe" || stage === "download" ? " " + Math.round(pct) + "%" : ""}`;
+    const m = document.getElementById("whisper-status");
+    if (m) m.textContent = whisper.msg;
+  });
+  try {
+    const caps = await invoke("whisper_transcribe", { dir, project: P(), model: whisper.model, language: whisper.language });
+    if (!caps.length) {
+      alert("No speech was found in this recording.");
+    } else {
+      change(null, () => {
+        P().scene.subtitles = P().scene.subtitles || [];
+        for (const c of caps) P().scene.subtitles.push({ id: uid(), text: c.text, sourceStartMs: c.startMs, sourceEndMs: c.endMs });
+        S.selected = null;
+      }, { panel: true, timeline: true, track: false });
+    }
+  } catch (e) {
+    alert("Caption generation failed: " + (e?.message || e));
+  } finally {
+    off?.();
+    whisper.busy = false;
+    whisper.msg = "";
+    whisper.have = {};
+    rerender();
+  }
+}
+
 export function panelCaptions(p) {
   const st = P().config.subtitles;
   const list = (P().scene.subtitles || []).slice().sort((a, b) => a.sourceStartMs - b.sourceStartMs);
   p.append(h3("Captions"));
   p.append(el('<div class="muted">Type captions or import an SRT file. They sit in the middle of the bottom third of the video, like TikTok.</div>'));
+  // on-device speech recognition (whisper.cpp); runs locally, nothing is uploaded
+  p.append(h3("Auto captions"));
+  p.append(el('<div class="muted">Transcribes the microphone on this computer with whisper.cpp. The first run downloads the model you pick (once); the audio never leaves your machine.</div>'));
+  p.append(segmented("Model", WHISPER_MODELS, () => whisper.model, (v) => (whisper.model = v), { track: false }));
+  if (whisper.model === "base") {
+    p.append(segmented("Language", [["auto", "Auto"], ["en", "English"], ["es", "Spanish"], ["fr", "French"], ["de", "German"]], () => whisper.language, (v) => (whisper.language = v), { track: false }));
+  }
+  const gen = el(`<button class="btn-line" ${whisper.busy ? "disabled" : ""}>${whisper.busy ? "Working…" : "Generate captions"}</button>`);
+  gen.onclick = () => generateCaptions(hooks.renderPanel);
+  p.append(gen);
+  if (whisper.busy) p.append(el(`<div class="hint muted" id="whisper-status">${whisper.msg}</div>`));
+  p.append(el('<div class="hint muted">Speech recognition by whisper.cpp (github.com/ggml-org/whisper.cpp, MIT) with OpenAI Whisper models (MIT).</div>'));
   const row = el('<div class="btn-row"></div>');
   const add = el('<button class="btn-line">Add caption</button>');
   add.onclick = addCaptionAtPlayhead;

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { marked } from 'marked';
 
 const root = import.meta.dirname;
 const partial = (n) => readFileSync(join(root, 'src/partials', n + '.html'), 'utf8');
@@ -25,7 +26,8 @@ const partials = {
       return html
         .replace('<!--@header-->', partial('header'))
         .replace('<!--@footer-->', partial('footer'))
-        .replace('<!--@docs-nav-->', partial('docs-nav'));
+        .replace('<!--@docs-nav-->', partial('docs-nav'))
+        .replace('<!--@notices-->', () => marked.parse(readFileSync(join(root, '../THIRD-PARTY-NOTICES.md'), 'utf8')));
     },
   },
 };

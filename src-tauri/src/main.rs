@@ -8,6 +8,7 @@ mod compress;
 mod inputlog;
 mod jpegio;
 mod levelmic;
+mod whisper;
 #[cfg(windows)]
 mod mf;
 #[cfg(windows)]
@@ -135,6 +136,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::sources::list_sources,
             commands::pace::find_idle,
+            whisper::whisper_models,
+            whisper::whisper_download,
+            whisper::whisper_transcribe,
             commands::files::read_text_file,
             commands::recording::start_recording,
             commands::recording::stop_recording,

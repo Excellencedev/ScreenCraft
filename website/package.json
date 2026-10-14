@@ -1,7 +1,7 @@
 {
   "name": "screencraft-website",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +10,7 @@
     "deploy": "vite build && wrangler pages deploy dist --project-name screencraft"
   },
   "devDependencies": {
+    "marked": "^18.1.1",
     "vite": "^7.0.0"
   }
 }

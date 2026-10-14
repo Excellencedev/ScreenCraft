@@ -18,7 +18,7 @@ use symphonia::core::meta::MetadataOptions;
 const OUT_NAME: &str = "mic-leveled-v2.wav";
 
 /// Returns (mono samples, sample rate).
-fn decode_mono(path: &Path) -> Result<(Vec<f32>, u32), String> {
+pub(crate) fn decode_mono(path: &Path) -> Result<(Vec<f32>, u32), String> {
     let file = File::open(path).map_err(|e| e.to_string())?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
     let mut hint = Hint::new();

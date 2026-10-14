@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0
+
+- **Auto captions:** *Captions → Generate captions* transcribes the microphone on your machine with
+  [whisper.cpp](https://github.com/ggml-org/whisper.cpp). Pick a model (tiny / base / small English, or
+  multilingual base); it is downloaded once on request. Nothing is uploaded.
+- **Device frames:** laptop, monitor, tablet, phone and browser window around the screen.
+- **Animated wallpapers:** subtle motion (drift, bokeh, waves, dust) on any wallpaper, identical in preview and export.
+- Legal and compliance: `THIRD-PARTY-NOTICES.md`, `COMPLIANCE.md`, `SECURITY.md`, license/disclaimer in the README.
+- A website (Vite, in `website/`) with docs, downloads and legal pages, deployed on Cloudflare.
+
 ## 0.2.0
 
 - Sped-up clips show one compact pill ("2×"), and a speed ramp is one block ("2.3× → 4.2×")
