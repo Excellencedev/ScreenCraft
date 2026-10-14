@@ -156,17 +156,20 @@ kbd { background: var(--surface); border: 1px solid var(--line-2); border-bottom
 .prose a { overflow-wrap: anywhere; }
 
 @media (max-width: 1040px) { .gh-btn span { display: none; } .gh-btn { padding: 0 11px; } .nav-sep { display: none; } }
-@media (max-width: 880px) {
+@media (max-width: 900px) { .hide-t, .nav-sep { display: none; } .btn-nav span { display: none; } .btn-nav { padding: 0; width: 42px; } }
+@media (max-width: 800px) {
   .nav-links, .hide-m, .nav-sep { display: none; }
   .burger { display: inline-grid; }
   .nav.open .nav-panel { display: block; }
+}
+@media (max-width: 880px) {
   .row, .osrow, .docs, .deflist,   .row.flip .row-text { order: 0; }
   .os + .os { border-left: 0; border-top: 1px solid var(--line-2); }
   .foot-grid { grid-template-columns: 1fr 1fr; } .foot-brand { grid-column: 1 / -1; }
   .docs-nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--line); } .docs-nav h5 { display: none; }
   .frame .bar { height: 30px; }
 }
-@media (max-width: 440px) { .btn:not(.btn-nav) { width: 100%; } .btn-nav span { display: none; } .btn-nav { padding: 0; width: 42px; } }
+@media (max-width: 440px) { .btn:not(.btn-nav) { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } html { scroll-behavior: auto; } }
 .nav.open { background: var(--bg); backdrop-filter: none; }
 .nav-panel { max-height: calc(100vh - var(--nav-h)); overflow-y: auto; }
@@ -436,3 +439,9 @@ html { overflow-x: clip; }
 
 .keys li .d { display: block; }
 .keys li .d kbd { margin: 0 2px; }
+
+.support-btn { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 14px; border: 1px solid var(--line-2); border-radius: 8px; color: var(--text); font-weight: 500; font-size: 15px; }
+.support-btn:hover { background: var(--bg-2); text-decoration: none; }
+.support-btn svg { color: #e5566d; }
+@media (max-width: 1040px) { .support-btn span { display: none; } .support-btn { width: 42px; padding: 0; justify-content: center; } }
+@media (max-width: 1040px) { .nav-links { margin-left: 14px; } }
