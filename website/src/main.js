@@ -109,24 +109,21 @@ if (!reduceMotion && 'IntersectionObserver' in window) {
       el.style.setProperty('--d', Math.min(sibling, 5) * 0.09 + 's');
     });
   });
-  const io = new IntersectionObserver((entries) => entries.forEach((e) => {
-    // also reveal anything already scrolled past (anchor jumps, reloads mid-page)
-    if (e.isIntersecting || e.boundingClientRect.top < 0) { e.target.classList.add('in'); io.unobserve(e.target); }
-  }), { threshold: 0.15, rootMargin: '0px 0px -6% 0px' });
-  document.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
-  // the observer only fires on a change of state, so an anchor jump straight past a block would
-  // leave it hidden for the way back; reveal anything already above the viewport on scroll
-  let ticking = false;
-  addEventListener('scroll', () => {
-    if (ticking) return;
-    ticking = true;
-    setTimeout(() => {
-      ticking = false;
-      document.querySelectorAll('[data-reveal]:not(.in)').forEach((el) => {
-        if (el.getBoundingClientRect().bottom < 0) { el.classList.add('in'); io.unobserve(el); }
-      });
-    }, 50);
-  }, { passive: true });
+  // Reveal by geometry rather than an observer: anything whose top has entered the viewport
+  // (or is already above it) is shown. Cheap for ~20 elements and cannot miss an element.
+  const pending = () => document.querySelectorAll('[data-reveal]:not(.in)');
+  const check = () => {
+    const edge = innerHeight * 0.94;
+    pending().forEach((el) => { if (el.getBoundingClientRect().top < edge) el.classList.add('in'); });
+  };
+  let queued = false;
+  const queue = () => { if (queued) return; queued = true; setTimeout(() => { queued = false; check(); }, 40); };
+  addEventListener('scroll', queue, { passive: true });
+  addEventListener('resize', queue);
+  addEventListener('load', check);
+  check();
+  // and a safety net: whatever happens, nothing stays hidden
+  setTimeout(() => document.querySelectorAll('[data-reveal]:not(.in)').forEach((el) => { if (el.getBoundingClientRect().top < innerHeight * 2) el.classList.add('in'); }), 4000);
 }
 
 // three.js scenes load after first paint so they never delay the page

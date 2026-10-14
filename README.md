@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg"><b>Download for macOS</b></a> <sub>(0.3.0, 7.4 MB)</sub> ·
+  <a href="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg"><b>Download for macOS</b></a> ·
   <a href="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft-Setup.exe"><b>Download for Windows</b></a> ·
   <a href="https://getscreencraft.pages.dev">Website</a> ·
   <a href="CHANGELOG.md">Changelog</a>
