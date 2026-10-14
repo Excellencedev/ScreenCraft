@@ -345,7 +345,7 @@ html { overflow-x: clip; }
 
 /* ---- steps: three words and two arrows ---- */
 .steps > .wrap > h2, .sec > .wrap > h2 { font-size: clamp(26px, 3.2vw, 40px); }
-.flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: clamp(8px, 2vw, 28px); }
+.flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: clamp(20px, 4vw, 56px); }
 .flow .step { border-top: 2px solid var(--accent); padding-top: 18px; }
 .flow .step h3 { font-size: clamp(24px, 3vw, 34px); margin-bottom: 8px; }
 .flow .step p { color: var(--muted); margin: 0; font-size: 17px; max-width: 26ch; }
