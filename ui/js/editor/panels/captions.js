@@ -114,7 +114,13 @@ export function panelCaptions(p) {
   // on-device speech recognition (whisper.cpp); runs locally, nothing is uploaded
   p.append(h3("Auto captions"));
   p.append(el('<div class="muted">Transcribes the microphone on this computer with whisper.cpp. The first run downloads the model you pick (once); the audio never leaves your machine.</div>'));
-  p.append(segmented("Model", WHISPER_MODELS, () => whisper.model, (v) => (whisper.model = v), { track: false }));
+  // long labels do not fit a segmented control, so the model is a drop-down
+  const pick = el('<div class="field"><label><span>Model</span></label><select></select></div>');
+  const sel = pick.querySelector("select");
+  for (const [id, label] of WHISPER_MODELS) sel.add(new Option(label, id, false, id === whisper.model));
+  sel.onchange = () => { whisper.model = sel.value; hooks.renderPanel(); };
+  sel.onkeydown = (e) => e.stopPropagation();
+  p.append(pick);
   if (whisper.model === "base") {
     p.append(segmented("Language", [["auto", "Auto"], ["en", "English"], ["es", "Spanish"], ["fr", "French"], ["de", "German"]], () => whisper.language, (v) => (whisper.language = v), { track: false }));
   }

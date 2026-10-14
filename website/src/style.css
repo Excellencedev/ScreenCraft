@@ -329,3 +329,8 @@ html { overflow-x: clip; }
 .hero-video video { display: block; width: 100%; height: auto; }
 /* screenshots show only the app window; the frame's radius trims the window's own corners */
 .row .frame { border: 0; border-radius: 12px; box-shadow: var(--shadow); background: transparent; }
+
+/* UI panels shown as cards on a soft backdrop */
+.frame.panel { display: grid; place-items: center; padding: clamp(24px, 5vw, 56px); background:
+  radial-gradient(70% 80% at 30% 20%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%), var(--bg-2); }
+.frame.panel img { width: min(100%, 440px); height: auto; aspect-ratio: auto; border-radius: 10px; box-shadow: 0 24px 60px -24px rgba(0, 0, 0, .7); }
