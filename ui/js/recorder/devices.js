@@ -2,6 +2,7 @@
 import { invoke, IS_WINDOWS } from "../tauri.js";
 import { $, state, savePrefs, hooks, showError } from "./state.js";
 import { openMenu } from "./menu.js";
+import { guardAudio, refreshRoute } from "./audioguard.js";
 
 export async function cameraMenu() {
   try {
@@ -44,19 +45,41 @@ async function webAudioInputs() {
 
 export async function micMenu() {
   let devs = [];
-  try { devs = await invoke("list_audio_inputs"); } catch {}
-  if (!devs.length) devs = await webAudioInputs();
+  const r = await refreshRoute();
+  if (r?.inputs?.length) {
+    // built-in first: it is the one that keeps Bluetooth headphones in stereo
+    const rank = (d) => (d.transport === "builtin" ? 0 : d.transport === "bluetooth" ? 2 : 1);
+    devs = r.inputs
+      .slice()
+      .sort((a, b) => rank(a) - rank(b))
+      .map((d) => ({
+        id: d.uid,
+        name: d.name,
+        sub:
+          d.transport === "bluetooth"
+            ? "Bluetooth: headphones drop to call quality while this is on"
+            : d.transport === "builtin" && r.defaultOutputBluetooth
+              ? "Recommended: keeps your Bluetooth headphones in stereo"
+              : "",
+        bluetooth: d.transport === "bluetooth",
+      }));
+  } else {
+    try { devs = await invoke("list_audio_inputs"); } catch {}
+    if (!devs.length) devs = await webAudioInputs();
+  }
   await openMenu(
     [
       { header: "Microphone" },
-      { label: "No microphone", checked: !state.mic, onPick: () => { state.mic = false; savePrefs(); hooks.render(); } },
+      { label: "No microphone", checked: !state.mic, onPick: () => { state.mic = false; savePrefs(); hooks.render(); guardAudio(); } },
       ...devs.map((d) => ({
         label: d.name,
+        sub: d.sub,
         checked: state.mic && state.micId === d.id,
         onPick: () => {
-          Object.assign(state, { mic: true, micId: d.id, micName: d.name });
+          Object.assign(state, { mic: true, micId: d.id, micName: d.name, micBtOk: !!d.bluetooth });
           savePrefs();
           hooks.render();
+          guardAudio({ force: true });
         },
       })),
     ],

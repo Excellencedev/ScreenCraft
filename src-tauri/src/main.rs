@@ -3,6 +3,7 @@
 #[cfg(target_os = "macos")]
 mod ax;
 mod capture;
+mod audioroute;
 mod commands;
 mod compress;
 mod inputlog;
@@ -136,6 +137,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::sources::list_sources,
             commands::pace::find_idle,
+            commands::devices::audio_route,
+            commands::devices::audio_pin_builtin_input,
+            commands::devices::audio_restore_input,
             whisper::whisper_models,
             whisper::whisper_download,
             whisper::whisper_transcribe,
@@ -237,6 +241,10 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while building ScreenCraft")
         .run(|app, event| {
+            // never leave the system's default microphone moved when the app goes away
+            if let tauri::RunEvent::Exit = event {
+                audioroute::restore_input();
+            }
             // ⌘Q and friends: give open editors the chance to ask about unsaved edits
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
                 if !windows::ALLOW_EXIT.load(std::sync::atomic::Ordering::SeqCst) {

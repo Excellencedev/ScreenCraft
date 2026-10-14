@@ -5,6 +5,7 @@ import { showBar, resizeBar } from "./window.js";
 import { closeMenu, isMenuOpen } from "./menu.js";
 import { getPreview, openCameraStream, startDrawLoop, syncPreview } from "./preview.js";
 import { syncMeters } from "./meters.js";
+import { guardAudio } from "./audioguard.js";
 
 let cameraRec = null;
 let cameraStartedMs = null;
@@ -17,6 +18,7 @@ let micChain = Promise.resolve();
 /** Record the microphone on its own so its level can be mixed independently of system audio. */
 async function startMic() {
   if (!window.MediaRecorder) throw new Error("this web view cannot record audio");
+  await guardAudio({ force: true }); // keeps Bluetooth headphones in stereo while the microphone is open
   let deviceId;
   try {
     const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput");

@@ -1,6 +1,7 @@
 // Live input level meters: microphone (WebAudio) and system audio (Rust).
 import { invoke, listen } from "../tauri.js";
 import { $, state, setLoading } from "./state.js";
+import { guardAudio } from "./audioguard.js";
 
 let micStream = null, micCtx = null, analyser = null, micBuf = null, micLoop = 0;
 let micLevel = 0, sysLevel = 0;
@@ -32,6 +33,7 @@ export async function startMicMeter() {
   micOpening = true;
   setLoading("mic", true);
   try {
+    await guardAudio(); // never open a Bluetooth headset's microphone by accident
     // match the chosen device by name (WebKit device ids differ from AVFoundation ids)
     let deviceId;
     try {
@@ -96,6 +98,7 @@ export async function stopSysMeter() {
 /** Re-sync meters with the current toggles / visibility. */
 export function syncMeters() {
   const visible = !document.hidden;
+  guardAudio(); // pins/restores the default input when the microphone choice changed
   if (state.mic && visible) startMicMeter(); else stopMicMeter();
   if (state.sys && visible) startSysMeter(); else stopSysMeter();
   document.querySelector("#optMic")?.classList.toggle("listening", !!micStream);

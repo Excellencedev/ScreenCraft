@@ -13,6 +13,8 @@
 <div class="wrap docs"><!--@docs-nav--><article class="prose">
 <h1>Troubleshooting</h1>
 <h3>The recording is black / empty (macOS)</h3><p>Grant Screen Recording permission in System Settings → Privacy &amp; Security and relaunch ScreenCraft.</p>
+<h3>Music sounds muffled or the recording is tinny with Bluetooth headphones</h3>
+<p>This happens when anything opens the headphones' <b>microphone</b>: the headset switches from stereo to a phone-call profile (16 kHz, mono), and so does everything it plays and records. ScreenCraft avoids it by using your Mac's built-in microphone instead and keeping the headphones for listening only. In the Microphone menu, pick the built-in microphone (it is marked as recommended when Bluetooth headphones are connected). If you choose the headset's own microphone on purpose, expect call-quality audio. A separate USB or wired microphone works too.</p>
 <h3>Keys are not shown</h3><p>Grant Accessibility (macOS) or run without a blocking security tool (Windows).</p>
 <h3>Export seems stuck</h3><p>Cancel and retry; ScreenCraft falls back to the software encoder automatically after a stall. Report persistent issues on GitHub with your OS and recording size.</p>
 </article></div>

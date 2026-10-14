@@ -40,6 +40,7 @@ export const state = {
   mic: !!prefs.mic,
   micId: prefs.micId || null,
   micName: prefs.micName || "",
+  micBtOk: !!prefs.micBtOk, // the person chose a Bluetooth microphone on purpose
   sys: !!prefs.sys,
   resolution: snapResolution(prefs.resolution ?? migrateResolution(prefs.quality)),
   fps: prefs.fps ?? (prefs.quality === "native" ? 60 : 30),
@@ -49,8 +50,8 @@ export const state = {
 
 export function savePrefs() {
   try {
-    const { mode, camera, cameraId, cameraLabel, mic, micId, micName, sys, resolution, fps } = state;
-    localStorage.setItem("sc-recorder", JSON.stringify({ mode, camera, cameraId, cameraLabel, mic, micId, micName, sys, resolution, fps }));
+    const { mode, camera, cameraId, cameraLabel, mic, micId, micName, micBtOk, sys, resolution, fps } = state;
+    localStorage.setItem("sc-recorder", JSON.stringify({ mode, camera, cameraId, cameraLabel, mic, micId, micName, micBtOk, sys, resolution, fps }));
   } catch {}
 }
 

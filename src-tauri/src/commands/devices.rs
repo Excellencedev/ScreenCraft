@@ -47,3 +47,21 @@ pub fn meter_start(app: AppHandle, state: State<AppState>) -> CmdResult<()> {
 pub fn meter_stop(state: State<AppState>) {
     state.meter.stop();
 }
+
+/// Inputs with their transport and the default routes (used to keep Bluetooth headphones out of
+/// call-quality mode; see `audioroute`).
+#[tauri::command]
+pub fn audio_route() -> crate::audioroute::Route {
+    crate::audioroute::route()
+}
+
+/// If the default input is a Bluetooth headset, move it to the built-in microphone for now.
+#[tauri::command]
+pub fn audio_pin_builtin_input() -> CmdResult<Option<String>> {
+    crate::audioroute::pin_builtin_input()
+}
+
+#[tauri::command]
+pub fn audio_restore_input() {
+    crate::audioroute::restore_input();
+}

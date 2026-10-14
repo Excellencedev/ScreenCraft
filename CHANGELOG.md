@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Bluetooth headphones stay in stereo while you record.** Opening a Bluetooth headset's microphone
+  makes the headphones drop to call quality (16 kHz mono), which ruined what you heard and what was
+  recorded. ScreenCraft now prefers the Mac's own microphone, never opens a headset microphone by
+  accident (not even to fill the device list), and while a microphone is in use it pins the system's
+  default input to the built-in one, restoring it when you turn the microphone off or quit. Picking
+  a Bluetooth microphone on purpose still works and says what it costs.
+
 ## 0.3.0
 
 - **Auto captions:** *Captions → Generate captions* transcribes the microphone on your machine with
