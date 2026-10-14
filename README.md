@@ -20,8 +20,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg"><b>Download for macOS</b></a> ·
+  <a href="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg"><b>Download for macOS</b></a> <sub>(0.3.0, 7.4 MB)</sub> ·
   <a href="https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft-Setup.exe"><b>Download for Windows</b></a> ·
+  <a href="https://getscreencraft.pages.dev">Website</a> ·
   <a href="CHANGELOG.md">Changelog</a>
 </p>
 
@@ -262,7 +263,7 @@ This project is licensed under the MIT License. By using this software, you agre
 
 See [LICENSE](LICENSE) for the full text, [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for the open-source
 components ScreenCraft uses (including whisper.cpp), and [COMPLIANCE.md](COMPLIANCE.md) for the legal and
-compliance guide. The [website](https://screencraft-9gr.pages.dev) has the privacy policy, terms and cookie policy.
+compliance guide. The [website](https://getscreencraft.pages.dev) has the privacy policy, terms and cookie policy.
 
 ## Known limitations
 

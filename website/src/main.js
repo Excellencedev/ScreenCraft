@@ -1,4 +1,5 @@
 import './style.css';
+import { STRINGS, LANGS, detect } from './i18n.js';
 
 const nav = document.getElementById('nav');
 const onScroll = () => nav?.classList.toggle('scrolled', scrollY > 8);
@@ -16,41 +17,52 @@ document.querySelectorAll('.nav-links a, .docs-nav a').forEach((a) => {
   if (p.hash === '' && p.pathname === path) a.classList.add('active');
 });
 
-// scroll reveal
-const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
-document.querySelectorAll('.reveal, .shot').forEach((el) => io.observe(el));
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode: fine */ } },
+};
 
-// feature tabs
-const tabs = document.querySelectorAll('.tab');
-tabs.forEach((t) => t.addEventListener('click', () => {
-  tabs.forEach((x) => x.setAttribute('aria-selected', String(x === t)));
-  document.querySelectorAll('.tabpanel').forEach((p) => p.classList.toggle('on', p.id === t.dataset.tab));
+// theme: dark unless the visitor chose otherwise (the choice is kept only in this browser)
+const root = document.documentElement;
+document.querySelectorAll('.theme-btn').forEach((b) => b.addEventListener('click', () => {
+  const next = root.dataset.theme === 'light' ? 'dark' : 'light';
+  root.dataset.theme = next;
+  store.set('sc-theme', next);
 }));
 
-// OS detection for the primary download button
-const ua = navigator.userAgent;
-const win = /Windows/i.test(ua);
-document.querySelectorAll('[data-os-cta]').forEach((a) => {
-  if (win) { a.textContent = 'Download for Windows'; a.href = a.dataset.win; }
-  else { a.textContent = 'Download for macOS'; a.href = a.dataset.mac; }
-});
+// language
+const isMac = !/Windows/i.test(navigator.userAgent);
+function applyLang(lang) {
+  const dict = { ...STRINGS.en, ...(STRINGS[lang] || {}) };
+  root.lang = lang === 'zh-CN' ? 'zh-Hans' : lang === 'zh-TW' ? 'zh-Hant' : lang;
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    const v = dict[el.dataset.i18n];
+    if (v != null) el.innerHTML = v;
+  });
+  document.querySelectorAll('[data-i18n-os]').forEach((el) => {
+    el.textContent = dict[isMac ? 'dl.mac' : 'dl.win'];
+  });
+  document.querySelectorAll('[data-lang-select]').forEach((sel) => {
+    sel.value = lang;
+    // size the select to the chosen language so the caret sits right beside the text
+    const probe = document.createElement('span');
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:500 15px var(--font)';
+    probe.textContent = sel.options[sel.selectedIndex].text;
+    document.body.append(probe);
+    sel.style.width = Math.ceil(probe.getBoundingClientRect().width) + 22 + 'px';
+    probe.remove();
+  });
+}
+const saved = store.get('sc-lang');
+let lang = LANGS.includes(saved) ? saved : detect();
+document.querySelectorAll('[data-lang-select]').forEach((sel) => sel.addEventListener('change', () => {
+  lang = sel.value;
+  store.set('sc-lang', lang);
+  applyLang(lang);
+}));
+applyLang(lang);
 
-// animated stage canvases (subtle moving backgrounds, same idea as the app's)
-document.querySelectorAll('canvas[data-bg]').forEach((c) => {
-  const ctx = c.getContext('2d'); let t = 0;
-  const fit = () => { c.width = c.clientWidth * 1.5; c.height = c.clientHeight * 1.5; }; fit(); addEventListener('resize', fit);
-  const blobs = [[.2, .3, 0, '59,130,196'], [.75, .25, 2, '130,90,230'], [.5, .8, 4, '40,200,170'], [.85, .75, 1, '59,130,196']];
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const draw = () => {
-    t += reduce ? 0 : 0.004; const { width: w, height: h } = c;
-    ctx.fillStyle = '#0a0f18'; ctx.fillRect(0, 0, w, h);
-    for (const [x, y, ph, rgb] of blobs) {
-      const cx = (x + Math.sin(t + ph) * .08) * w, cy = (y + Math.cos(t * .8 + ph) * .1) * h, r = Math.max(w, h) * .45;
-      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      g.addColorStop(0, `rgba(${rgb},.45)`); g.addColorStop(1, `rgba(${rgb},0)`);
-      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-    }
-    if (!reduce) requestAnimationFrame(draw);
-  };
-  draw();
+// the hero button downloads the installer for the visitor's system
+document.querySelectorAll('[data-os-cta]').forEach((a) => {
+  a.href = isMac ? a.dataset.mac : a.dataset.win;
 });
