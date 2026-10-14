@@ -8,8 +8,10 @@ import { change } from "./history.js";
 import { requestSeek, pause, play, updateTransport, setTimelineWidth } from "./playback.js";
 
 /** Ids of every selected zoom region (the first one drives the panel). */
-export const selectedZoomIds = () => (S.multi?.length ? S.multi : S.selected?.type === "zoom" ? [S.selected.id] : []);
+export const selectedZoomIds = () => (S.selected?.type !== "zoom" ? [] : S.multi?.length ? S.multi : [S.selected.id]);
 const isZoomSel = (id) => selectedZoomIds().includes(id);
+/** Ids of every selected caption (the first one drives the panel). */
+export const selectedCaptionIds = () => (S.selected?.type === "caption" ? (S.multi?.length ? S.multi : [S.selected.id]) : []);
 
 const tlWidth = () => Math.max(100, $("tlInner").clientWidth);
 let rulerKey = "";
@@ -229,7 +231,8 @@ export function renderTimeline() {
       if (b - a < 1) continue;
       capCount++;
       const el = document.createElement("div");
-      el.className = "block caption" + (S.selected?.type === "caption" && S.selected.id === c.id ? " sel" : "");
+      el.className = "block caption" + (selectedCaptionIds().includes(c.id) ? " sel" : "");
+      el.dataset.cid = c.id;
       el.style.left = a * pxPerMs + "px";
       el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
       const label = (c.text || "").replace(/\s+/g, " ").slice(0, 40) || "(empty)";
@@ -290,10 +293,38 @@ export const NOTE_NAMES = {
 function beginRegionDrag(e, item, type, el, pxPerMs, a0, b0) {
   e.stopPropagation();
   e.preventDefault();
-  S.selected = { type, id: item.id };
-  S.multi = null;
+  let group = false;
+  if (type === "caption") {
+    S.tab = "captions";
+    const list = (P().scene.subtitles || []).slice().sort((a, b) => a.sourceStartMs - b.sourceStartMs);
+    if (e.shiftKey || e.metaKey || e.ctrlKey) {
+      // Shift selects the range from the current caption; ⌘ / Ctrl toggles one (no drag).
+      let ids = selectedCaptionIds().slice();
+      if (e.shiftKey && ids.length) {
+        const i0 = list.findIndex((c) => c.id === ids[0]);
+        const i1 = list.findIndex((c) => c.id === item.id);
+        ids = list.slice(Math.min(i0, i1), Math.max(i0, i1) + 1).map((c) => c.id);
+        if (i0 > i1) ids.reverse();
+      } else {
+        const at = ids.indexOf(item.id);
+        if (at >= 0) ids.splice(at, 1);
+        else ids.push(item.id);
+      }
+      S.selected = ids.length ? { type: "caption", id: ids[0] } : null;
+      S.multi = ids.length > 1 ? ids : null;
+      renderTimeline();
+      hooks.renderPanel();
+      hooks.syncControls();
+      return;
+    }
+    group = S.multi?.length > 1 && S.multi.includes(item.id);
+  }
+  if (!group) {
+    S.selected = { type, id: item.id };
+    S.multi = null;
+  }
   S.tab = type === "layout" ? "camera" : type === "caption" ? "captions" : "annotate";
-  document.querySelectorAll(".block.sel").forEach((b) => b.classList.remove("sel"));
+  document.querySelectorAll(".block.sel").forEach((b) => { if (!group) b.classList.remove("sel"); });
   el.classList.add("sel");
   el.setPointerCapture(e.pointerId);
   hooks.renderPanel();
@@ -321,11 +352,44 @@ function beginRegionDrag(e, item, type, el, pxPerMs, a0, b0) {
     nb = b;
     el.style.left = a * pxPerMs + "px";
     el.style.width = Math.max(14, (b - a) * pxPerMs - 2) + "px";
+    if (group && mode === "move") {
+      const shift = (a - a0) * pxPerMs;
+      for (const id of S.multi || []) {
+        if (id === item.id) continue;
+        document.querySelectorAll(`#trackCaptions .block[data-cid="${id}"]`).forEach((b2) => (b2.style.transform = `translateX(${shift}px)`));
+      }
+    }
   };
   el.onpointerup = (ev) => {
     el.onpointermove = el.onpointerup = null;
     try { el.releasePointerCapture(ev.pointerId); } catch {}
-    if (!moved) return;
+    if (group && moved && mode === "move") {
+      // move every selected caption by the same amount of recording time
+      const delta = outToSrc(na).src - outToSrc(a0).src;
+      const ids = (S.multi || []).slice();
+      const total = P().media.durationMs;
+      change(null, () => {
+        for (const id of ids) {
+          const r = (P().scene.subtitles || []).find((x) => x.id === id);
+          if (!r) continue;
+          const len = r.sourceEndMs - r.sourceStartMs;
+          const start = Math.min(Math.max(0, r.sourceStartMs + delta), Math.max(0, total - len));
+          r.sourceStartMs = start;
+          r.sourceEndMs = start + len;
+        }
+      }, { timeline: true });
+      return;
+    }
+    if (!moved) {
+      if (group) {
+        S.selected = { type, id: item.id };
+        S.multi = null;
+        renderTimeline();
+        hooks.renderPanel();
+      }
+      return;
+    }
+    if (group) { S.selected = { type, id: item.id }; S.multi = null; }
     const ns = outToSrc(na).src, ne = outToSrc(nb).src;
     change(null, () => {
       item.sourceStartMs = ns;
@@ -720,7 +784,10 @@ export function deleteSelected() {
   if (!sel) return;
   if (sel.type === "music") {
     removeMusicClip(sel.id);
-  } else if (sel.type === "layout" || sel.type === "annot" || sel.type === "caption") {
+  } else if (sel.type === "caption") {
+    const ids = selectedCaptionIds();
+    change(null, () => { P().scene.subtitles = P().scene.subtitles.filter((x) => !ids.includes(x.id)); S.selected = null; S.multi = null; }, { panel: true, timeline: true });
+  } else if (sel.type === "layout" || sel.type === "annot") {
     const key = REGION_KEYS[sel.type];
     change(null, () => { P().scene[key] = P().scene[key].filter((x) => x.id !== sel.id); S.selected = null; }, { panel: true, timeline: true });
   } else if (sel.type === "zoom") {
@@ -734,6 +801,15 @@ export function deleteSelected() {
 
 /** Select every zoom region (⌘/Ctrl + A while editing zooms). */
 export function selectAllZooms() {
+  if (S.tab === "captions") {
+    const cids = (P().scene.subtitles || []).map((c) => c.id);
+    if (!cids.length) return;
+    S.selected = { type: "caption", id: cids[0] };
+    S.multi = cids.length > 1 ? cids : null;
+    renderTimeline();
+    hooks.renderPanel();
+    return;
+  }
   const ids = P().scene.zooms.map((z) => z.id);
   if (!ids.length) return;
   S.selected = { type: "zoom", id: ids[0] };

@@ -141,7 +141,16 @@ export function panelCaptions(p) {
   p.append(row);
 
   const cap = S.selected?.type === "caption" && list.find((c) => c.id === S.selected.id);
-  if (cap) {
+  if (cap && S.multi?.length > 1) {
+    p.append(h3(`${S.multi.length} captions selected`));
+    p.append(el('<div class="hint muted">Drag any selected caption to move them all together. ⌘ / Ctrl-click adds or removes one, Shift-click selects a range, ⌘ / Ctrl + A selects all.</div>'));
+    const del = el(`<button class="btn-line danger">Delete ${S.multi.length} captions</button>`);
+    del.onclick = deleteSelected;
+    p.append(del);
+    const clr = el('<button class="btn-line">Deselect</button>');
+    clr.onclick = () => { S.selected = null; S.multi = null; hooks.renderTimeline(); hooks.renderPanel(); };
+    p.append(clr);
+  } else if (cap) {
     p.append(h3("Selected caption"));
     const w = el('<div class="field"><label><span>Text</span></label><textarea rows="3" spellcheck="false"></textarea></div>');
     const ta = w.querySelector("textarea");
