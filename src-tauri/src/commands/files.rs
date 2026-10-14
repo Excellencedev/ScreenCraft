@@ -121,3 +121,15 @@ pub fn read_image_data_url(path: String) -> CmdResult<String> {
 pub fn dbg_log(msg: String) {
     eprintln!("[js] {msg}");
 }
+
+/// Delete a project folder (a scrapped recording). Only folders inside the projects root.
+#[tauri::command]
+pub fn discard_project(state: State<AppState>, dir: String) -> CmdResult<()> {
+    let root = state.projects_root();
+    let target = fs::canonicalize(&dir).map_err(|e| e.to_string())?;
+    let root = fs::canonicalize(&root).map_err(|e| e.to_string())?;
+    if target == root || !target.starts_with(&root) {
+        return Err("refusing to delete a folder outside the projects folder".into());
+    }
+    fs::remove_dir_all(&target).map_err(|e| e.to_string())
+}

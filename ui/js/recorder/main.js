@@ -5,7 +5,7 @@ import { openMenu, closeMenu, isMenuOpen } from "./menu.js";
 import { syncPreview } from "./preview.js";
 import { syncMeters } from "./meters.js";
 import { cameraMenu, micMenu, systemMenu } from "./devices.js";
-import { beginRecording, finishRecording } from "./capture.js";
+import { beginRecording, finishRecording, discardRecording, askDiscard, cancelDiscard } from "./capture.js";
 
 function render() {
   document.querySelectorAll(".tool").forEach((b) => b.classList.toggle("active", b.dataset.mode === state.mode));
@@ -67,10 +67,12 @@ async function chooseMode(mode) {
         sub: `${Math.round(w.width)} × ${Math.round(w.height)}`,
         checked: state.windowId === w.id,
         onPick: () => { state.windowId = w.id; state.windowTitle = w.title || w.app; render(); },
+        // hovering a window in the list outlines it on screen
+        onHover: () => invoke("show_area_frame", { rect: { x: w.x, y: w.y, width: w.width, height: w.height }, displayId: null, style: "hl" }).catch(() => {}),
       });
     }
     if (items.length === 1) items.push({ label: "No windows found", onPick() {} });
-    await openMenu(items, anchor);
+    await openMenu(items, anchor, { onLeave: () => invoke("hide_area_frame").catch(() => {}) });
   } else if (mode === "display" && state.sources && state.sources.displays.length > 1) {
     await openMenu(
       [
@@ -153,6 +155,9 @@ $("optQuality").onclick = () => toggleMenu(captureMenu);
 $("optFolder").onclick = () => toggleMenu(folderMenu);
 $("btnRec").onclick = beginRecording;
 $("btnStop").onclick = finishRecording;
+$("btnTrash").onclick = askDiscard;
+$("btnKeep").onclick = cancelDiscard;
+$("btnDrop").onclick = discardRecording;
 $("btnClose").onclick = async () => {
   if (state.phase === "recording" || state.phase === "countdown") return;
   await invoke("quit_app");
@@ -160,22 +165,24 @@ $("btnClose").onclick = async () => {
 
 await listen("area-selected", async (e) => {
   state.area = e.payload;
+  if (e.payload.displayId != null) state.displayId = e.payload.displayId;
   state.mode = "area";
   savePrefs();
   render();
-  try { await invoke("show_area_frame", { rect: e.payload, displayId: state.displayId }); } catch (err) { showError(String(err)); }
+  try { await invoke("show_area_frame", { rect: e.payload, displayId: state.displayId, style: "sel" }); } catch (err) { showError(String(err)); }
 });
 // the area picker closed without a selection: fall back to capturing the display
 await listen("area-cancelled", async () => {
   if (state.mode !== "area") return;
   if (!state.area) await chooseMode("display");
-  else invoke("show_area_frame", { rect: state.area, displayId: state.displayId }).catch(() => {});
+  else invoke("show_area_frame", { rect: state.area, displayId: state.displayId, style: "sel" }).catch(() => {});
 });
 await listen("toggle-record", () => (state.phase === "recording" || state.phase === "countdown" ? finishRecording() : beginRecording()));
 await listen("stop-record", () => finishRecording());
 addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  if (state.phase === "countdown") finishRecording();
+  if (document.body.classList.contains("confirm")) cancelDiscard();
+  else if (state.phase === "countdown") finishRecording();
   else if (isMenuOpen()) closeMenu();
 });
 

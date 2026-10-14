@@ -130,6 +130,18 @@ fn main_display_size(app: &AppHandle) -> (f64, f64) {
         .unwrap_or((1440.0, 900.0))
 }
 
+/// Put the record bar back at the bottom-centre of the main display at `w` x `h`. The bar is
+/// never movable; only the recording HUD is, so this is how it returns after a recording.
+#[tauri::command]
+pub async fn dock_bar(app: AppHandle, w: f64, h: f64) -> Result<(), String> {
+    let win = app.get_webview_window("recorder").ok_or("no recorder window")?;
+    let d = display_frames(&app)?.into_iter().next().ok_or("no display")?;
+    win.set_size(tauri::LogicalSize::new(w, h)).map_err(|e| e.to_string())?;
+    win.set_position(tauri::LogicalPosition::new(d.x + (d.width - w) / 2.0, d.y + d.height - h - 90.0))
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 pub fn show_recorder_window(app: &AppHandle) -> tauri::Result<()> {
     if let Some(w) = app.get_webview_window("recorder") {
         w.show()?;
@@ -276,38 +288,37 @@ pub async fn open_editor(app: AppHandle, dir: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Close the area picker without a selection (the user chose another capture mode).
+/// Close the area picker (every display's overlay) without a selection.
 #[tauri::command]
 pub fn close_area_picker(app: AppHandle) {
-    if let Some(w) = app.get_webview_window("area") {
-        let _ = w.close();
+    for (label, w) in app.webview_windows() {
+        if label == "area" || label.starts_with("area-") {
+            let _ = w.close();
+        }
     }
 }
 
+/// Dim every display and let the user drag the area on whichever one they like.
 #[tauri::command]
-pub async fn open_area_picker(app: AppHandle, display_id: Option<u32>) -> Result<(), String> {
-    if let Some(w) = app.get_webview_window("area") {
-        let _ = w.close();
-    }
+pub async fn open_area_picker(app: AppHandle, _display_id: Option<u32>) -> Result<(), String> {
+    close_area_picker(app.clone());
     let displays = display_frames(&app)?;
-    let d = match display_id {
-        Some(id) => displays.iter().find(|d| d.id == id),
-        None => displays.first(),
+    for d in &displays {
+        let url = format!("area.html?x={}&y={}&d={}", d.x, d.y, d.id);
+        WebviewWindowBuilder::new(&app, format!("area-{}", d.id), WebviewUrl::App(url.into()))
+            .title("Select area")
+            .position(d.x, d.y)
+            .inner_size(d.width, d.height)
+            .decorations(false)
+            .transparent(true)
+            .shadow(false)
+            .resizable(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .accept_first_mouse(true)
+            .build()
+            .map_err(|e| e.to_string())?;
     }
-    .ok_or("display not found")?;
-    WebviewWindowBuilder::new(&app, "area", WebviewUrl::App(format!("area.html?x={}&y={}", d.x, d.y).into()))
-        .title("Select area")
-        .position(d.x, d.y)
-        .inner_size(d.width, d.height)
-        .decorations(false)
-        .transparent(true)
-        .shadow(false)
-        .resizable(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .accept_first_mouse(true)
-        .build()
-        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -348,7 +359,7 @@ pub struct FrameRect {
 /// surround and one transparent window draws the outline. They are our own
 /// windows, so ScreenCaptureKit excludes them from the recording.
 #[tauri::command]
-pub async fn show_area_frame(app: AppHandle, rect: FrameRect, display_id: Option<u32>) -> Result<(), String> {
+pub async fn show_area_frame(app: AppHandle, rect: FrameRect, display_id: Option<u32>, style: Option<String>) -> Result<(), String> {
     hide_area_frame(app.clone());
 
     let displays = display_frames(&app)?;
@@ -368,8 +379,8 @@ pub async fn show_area_frame(app: AppHandle, rect: FrameRect, display_id: Option
     // One transparent, click-through window covering the display. The page draws
     // the dim with a cut-out hole over the area, so the area itself stays clear.
     let url = format!(
-        "frame.html?x={}&y={}&w={}&h={}",
-        ax - dx, ay - dy, aw, ah
+        "frame.html?x={}&y={}&w={}&h={}&s={}",
+        ax - dx, ay - dy, aw, ah, style.unwrap_or_else(|| "sel".into())
     );
     let win = WebviewWindowBuilder::new(&app, "frame-border", WebviewUrl::App(url.into()))
         .position(dx, dy)
@@ -514,5 +525,23 @@ pub async fn menu_show(app: AppHandle, width: f64, height: f64) -> Result<(), St
 pub fn close_menu_window(app: AppHandle) {
     if let Some(w) = app.get_webview_window("menu") {
         let _ = w.hide();
+    }
+}
+
+/// The tray's "Stop Recording" item, enabled only while a recording is running.
+pub struct TrayStop(pub tauri::menu::MenuItem<tauri::Wry>);
+
+/// Recording indicator in the menu bar / tray: enables "Stop Recording" and shows `title`
+/// (e.g. "● 0:12") next to the icon on macOS. `active = false` clears both.
+#[tauri::command]
+pub fn set_tray_recording(app: AppHandle, active: bool, title: String) {
+    if let Some(stop) = app.try_state::<TrayStop>() {
+        let _ = stop.0.set_enabled(active);
+    }
+    if let Some(t) = app.tray_by_id("tray") {
+        #[cfg(target_os = "macos")]
+        let _ = t.set_title(if active && !title.is_empty() { Some(title.clone()) } else { None });
+        let tip = if active { format!("ScreenCraft {title}") } else { "ScreenCraft".to_string() };
+        let _ = t.set_tooltip(Some(tip));
     }
 }

@@ -3,12 +3,20 @@
 <style>
   html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; pointer-events: none; }
   .dim { position: fixed; background: rgba(0, 0, 0, .30); }
+  body.hl .dim, body.rec .dim { background: transparent; }
+  body.rec .dim { background: rgba(0, 0, 0, .18); }
+  body.hl #hole { border: 3px solid #6aaee8; border-radius: 6px; background: rgba(106, 174, 232, .14); box-shadow: 0 0 0 1px rgba(0,0,0,.4), 0 0 22px rgba(106,174,232,.55); }
+  body.rec #hole { border: 2px solid #ff5566; border-radius: 3px; box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 0 16px rgba(255,85,102,.5); animation: recpulse 1.6s ease-in-out infinite; }
+  #tag { position: fixed; display: none; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 6px; background: #ff5566; color: #fff; font: 700 11px/1 -apple-system, system-ui, sans-serif; letter-spacing: .08em; }
+  body.rec #tag { display: flex; }
+  #tag i { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: recpulse 1s ease-in-out infinite; }
+  @keyframes recpulse { 50% { opacity: .45; } }
   #hole { position: fixed; box-sizing: border-box; border: 2px dashed #6aaee8; border-radius: 3px;
           box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35); }
 </style></head>
 <body>
 <div class="dim" id="t"></div><div class="dim" id="b"></div><div class="dim" id="l"></div><div class="dim" id="r"></div>
-<div id="hole"></div>
+<div id="hole"></div><div id="tag"><i></i>REC</div>
 <script>
   const q = new URLSearchParams(location.search);
   const x = +q.get("x"), y = +q.get("y"), w = +q.get("w"), h = +q.get("h");
@@ -22,5 +30,9 @@
   set("l", 0, y, x, h);
   set("r", x + w, y, W - (x + w), h);
   set("hole", x, y, w, h);
+  const kind = q.get("s") || "sel";
+  document.body.classList.add(kind);
+  const tag = document.getElementById("tag").style;
+  tag.left = x + "px"; tag.top = Math.max(4, y - 28) + "px";
 </script>
 </body></html>

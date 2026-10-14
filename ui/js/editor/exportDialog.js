@@ -1,4 +1,4 @@
-import { invoke, dialog, listen, FILE_MANAGER } from "../tauri.js";
+import { invoke, dialog, listen, FILE_MANAGER, IS_WINDOWS } from "../tauri.js";
 import { $, P, dir } from "./state.js";
 import { pause } from "./playback.js";
 import { exportMp4, exportGif, qualityBitrate } from "../export.js";
@@ -59,6 +59,15 @@ async function updateEstimates() {
 }
 
 function syncCompressUI() {
+  // compression is not available on Windows yet: hide it rather than fail the export at 55%
+  if (IS_WINDOWS) {
+    exp.compress = false;
+    exp.keep = false;
+    $("rowCompress").hidden = true;
+    $("compressOpts").hidden = true;
+    $("expCompress").classList.remove("on");
+    return;
+  }
   $("expCompress").classList.toggle("on", exp.compress);
   $("compressOpts").hidden = !(exp.compress && exp.format === "mp4");
   $("rowCompress").hidden = exp.format !== "mp4";

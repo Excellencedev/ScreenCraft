@@ -1,5 +1,5 @@
 // Start / stop recording (screen via Rust, camera via MediaRecorder).
-import { invoke } from "../tauri.js";
+import { invoke, currentWindow, LogicalPosition } from "../tauri.js";
 import { $, state, showError, hooks, anyLoading } from "./state.js";
 import { showBar, resizeBar } from "./window.js";
 import { closeMenu, isMenuOpen } from "./menu.js";
@@ -231,15 +231,76 @@ export async function beginRecording() {
   document.body.classList.add("hud");
   $("hudLeft").style.display = "flex";
   $("btnStop").style.display = "block";
-  await resizeBar(cam ? 330 : 290, 60);
+  await resizeBar(cam ? 380 : 340, 60);
+  await placeHudNearArea();
   const t0 = performance.now();
-  timerHandle = setInterval(() => {
+  const paint = () => {
     const s = Math.floor((performance.now() - t0) / 1000);
-    $("timer").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-  }, 250);
+    const t = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    $("timer").textContent = t;
+    invoke("set_tray_recording", { active: true, title: `● ${t}` }).catch(() => {});
+  };
+  paint();
+  timerHandle = setInterval(paint, 1000);
+  if (state.mode === "area" && state.area) {
+    invoke("show_area_frame", { rect: state.area, displayId: state.displayId, style: "rec" }).catch(() => {});
+  }
+}
+
+/** In area mode the Stop HUD sits just outside the area's border, where you are looking. */
+async function placeHudNearArea() {
+  if (state.mode !== "area" || !state.area) return;
+  try {
+    const a = state.area;
+    const w = 340, h = 60, gap = 10;
+    const srcs = state.sources?.displays || [];
+    const d = srcs.find((x) => x.id === state.displayId) || srcs[0];
+    const top = d ? d.y : 0, bottom = d ? d.y + d.height : 1080;
+    let y = a.y + a.height + gap;
+    if (y + h > bottom - 4) y = a.y - h - gap;           // no room below: above the area
+    if (y < top + 4) y = a.y + a.height - h - gap;       // no room either side: inside, bottom edge
+    const x = Math.max((d ? d.x : 0) + 4, a.x + a.width - w);
+    await currentWindow().setPosition(new LogicalPosition(x, y));
+  } catch {}
 }
 
 let countdownRun = 0;
+
+/** Stop a MediaRecorder and wait for it, without ever hanging (it may already be inactive). */
+function stopRecorder(rec) {
+  return new Promise((res) => {
+    if (!rec || rec.state === "inactive") return res();
+    const done = setTimeout(res, 4000);
+    rec.onstop = () => { clearTimeout(done); res(); };
+    try { rec.stop(); } catch { clearTimeout(done); res(); }
+  });
+}
+
+/** Stop the camera and microphone recorders and flush their chunks. Never throws. */
+async function stopSideRecorders() {
+  try {
+    if (cameraRec) {
+      await stopRecorder(cameraRec.rec);
+      if (!cameraRec.shared) cameraRec.stream.getTracks().forEach((t) => t.stop());
+      $("hudCam").classList.remove("on");
+      await writeChain;
+    }
+  } catch {}
+  try {
+    if (micRec) {
+      await stopRecorder(micRec.rec);
+      micRec.stream.getTracks().forEach((t) => t.stop());
+      await micChain;
+    }
+  } catch {}
+}
+
+function endRecordingUi() {
+  clearInterval(timerHandle);
+  document.body.classList.remove("confirm");
+  invoke("set_tray_recording", { active: false, title: "" }).catch(() => {});
+  invoke("hide_area_frame").catch(() => {});
+}
 
 export async function finishRecording() {
   if (state.phase === "countdown") {
@@ -255,36 +316,55 @@ export async function finishRecording() {
   state.phase = "finishing";
   clearInterval(timerHandle);
   $("timer").textContent = "Saving…";
-  if (cameraRec) {
-    await new Promise((res) => {
-      cameraRec.rec.onstop = res;
-      cameraRec.rec.stop();
-    });
-    if (!cameraRec.shared) cameraRec.stream.getTracks().forEach((t) => t.stop());
-    $("hudCam").classList.remove("on");
-    await writeChain;
-  }
-  if (micRec) {
-    await new Promise((res) => {
-      micRec.rec.onstop = res;
-      micRec.rec.stop();
-    });
-    micRec.stream.getTracks().forEach((t) => t.stop());
-    await micChain;
-  }
+  await stopSideRecorders();
+  let dir = null;
   try {
-    const dir = await invoke("stop_recording", {
+    dir = await invoke("stop_recording", {
       cameraStartedUnixMs: cameraRec ? cameraStartedMs : null,
       micStartedUnixMs: micRec ? micStartedMs : null,
     });
-    await invoke("hide_area_frame");
-    await invoke("open_editor", { dir });
   } catch (e) {
-    showError(String(e));
+    showError(`Could not stop the recording: ${e}`);
   }
   cameraRec = null;
   micRec = null;
+  endRecordingUi();
+  if (dir) {
+    try { await invoke("open_editor", { dir }); } catch (e) { showError(String(e)); }
+  }
   resetUI();
+}
+
+/** Scrap the recording: stop everything and delete the project. Asks first (see btnTrash). */
+export async function discardRecording() {
+  if (state.phase !== "recording") return;
+  state.phase = "finishing";
+  clearInterval(timerHandle);
+  document.body.classList.remove("confirm");
+  $("timer").textContent = "Discarding…";
+  await resizeBar(cameraRec ? 380 : 340, 60);
+  await stopSideRecorders();
+  try {
+    const dir = await invoke("stop_recording", { cameraStartedUnixMs: null, micStartedUnixMs: null });
+    if (dir) await invoke("discard_project", { dir });
+  } catch (e) {
+    showError(`Could not discard the recording: ${e}`);
+  }
+  cameraRec = null;
+  micRec = null;
+  endRecordingUi();
+  resetUI();
+}
+
+/** Ask before scrapping: the HUD turns into a small confirmation. */
+export async function askDiscard() {
+  if (state.phase !== "recording") return;
+  document.body.classList.add("confirm");
+  await resizeBar(420, 60);
+}
+export async function cancelDiscard() {
+  document.body.classList.remove("confirm");
+  await resizeBar(cameraRec ? 380 : 340, 60);
 }
 
 async function resetUI() {

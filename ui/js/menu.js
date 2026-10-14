@@ -25,6 +25,7 @@ function render(items) {
       s.textContent = it.sub;
       b.appendChild(s);
     }
+    b.onmouseenter = () => emit("menu-hover", { id: it.id });
     b.onclick = async () => {
       await emit("menu-pick", { id: it.id });
       invoke("close_menu_window");

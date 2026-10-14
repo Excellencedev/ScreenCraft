@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Recording controls.** The record bar is now locked bottom-centre on the main display. While recording, the
+  timer and Stop move freely (and sit just outside an area's border); a trash button scraps the
+  whole recording after a confirmation. Area recordings get a red, pulsing outline with a REC tag,
+  and the menu bar shows a recording indicator with the elapsed time.
+- **Window and area picking.** Hovering a window in the list outlines it on screen. Choosing an area
+  dims every display so you can start dragging on any of them.
+- **Fixes.** Stop always stops (a camera or microphone recorder that had already ended could block it),
+  the menu-bar "Stop Recording" is only enabled while recording, and Windows no longer offers
+  "Compress after export", which could not work there and made exports fail.
 - **Update notifications (never automatic).** At startup ScreenCraft can check, with one small
   request that sends only its version number, whether a newer version exists. If so, About, Privacy
   & Updates tells you and offers the download page; nothing is downloaded or installed by itself.

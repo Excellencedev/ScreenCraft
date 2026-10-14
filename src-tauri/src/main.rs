@@ -210,6 +210,7 @@ fn main() {
             commands::files::test_export_path,
             commands::files::get_settings,
             commands::files::set_projects_dir,
+            commands::files::discard_project,
             commands::compress::probe_video,
             commands::compress::compress_video,
             commands::compress::cancel_compress,
@@ -226,6 +227,8 @@ fn main() {
             windows::show_recorder,
             windows::show_permissions,
             windows::show_about,
+            windows::dock_bar,
+            windows::set_tray_recording,
             updates::update_prefs,
             updates::set_update_check,
             updates::dismiss_update,
@@ -243,7 +246,8 @@ fn main() {
             let compress = MenuItem::with_id(app, "compress", "Compress Video…", true, None::<&str>)?;
             let perms = MenuItem::with_id(app, "perms", "Permissions…", true, None::<&str>)?;
             let about = MenuItem::with_id(app, "about", "About, Privacy & Updates…", true, None::<&str>)?;
-            let stop = MenuItem::with_id(app, "stop", "Stop Recording", true, None::<&str>)?;
+            let stop = MenuItem::with_id(app, "stop", "Stop Recording", false, None::<&str>)?;
+            app.manage(windows::TrayStop(stop.clone()));
             let quit = MenuItem::with_id(app, "quit", "Quit ScreenCraft", true, Some("CmdOrCtrl+Q"))?;
             let menu = Menu::with_items(app, &[&new_rec, &compress, &perms, &about, &stop, &quit])?;
             TrayIconBuilder::with_id("tray")

@@ -1,6 +1,8 @@
-import { emit, currentWindow } from "./tauri.js";
+import { emit, invoke } from "./tauri.js";
 const q = new URLSearchParams(location.search);
 const ox = parseFloat(q.get("x") || "0"), oy = parseFloat(q.get("y") || "0");
+const did = q.get("d") ? Number(q.get("d")) : null;
+const closeAll = () => invoke("close_area_picker");
 const sel = document.getElementById("sel"), lab = document.getElementById("lab");
 let start = null, rect = null;
 
@@ -21,15 +23,15 @@ addEventListener("mousemove", (e) => {
 addEventListener("mouseup", async () => {
   start = null;
   if (rect && rect.w > 40 && rect.h > 40) {
-    await emit("area-selected", { x: ox + rect.x, y: oy + rect.y, width: rect.w, height: rect.h });
+    await emit("area-selected", { x: ox + rect.x, y: oy + rect.y, width: rect.w, height: rect.h, displayId: did });
   } else {
     await emit("area-cancelled", {});
   }
-  currentWindow().close();
+  closeAll();
 });
 addEventListener("keydown", async (e) => {
   if (e.key === "Escape") {
     await emit("area-cancelled", {});
-    currentWindow().close();
+    closeAll();
   }
 });

@@ -7,8 +7,11 @@ use crate::state::{save_settings, AppState, CmdResult};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
-const MANIFEST_URL: &str = "https://screencraft.mdnlabs.dev/latest.json";
+/// The same static file, served by the same Cloudflare Pages project on both names; the second
+/// is a fallback for networks that block the custom domain.
+const MANIFEST_URLS: &[&str] = &["https://screencraft.mdnlabs.dev/latest.json", "https://getscreencraft.pages.dev/latest.json"];
 const ALLOWED_PREFIX: &str = "https://screencraft.mdnlabs.dev/";
+const ALLOWED_FALLBACK: &str = "https://getscreencraft.pages.dev/";
 
 #[derive(Deserialize)]
 struct Manifest {
@@ -59,16 +62,24 @@ fn newer(latest: &str, current: &str) -> bool {
 }
 
 fn fetch(current: &str) -> Result<UpdateInfo, String> {
-    let resp = ureq::get(MANIFEST_URL)
-        .set("User-Agent", &format!("ScreenCraft/{current}"))
-        .timeout(std::time::Duration::from_secs(8))
-        .call()
-        .map_err(|e| format!("could not reach the update server: {e}"))?;
+    let mut last = String::new();
+    let mut got = None;
+    for url in MANIFEST_URLS {
+        match ureq::get(url)
+            .set("User-Agent", &format!("ScreenCraft/{current}"))
+            .timeout(std::time::Duration::from_secs(8))
+            .call()
+        {
+            Ok(r) => { got = Some(r); break; }
+            Err(e) => last = e.to_string(),
+        }
+    }
+    let resp = got.ok_or_else(|| format!("could not reach the update server: {last}"))?;
     let body = resp.into_string().map_err(|e| format!("unreadable update information: {e}"))?;
     let m: Manifest = serde_json::from_str(&body).map_err(|e| format!("unreadable update information: {e}"))?;
     let pick = if cfg!(windows) { &m.windows } else { &m.mac };
     // only ever hand out links on our own site
-    let ok = |u: &str| u.starts_with(ALLOWED_PREFIX);
+    let ok = |u: &str| u.starts_with(ALLOWED_PREFIX) || u.starts_with(ALLOWED_FALLBACK);
     let page = if ok(&m.page) { m.page.clone() } else { format!("{ALLOWED_PREFIX}download") };
     let download = if ok(pick) { pick.clone() } else { page.clone() };
     Ok(UpdateInfo {
