@@ -3,6 +3,7 @@
 export const LANGS = ['en', 'fr', 'es', 'pt-BR', 'ja', 'zh-CN', 'zh-TW', 'de'];
 
 const en = {
+  'p.all': "Free under the MIT license. No account, no telemetry, no cloud rendering. Everything is recorded, edited and exported on your own machine, by a native Rust core.",
   skip: 'Skip to content', lang: 'Language',
   'nav.docs': 'Docs', 'nav.features': 'Features', 'nav.faq': 'FAQ', 'nav.downloads': 'Downloads',
   'hero.title': 'Record your screen. It already looks edited.',
@@ -23,9 +24,6 @@ const en = {
   'more.pace.t': 'Pace and transitions', 'more.pace.d': 'Speed up idle stretches, ramp speed, freeze a frame, cross-dissolve between clips.',
   'more.audio.t': 'Audio', 'more.audio.d': 'Mic levelling, music that ducks under your voice, and optional click and key sounds.',
   'more.look.t': 'Look', 'more.look.d': 'Wallpapers with subtle motion, device frames, padding, corners, shadow and any aspect ratio.',
-  'p.free': '<b>Free, for good.</b>MIT licensed. Read the code, change it, ship it.',
-  'p.local': '<b>Nothing leaves your machine.</b>No account, no telemetry, no cloud rendering.',
-  'p.rust': '<b>Native and quick.</b>A Rust core with hardware capture and encoding.',
   'cta.title': 'Make your next demo look good.', 'cta.sub': 'Free for macOS and Windows. Install it, press record.',
   'foot.tag': 'A free, open-source screen recorder and editor for macOS and Windows. Everything runs on your own machine.',
   'foot.product': 'Product', 'foot.platforms': 'Platforms', 'foot.project': 'Project', 'foot.legal': 'Legal',
@@ -49,6 +47,7 @@ const en = {
 };
 
 const fr = {
+  'p.all': "Gratuit sous licence MIT. Sans compte, sans télémétrie, sans rendu cloud. Tout est enregistré, monté et exporté sur votre machine, par un cœur Rust natif.",
   skip: 'Aller au contenu', lang: 'Langue',
   'nav.docs': 'Documentation', 'nav.features': 'Fonctionnalités', 'nav.faq': 'FAQ', 'nav.downloads': 'Téléchargements',
   'hero.title': 'Enregistrez votre écran. Il est déjà monté.',
@@ -69,9 +68,6 @@ const fr = {
   'more.pace.t': 'Rythme et transitions', 'more.pace.d': 'Accélérez les temps morts, variez la vitesse, figez une image, fondu enchaîné entre plans.',
   'more.audio.t': 'Audio', 'more.audio.d': 'Nivellement du micro, musique qui s’efface sous la voix, sons de clic et de touches en option.',
   'more.look.t': 'Apparence', 'more.look.d': 'Fonds animés en douceur, cadres d’appareil, marges, coins, ombre et tous les formats.',
-  'p.free': '<b>Gratuit, pour de bon.</b>Licence MIT. Lisez le code, modifiez-le, diffusez-le.',
-  'p.local': '<b>Rien ne quitte votre machine.</b>Sans compte, sans télémétrie, sans rendu cloud.',
-  'p.rust': '<b>Natif et rapide.</b>Un cœur Rust avec capture et encodage matériels.',
   'cta.title': 'Donnez fière allure à votre prochaine démo.', 'cta.sub': 'Gratuit sur macOS et Windows. Installez, puis enregistrez.',
   'foot.tag': 'Un enregistreur et éditeur d’écran libre et gratuit pour macOS et Windows. Tout s’exécute sur votre machine.',
   'foot.product': 'Produit', 'foot.platforms': 'Plateformes', 'foot.project': 'Projet', 'foot.legal': 'Mentions légales',
@@ -95,6 +91,7 @@ const fr = {
 };
 
 const es = {
+  'p.all': "Gratis bajo la licencia MIT. Sin cuenta, sin telemetría, sin renderizado en la nube. Todo se graba, edita y exporta en tu equipo, con un núcleo nativo en Rust.",
   skip: 'Saltar al contenido', lang: 'Idioma',
   'nav.docs': 'Documentación', 'nav.features': 'Funciones', 'nav.faq': 'Preguntas', 'nav.downloads': 'Descargas',
   'hero.title': 'Graba tu pantalla. Ya sale editada.',
@@ -115,9 +112,6 @@ const es = {
   'more.pace.t': 'Ritmo y transiciones', 'more.pace.d': 'Acelera los tiempos muertos, rampas de velocidad, congela un fotograma y fundidos entre clips.',
   'more.audio.t': 'Audio', 'more.audio.d': 'Nivelación del micrófono, música que baja con tu voz y sonidos opcionales de clic y teclas.',
   'more.look.t': 'Aspecto', 'more.look.d': 'Fondos con movimiento sutil, marcos de dispositivo, márgenes, esquinas, sombra y cualquier proporción.',
-  'p.free': '<b>Gratis, para siempre.</b>Licencia MIT. Lee el código, cámbialo, distribúyelo.',
-  'p.local': '<b>Nada sale de tu equipo.</b>Sin cuenta, sin telemetría, sin renderizado en la nube.',
-  'p.rust': '<b>Nativo y rápido.</b>Un núcleo en Rust con captura y codificación por hardware.',
   'cta.title': 'Haz que tu próxima demo luzca bien.', 'cta.sub': 'Gratis para macOS y Windows. Instala y pulsa grabar.',
   'foot.tag': 'Un grabador y editor de pantalla libre y gratuito para macOS y Windows. Todo se ejecuta en tu equipo.',
   'foot.product': 'Producto', 'foot.platforms': 'Plataformas', 'foot.project': 'Proyecto', 'foot.legal': 'Legal',
@@ -141,6 +135,7 @@ const es = {
 };
 
 const ptBR = {
+  'p.all': "Grátis sob a licença MIT. Sem conta, sem telemetria, sem renderização na nuvem. Tudo é gravado, editado e exportado na sua máquina, por um núcleo nativo em Rust.",
   skip: 'Pular para o conteúdo', lang: 'Idioma',
   'nav.docs': 'Documentação', 'nav.features': 'Recursos', 'nav.faq': 'Perguntas', 'nav.downloads': 'Downloads',
   'hero.title': 'Grave sua tela. Ela já sai editada.',
@@ -161,9 +156,6 @@ const ptBR = {
   'more.pace.t': 'Ritmo e transições', 'more.pace.d': 'Acelere trechos parados, rampas de velocidade, congele um quadro e dissolva entre clipes.',
   'more.audio.t': 'Áudio', 'more.audio.d': 'Nivelamento do microfone, música que abaixa com sua voz e sons opcionais de clique e teclas.',
   'more.look.t': 'Visual', 'more.look.d': 'Fundos com movimento sutil, molduras de dispositivo, margens, cantos, sombra e qualquer proporção.',
-  'p.free': '<b>Grátis, de verdade.</b>Licença MIT. Leia o código, altere, distribua.',
-  'p.local': '<b>Nada sai da sua máquina.</b>Sem conta, sem telemetria, sem renderização na nuvem.',
-  'p.rust': '<b>Nativo e rápido.</b>Um núcleo em Rust com captura e codificação por hardware.',
   'cta.title': 'Deixe sua próxima demo com cara de pronta.', 'cta.sub': 'Grátis para macOS e Windows. Instale e aperte gravar.',
   'foot.tag': 'Um gravador e editor de tela livre e gratuito para macOS e Windows. Tudo roda na sua máquina.',
   'foot.product': 'Produto', 'foot.platforms': 'Plataformas', 'foot.project': 'Projeto', 'foot.legal': 'Legal',
@@ -187,6 +179,7 @@ const ptBR = {
 };
 
 const ja = {
+  'p.all': "MIT ライセンスで無料。アカウント、テレメトリ、クラウドレンダリングはありません。録画、編集、書き出しのすべてが、ネイティブな Rust コアによってお使いのマシン上で行われます。",
   skip: '本文へスキップ', lang: '言語',
   'nav.docs': 'ドキュメント', 'nav.features': '機能', 'nav.faq': 'FAQ', 'nav.downloads': 'ダウンロード',
   'hero.title': '画面を録画するだけで、編集済みの仕上がりに。',
@@ -207,9 +200,6 @@ const ja = {
   'more.pace.t': 'テンポとトランジション', 'more.pace.d': '無操作区間の早送り、速度のランプ、フリーズフレーム、クリップ間のクロスディゾルブ。',
   'more.audio.t': 'オーディオ', 'more.audio.d': 'マイクのレベル調整、声に合わせて下がる BGM、クリック音とキー音（任意）。',
   'more.look.t': 'ルック', 'more.look.d': '控えめに動く壁紙、デバイスフレーム、余白、角丸、影、任意のアスペクト比。',
-  'p.free': '<b>ずっと無料。</b>MIT ライセンス。コードを読み、変更し、配布できます。',
-  'p.local': '<b>データはマシンの外へ出ません。</b>アカウント、テレメトリ、クラウドレンダリングはありません。',
-  'p.rust': '<b>ネイティブで高速。</b>Rust コアとハードウェアによるキャプチャ／エンコード。',
   'cta.title': '次のデモを、もっと見栄えよく。', 'cta.sub': 'macOS と Windows で無料。インストールして録画を押すだけ。',
   'foot.tag': 'macOS と Windows 向けの、無料のオープンソース画面録画・編集アプリ。すべてお使いのマシン上で動作します。',
   'foot.product': '製品', 'foot.platforms': 'プラットフォーム', 'foot.project': 'プロジェクト', 'foot.legal': '法的情報',
@@ -233,6 +223,7 @@ const ja = {
 };
 
 const zhCN = {
+  'p.all': "MIT 许可证下免费。无账号、无遥测、无云端渲染。录制、编辑和导出全部由原生 Rust 内核在你的设备上完成。",
   skip: '跳到内容', lang: '语言',
   'nav.docs': '文档', 'nav.features': '功能', 'nav.faq': '常见问题', 'nav.downloads': '下载',
   'hero.title': '录制屏幕，直接就是剪辑好的效果。',
@@ -253,9 +244,6 @@ const zhCN = {
   'more.pace.t': '节奏与转场', 'more.pace.d': '加速空闲片段、速度渐变、定格画面、片段间交叉溶解。',
   'more.audio.t': '音频', 'more.audio.d': '麦克风电平调整、说话时自动压低的音乐，以及可选的点击和按键音效。',
   'more.look.t': '外观', 'more.look.d': '带细微动态的壁纸、设备边框、边距、圆角、阴影和任意画面比例。',
-  'p.free': '<b>永久免费。</b>MIT 许可证。可阅读、修改和分发代码。',
-  'p.local': '<b>数据不出本机。</b>无账号、无遥测、无云端渲染。',
-  'p.rust': '<b>原生且快速。</b>Rust 内核，硬件采集与编码。',
   'cta.title': '让下一个演示更好看。', 'cta.sub': 'macOS 和 Windows 免费使用。安装后点击录制即可。',
   'foot.tag': '适用于 macOS 和 Windows 的免费开源屏幕录制与编辑工具，一切都在你的设备上运行。',
   'foot.product': '产品', 'foot.platforms': '平台', 'foot.project': '项目', 'foot.legal': '法律',
@@ -279,6 +267,7 @@ const zhCN = {
 };
 
 const zhTW = {
+  'p.all': "以 MIT 授權免費提供。無帳號、無遙測、無雲端算圖。錄製、編輯與匯出全部由原生 Rust 核心在你的裝置上完成。",
   skip: '跳至內容', lang: '語言',
   'nav.docs': '文件', 'nav.features': '功能', 'nav.faq': '常見問題', 'nav.downloads': '下載',
   'hero.title': '錄製螢幕，直接就是剪輯好的效果。',
@@ -299,9 +288,6 @@ const zhTW = {
   'more.pace.t': '節奏與轉場', 'more.pace.d': '加速閒置片段、速度漸變、定格畫面、片段間交叉溶接。',
   'more.audio.t': '音訊', 'more.audio.d': '麥克風音量調整、說話時自動壓低的音樂，以及可選的點擊與按鍵音效。',
   'more.look.t': '外觀', 'more.look.d': '帶細微動態的桌布、裝置外框、邊距、圓角、陰影與任意畫面比例。',
-  'p.free': '<b>永久免費。</b>MIT 授權。可閱讀、修改與散布程式碼。',
-  'p.local': '<b>資料不離開本機。</b>無帳號、無遙測、無雲端算圖。',
-  'p.rust': '<b>原生且快速。</b>Rust 核心，硬體擷取與編碼。',
   'cta.title': '讓下一個示範更好看。', 'cta.sub': 'macOS 與 Windows 免費使用。安裝後按下錄製即可。',
   'foot.tag': '適用於 macOS 與 Windows 的免費開源螢幕錄製與編輯工具，一切都在你的裝置上執行。',
   'foot.product': '產品', 'foot.platforms': '平台', 'foot.project': '專案', 'foot.legal': '法律',
@@ -325,6 +311,7 @@ const zhTW = {
 };
 
 const de = {
+  'p.all': "Kostenlos unter der MIT-Lizenz. Kein Konto, keine Telemetrie, kein Cloud-Rendering. Aufnahme, Schnitt und Export laufen auf deinem Rechner, mit einem nativen Rust-Kern.",
   skip: 'Zum Inhalt springen', lang: 'Sprache',
   'nav.docs': 'Dokumentation', 'nav.features': 'Funktionen', 'nav.faq': 'FAQ', 'nav.downloads': 'Downloads',
   'hero.title': 'Bildschirm aufnehmen. Sieht schon geschnitten aus.',
@@ -345,9 +332,6 @@ const de = {
   'more.pace.t': 'Tempo und Übergänge', 'more.pace.d': 'Leerlauf beschleunigen, Tempo-Rampen, Standbild, Überblendung zwischen Clips.',
   'more.audio.t': 'Audio', 'more.audio.d': 'Mikrofon-Pegelung, Musik, die unter deiner Stimme leiser wird, optionale Klick- und Tastentöne.',
   'more.look.t': 'Look', 'more.look.d': 'Hintergründe mit dezenter Bewegung, Geräterahmen, Abstand, Ecken, Schatten und jedes Seitenverhältnis.',
-  'p.free': '<b>Kostenlos, dauerhaft.</b>MIT-Lizenz. Code lesen, ändern, weitergeben.',
-  'p.local': '<b>Nichts verlässt deinen Rechner.</b>Kein Konto, keine Telemetrie, kein Cloud-Rendering.',
-  'p.rust': '<b>Nativ und schnell.</b>Ein Rust-Kern mit Hardware-Aufnahme und -Encoding.',
   'cta.title': 'Gib deiner nächsten Demo den letzten Schliff.', 'cta.sub': 'Kostenlos für macOS und Windows. Installieren, Aufnahme drücken.',
   'foot.tag': 'Ein freier, kostenloser Bildschirmrecorder und Editor für macOS und Windows. Alles läuft auf deinem eigenen Rechner.',
   'foot.product': 'Produkt', 'foot.platforms': 'Plattformen', 'foot.project': 'Projekt', 'foot.legal': 'Rechtliches',
