@@ -66,3 +66,10 @@ applyLang(lang);
 document.querySelectorAll('[data-os-cta]').forEach((a) => {
   a.href = isMac ? a.dataset.mac : a.dataset.win;
 });
+
+// live GitHub star count, via our own cached endpoint
+fetch('/api/stars').then((r) => r.json()).then(({ stars }) => {
+  if (typeof stars !== 'number') return;
+  const text = stars >= 1000 ? (stars / 1000).toFixed(stars >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k' : String(stars);
+  document.querySelectorAll('.star-count').forEach((el) => { el.textContent = text; el.hidden = false; });
+}).catch(() => {});

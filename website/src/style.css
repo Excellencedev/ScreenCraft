@@ -174,3 +174,6 @@ kbd { background: var(--surface); border: 1px solid var(--line-2); border-bottom
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } html { scroll-behavior: auto; } }
 .nav.open { background: var(--bg); backdrop-filter: none; }
 .nav-panel { max-height: calc(100vh - var(--nav-h)); overflow-y: auto; }
+.star-count { font-family: var(--mono); font-size: 13.5px; color: var(--muted); }
+.star-count[hidden] { display: none; }
+@media (max-width: 1040px) { .gh-btn .star-count { display: none; } }
