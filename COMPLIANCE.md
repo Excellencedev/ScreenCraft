@@ -19,11 +19,10 @@ responsibly, what has been done, and what remains for the maintainer or for anyo
 | Item | Where | Requirement |
 | --- | --- | --- |
 | Third-party notices | [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), also on the website | MIT/BSD/ISC/Apache require the license and copyright notice to accompany binary distributions. This file is that notice. **Ship it (or a link to it) with every build.** |
-| whisper.cpp / ggml | MIT | Credited in notices, README and the Captions panel. |
-| OpenAI Whisper weights | MIT | Not bundled; downloaded by the user from Hugging Face. Credited. |
-| symphonia and a few other crates | MPL-2.0 | File-level copyleft. Used unmodified; source is public on crates.io. If you modify those crates' files you must publish your modifications to them. |
+| OpenH264, rav1e, libopus (and libvpx when built with `vp9`) | BSD-2/3-Clause | Credited in the notices file. **H.264 patents:** Cisco's royalty-free grant covers only its own binaries; ScreenCraft builds OpenH264 from source and also uses the OS hardware encoder (VideoToolbox) where available. Anyone shipping H.264 output commercially should confirm their own licensing position. AV1 (rav1e) and VP9 / Opus come with royalty-free patent grants. |
+| Crates under MPL-2.0 (if any appear in the lock file) | MPL-2.0 | File-level copyleft. Used unmodified; source is public on crates.io. If you modify those crates' files you must publish your modifications to them. |
 | Dual-licensed crates (`MIT OR Apache-2.0`, `... OR LGPL`) | | We elect MIT/Apache-2.0. No LGPL code is linked. |
-| Regenerating the list | `cargo metadata` over `src-tauri/Cargo.toml` | Re-run when dependencies change (see the notices file header). `cargo deny check licenses` is a good CI gate. |
+| Regenerating the list | `python3 scripts/gen-notices.py` (reads `cargo metadata`) | Re-run when dependencies change. `cargo deny check licenses` is a good CI gate. |
 
 No GPL/AGPL/LGPL code is linked into ScreenCraft; keep it that way, because it would change the terms
 of distribution for the whole binary.
@@ -63,13 +62,14 @@ the rights to anything they record or add (music, logos, third-party footage).
 
 | Platform | What is required for distribution | Status |
 | --- | --- | --- |
-| macOS | Usage-description strings for Screen Recording, Microphone, Camera, Accessibility (in `Info.plist`). Developer ID signing + notarization to avoid Gatekeeper warnings. | Strings present. Ad-hoc signed only; **notarization needs a paid Apple Developer account** (not done). |
-| Windows | Authenticode code signing to avoid SmartScreen warnings. WebView2 runtime handling. | Unsigned; installer bootstraps WebView2 via Microsoft's official bootstrapper. A code-signing certificate (or Azure Trusted Signing) is a future step. |
+| macOS | Usage-description strings for Screen Recording and Microphone (written into `Info.plist` by `scripts/bundle.sh`). Developer ID signing + notarization to avoid Gatekeeper warnings. | Strings present. Ad-hoc signed only; **notarization needs a paid Apple Developer account** (not done). |
+| Windows | Authenticode code signing to avoid SmartScreen warnings. | Unsigned. No runtime prerequisites (the UI is native). A code-signing certificate (or Azure Trusted Signing) is a future step. |
+| Linux | Needs `xdg-desktop-portal` with a ScreenCast backend and PipeWire at runtime. | Documented in the README. No package is published yet. |
 | Both | Distribute the MIT license and third-party notices with the binary. | The repository root carries both; link them from any release page. |
 
 ## 7. Export controls and encryption
 
-The app uses TLS (rustls/ring) only to download the optional model. Publicly available open-source
+The app itself makes no network connections (there is no update check, telemetry or model download). Publicly available open-source
 software with mass-market encryption is generally not restricted, but US EAR §742.15(b) asks for an
 email notification to BIS/NSA for publicly available encryption source code in some cases. If you publish
 builds from the US, check this once; it is a one-off notification, not an ongoing duty.
@@ -89,7 +89,7 @@ builds from the US, check this once; it is a one-off notification, not an ongoin
 
 ## 10. Maintainer checklist before each release
 
-1. Bump version in `Cargo.toml`, `src-tauri/tauri.conf.json`, `website/package.json`; update `CHANGELOG.md`.
+1. Bump `version` in the workspace `Cargo.toml` and `website/package.json`; update `CHANGELOG.md`.
 2. Regenerate `THIRD-PARTY-NOTICES.md` if dependencies changed.
 3. Build both installers; record SHA-256 sums in the release notes.
 4. Confirm the privacy policy still matches what the app and site do.

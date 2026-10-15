@@ -4,6 +4,5 @@ node_modules/
 .DS_Store
 # third-party reverse-engineering toolkit used for research (own git history)
 reference/
-src-tauri/gen/
 website/public/downloads/
 website/public/latest.json

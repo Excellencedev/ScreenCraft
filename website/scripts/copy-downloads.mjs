@@ -14,7 +14,7 @@ for (const f of ['ScreenCraft.dmg', 'ScreenCraft-Setup.exe']) {
 
 // latest.json: what the app's notify-only update check reads. The version comes from the app's
 // own config, the notes from the matching section of CHANGELOG.md (bold bullet titles).
-const conf = JSON.parse(readFileSync(join(root, 'src-tauri', 'tauri.conf.json'), 'utf8'));
+const conf = { version: readFileSync(join(root, 'Cargo.toml'), 'utf8').match(/^version = "([^"]+)"/m)[1] };
 const log = readFileSync(join(root, 'CHANGELOG.md'), 'utf8');
 const section = log.split(/\n(?=## )/).find((b) => b.startsWith(`## ${conf.version}`)) || '';
 const notes = [...section.matchAll(/^- \*\*(.+?)\*\*/gm)].map((m) => m[1].replace(/[.:]$/, '')).slice(0, 5);

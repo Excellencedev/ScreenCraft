@@ -1,22 +1,22 @@
 <p align="center">
-  <img src="src-tauri/icons/icon-1024.png" alt="ScreenCraft" width="128">
+  <img src="assets/icons/icon-1024.png" alt="ScreenCraft" width="128">
 </p>
 
 <h1 align="center">ScreenCraft</h1>
 
 <p align="center">
   <b>Screen recording and video editing; an open-source, from-scratch alternative to Screen Studio, built in Rust.</b><br>
-  Automatic zooms that follow your cursor and typing, smooth cursor, camera layouts, annotations,<br>
-  captions, speed ramps and transitions, in a native app that records and exports on your own machine.
+  Automatic zooms that follow your cursor and typing, a smooth cursor with click effects and highlight,<br>
+  non-destructive trim / split / speed, and AV1 / H.264 / VP9 export, in one native Rust app.
 </p>
 
 <p align="center">
   <img alt="Rust" src="https://img.shields.io/badge/core-Rust-b7410e?style=flat-square&logo=rust">
-  <img alt="macOS · Windows" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows-native-0EA5C6?style=flat-square">
+  <img alt="macOS · Windows · Linux" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-native-0EA5C6?style=flat-square">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-3a3a3a?style=flat-square">
-  <img alt="Version 0.3.0" src="https://img.shields.io/badge/version-0.2.0-5b6ee1?style=flat-square">
+  <img alt="Version 0.4.0" src="https://img.shields.io/badge/version-0.4.0-5b6ee1?style=flat-square">
   <img alt="Status: early alpha" src="https://img.shields.io/badge/status-early%20alpha-d69e2e?style=flat-square">
-  <img alt="On-device captions" src="https://img.shields.io/badge/captions-on--device-2f9a72?style=flat-square">
+  <img alt="Pure Rust engines" src="https://img.shields.io/badge/engines-Rust%20%2B%20wgpu-2f9a72?style=flat-square">
 </p>
 
 <p align="center">
@@ -47,88 +47,56 @@
 
 ## Screenshots
 
-The editor, with a generated demo recording (a synthetic "app" with a typing
-box, not real footage). Zoom regions are the blue blocks on the timeline.
+The editor, with a generated demo recording (a synthetic "app", not real footage). Zoom regions
+are the blue blocks on the timeline; the waveform sits inside the clip.
 
-![The editor](docs/screenshots/editor.jpg)
+![The editor](docs/screenshots/editor.png)
 
-Paused inside a zoom: the camera is framing the cards and the preview re-fetches a
-full-resolution frame so zoomed stills stay sharp.
+Paused inside a zoom region: the camera frames the content and the click ripple and cursor are
+drawn by the same shader the exporter uses.
 
-![Zoomed in the editor](docs/screenshots/editor-zoom.jpg)
+![Zoomed in the editor](docs/screenshots/editor-zoom.png)
 
-Cursor and camera-motion settings:
+Light theme (the app follows the system setting), cursor and click-effect settings:
 
-![Cursor and camera motion](docs/screenshots/editor-cursor.jpg)
+![Light theme](docs/screenshots/editor-light.png)
 
-Export, with optional compress-after-export and a size estimate:
+The library and capture setup:
 
-![Export dialog](docs/screenshots/export.jpg)
-
-The recorder bar: capture mode, camera / microphone / system audio with level
-meters, resolution and frame rate, and the project list.
-
-![Recorder bar](docs/screenshots/recorder.jpg)
+![Library](docs/screenshots/library.png)
 
 ## What it does
 
 **Recording**
-- Capture a full display, a single window, or a dragged area (the area outside it is
-  dimmed so you can see what is being recorded).
-- Camera bubble, microphone and system audio, each with a device picker and a live
-  level meter. Choose resolution (Native / 2560 / 1920 / 1600 / 1280) and 30 or 60 fps.
-- The system cursor is not baked into the video, so it can be redrawn, smoothed and
-  restyled in the editor. Clicks, cursor motion and keystrokes are logged alongside.
-- Draggable recording HUD, countdown, global shortcut **⌘⇧2** (**Ctrl+Shift+2** on Windows), menu-bar controls.
+- A full display, a single window or an area. Frame rate 30 / 60 and a resolution cap.
+- System audio and the microphone as separate, time-aligned tracks in the same file.
+- The pointer is not baked into the picture. Cursor motion, clicks and shortcuts are logged on the
+  same clock so the editor can redraw, smooth and restyle them.
+- A small always-on-top bar with the timer, level meters and Stop while recording, and a global
+  shortcut (**⌘⇧R** on macOS, **Ctrl+Shift+R** elsewhere).
 
 **Editing**
-- **Zoom:** automatic zoom regions generated from your clicks and typing, with
-  adjustable ease in / ease out, plus manual zooms you can place anywhere. The camera
-  keeps the cursor near the centre and, while you type, follows the text caret.
-- **Timeline:** video, zoom, camera, notes, captions and music tracks. Split, trim, reorder, duplicate and
-  delete clips; change speed per clip; drag zoom regions and music clips freely. Zoom
-  the timeline itself in and out (slider, **Fit**, or ⌘/Ctrl + scroll) to work on a long
-  recording, and shift-click several zoom blocks to edit their settings together.
-- **Workspace:** drag the divider above the timeline and the divider beside the side panel
-  to give the area you are working in more room (double-click a divider to reset).
-- **Playback:** **Space** toggles play / pause; hold it to play at 2× while it is held.
-- **Annotate:** text titles, arrows, boxes, circles and highlights; **blur**, **pixelate**
-  and **spotlight** regions that stay pinned to the recording while the camera zooms; drag
-  them on the preview. A **shortcut display** pops up keys like ⌘C or Esc as you press
-  them (recordings made with this version or newer).
-- **Camera layouts:** a Camera track changes how the camera is shown over time: large
-  bubble, camera only, side by side (either side) or camera off. Each block can have its own
-  size, position, shape, mirror, border and shadow, and everything eases between blocks.
-- **Captions:** generate them **on your machine** with [whisper.cpp](https://github.com/ggml-org/whisper.cpp)
-  (the model is downloaded once on request; audio never leaves your computer), or type them or import an SRT; the default is TikTok-style (heavy white text with
-  a black outline in the middle of the bottom third), with red, highlight, classic and
-  minimal looks; export your captions back to SRT.
-- **Pace:** speed up idle stretches (found from clicks, typing, cursor motion and, if you
-  like, when you talk), ease speed changes into smooth ramps, freeze a frame for a
-  moment, and add cut transitions (true cross-dissolve, fade, flash, blur, slide, zoom).
-- **Look:** wallpapers (optionally with subtle motion: drift, bokeh, waves, dust), gradients, solid colours
-  or your own image (with blur), **device frames** (laptop, monitor, tablet, phone, browser window),
-  padding, corner radius, shadow, aspect ratio, crop, and a logo **watermark** (position, size,
-  opacity).
-- **Cursor:** several styles, click effects, hide-when-idle, and it hides when you start typing and only comes back when you move the mouse.
-- **Camera bubble:** size, shape, nine anchor positions (optionally flush to the frame
-  edge, ignoring the padding), mirror, border, and it shrinks smoothly while the view is
-  zoomed in.
-- **Audio:** separate mic / device / music / master levels. The microphone is
-  levelled and centred automatically.
-- **Sound effects:** optional built-in mouse-click and keyboard-typing sounds, placed on
-  the recorded clicks and key presses, each with a few styles and its own volume. They
-  are synthesised by `scripts/make-sounds.py`, so they are original and licence-free.
-- **Music:** add an audio file, trim and split it, see its waveform on the track, fade it
-  in and out, and have it lower itself while you speak.
-- **Project files:** edits stay in memory until you save (**⌘S**); a `*` in the title
-  shows unsaved changes and closing or quitting asks before discarding them.
+- **Trim / split / cut:** drag a clip's edges, press **S** to split at the playhead, **Delete** to cut
+  a piece out. Per-clip speed (0.25× to 8×) and volume. Nothing is destructive: the full recording
+  stays in the package, so a trim can always be extended again.
+- **Zoom and pan:** automatic zoom regions from clicks and typing, or add your own. A region
+  either follows the cursor or holds a fixed point you place by clicking in the preview, with
+  adjustable level and ease in / out. Regions are blocks you move and resize on the timeline.
+- **Cursor:** size, four styles, smoothing, tilt with movement, click effects (circle / ripple),
+  and a **cursor highlight** disc under the pointer.
+- **Look:** twelve procedural wallpapers (optionally drifting), gradients or solid colour, padding,
+  corner radius, directional shadow, aspect ratio (auto, 16:9, 9:16, 1:1, 4:3, 3:4, 4:5, 21:9) and crop.
+- **Audio:** separate system / microphone levels and mutes.
+- **Undo / redo** for every edit, and autosave.
 
-**Export & compression**
-- MP4 (H.264 / HEVC) or GIF at 720p – 4K, 30 / 60 fps, with a size estimate.
-- Optional *compress after export* (HandBrake-style presets via AVFoundation), with
-  the choice to keep the original, the compressed copy, or both.
-- A standalone **Compress Video…** tool for any video file.
+**Export**
+| Container | Video | Audio |
+| --- | --- | --- |
+| MP4 | H.264 (VideoToolbox hardware on macOS, OpenH264 software elsewhere), AV1 (rav1e), VP9 (libvpx, optional build feature) | Opus |
+| WebM | AV1, VP9 | Opus |
+
+720p to 4K at 24 / 30 / 60 fps with three quality levels. Exports are deterministic: the same
+project and settings produce the same bytes, whatever the thread count.
 
 ## Install
 
@@ -140,64 +108,49 @@ meters, resolution and frame rate, and the project list.
 curl -fsSL https://screencraft.mdnlabs.dev/install.sh | bash
 ```
 
-Or download [`ScreenCraft.dmg`](https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg) from the root of this repository, open
-it and drag **ScreenCraft** onto **Applications**. The app is only ad-hoc signed (not
-notarised), so macOS blocks it the first time: open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to ScreenCraft (or run `xattr -dr com.apple.quarantine /Applications/ScreenCraft.app`).
+Or download [`ScreenCraft.dmg`](https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft.dmg),
+open it and drag **ScreenCraft** onto **Applications**. The app is ad-hoc signed (not notarised), so
+macOS blocks it the first time: **System Settings → Privacy & Security → Open Anyway**, or
+`xattr -dr com.apple.quarantine /Applications/ScreenCraft.app`.
 
-Requires macOS 15 (Sequoia) or newer; developed and tested on Apple silicon.
-
-**Permissions.** On first launch a setup window checks the macOS permissions the app
-needs and takes you to the right System Settings pane:
+Requires macOS 15 (Sequoia) or newer; developed on Apple silicon.
 
 | Permission | Why |
 | --- | --- |
 | Screen Recording | capturing the display, windows and areas (required) |
-| Accessibility | finding the text caret so the camera can follow your typing (required) |
-| Input Monitoring | noticing when you start typing (required) |
-| Camera / Microphone | only if you use the camera bubble or narration |
+| Input Monitoring | noticing shortcuts and typing for auto-zoom (optional) |
+| Accessibility | following the text caret while typing (optional) |
+| Microphone | only when you turn the microphone on |
 
-macOS applies Screen Recording and Input Monitoring after the app restarts; the
-window offers a restart button. The app is signed ad hoc with a stable identity, so
-permissions persist across rebuilds.
+macOS applies Screen Recording after a restart. The bundle is signed with a stable identity, so
+permissions survive rebuilds.
 
 ### Windows
 
-Windows 10 / 11 is supported (added in
-[PR #1](https://github.com/MarshallNickolauson/ScreenCraft/pull/1) by
-[@PierrunoYT](https://github.com/PierrunoYT)). Recording (display, window or area,
-with camera, microphone and system audio), editing and exporting all work; no
-permissions setup is needed. Capture uses Windows.Graphics.Capture, decoding and
-encoding go through Media Foundation (hardware H.264 where available), system audio
-comes from a WASAPI loopback, and the recording shortcut is **Ctrl+Shift+2**.
+Download [`ScreenCraft-Setup.exe`](https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft-Setup.exe).
+It installs per user into `%LOCALAPPDATA%\Programs\ScreenCraft`. Capture uses DXGI Desktop
+Duplication, system audio is a WASAPI loopback. The installer is unsigned, so SmartScreen may warn.
 
-Download [`ScreenCraft-Setup.exe`](https://github.com/MarshallNickolauson/ScreenCraft/raw/main/ScreenCraft-Setup.exe) from the root of this
-repository and run it. It installs per user (no administrator rights) into
-`%LOCALAPPDATA%\Programs\ScreenCraft` with Start Menu and Desktop shortcuts, an entry
-in *Settings → Apps*, and fetches the WebView2 runtime from Microsoft if it is missing
-(it ships with Windows 11). The installer is unsigned, so SmartScreen may warn: choose
-*More info → Run anyway*.
-
-**Build it yourself** on a Windows PC (a few minutes the first time). You need
-[Rust](https://rustup.rs) with the MSVC toolchain, which needs the *Desktop development
-with C++* workload from the
-[Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/), and
-[NSIS](https://nsis.sourceforge.io) (`winget install NSIS.NSIS`), plus CMake and LLVM
-(`winget install Kitware.CMake LLVM.LLVM`) to build the captions engine. Then, in PowerShell,
-from the repository root:
+Build it yourself with Rust (MSVC toolchain, *Desktop development with C++*), CMake and NSIS:
 
 ```powershell
-git clone --recurse-submodules https://github.com/MarshallNickolauson/ScreenCraft.git
-cd ScreenCraft
 powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1
 ```
 
-This builds a release binary, writes `ScreenCraft-Setup.exe` in the repository root and
-prints its SHA-256. To run from source without installing, use
-`cargo run --release -p screencraft`.
+### Linux
 
-The standalone compressor (and compress-after-export) is not available on Windows yet,
-and typing focus follows the text caret only in apps that expose a classic Win32 caret;
-elsewhere it is estimated from keystrokes.
+Build from source (needs `xdg-desktop-portal` with a ScreenCast backend and PipeWire at runtime):
+
+```bash
+sudo apt install build-essential cmake pkg-config libpipewire-0.3-dev libasound2-dev \
+     libclang-dev libx11-dev libxtst-dev libxi-dev libwayland-dev libxkbcommon-dev
+cargo build --release -p screencraft
+./target/release/screencraft
+```
+
+The portal's own dialog picks the screen or window. Pointer position comes from the stream's cursor
+metadata; clicks and key shortcuts are only available on X11 (Wayland has no global input hook for
+normal applications), so click-based auto-zoom needs an X11 session.
 
 ### Build from source (macOS)
 
@@ -208,78 +161,87 @@ cd ScreenCraft
 open ~/Applications/ScreenCraft.app
 ```
 
-Needs [Rust](https://rustup.rs) (stable) and the Xcode command line tools
-(`xcode-select --install`). `./scripts/bundle.sh` without `--install` leaves the app at
-`dist/ScreenCraft.app`; `./scripts/dmg.sh` also rebuilds `ScreenCraft.dmg`. The first
-release build takes a few minutes. The app icon is rendered by `scripts/make-icon.swift`.
+Needs [Rust](https://rustup.rs), CMake and the Xcode command line tools. If `libvpx` is installed
+(`brew install libvpx`) the bundle is built with VP9 export. `./scripts/dmg.sh` also rebuilds
+`ScreenCraft.dmg`.
 
 ## Using it
 
-1. Pick **Display / Window / Area**, choose camera and audio sources, press **Record**
-   (or **⌘⇧2**). Press **Stop** in the HUD or use the shortcut again.
-2. The recording opens in the editor. The first open builds a smooth preview copy of
-   the footage, which takes a little while for long recordings and is then reused.
-3. Adjust zooms, look and audio; add music if you like; **⌘S** to save.
-4. **Export** (top right). Files go to `~/Movies` by default.
+1. Pick **Screen / Window / Area**, choose audio sources, press **Record** (or the shortcut). Press
+   **Stop** in the bar, or use the shortcut again.
+2. The recording opens in the editor. **Auto zoom** builds zoom regions from your clicks and typing.
+3. Adjust the look, trim and split, then **Export**.
 
-Projects live in `~/ScreenCraft Projects/<name>.screencraft` and can be renamed by
-clicking the title in the editor.
+Recordings live in `~/Movies/ScreenCraft` (`Videos\ScreenCraft` on Windows and Linux) as
+`<name>.screencraft` folders; the location can be changed on the home screen.
 
 ### Shortcuts
 
-`Space` play / pause (hold for 2×) · `Esc` close the open dialog · `S` split at playhead · `Z` add zoom · `⌘D` duplicate · `Q` / `E` jump to start / end · `A` / `D` previous / next zoom ·
-`⌫` delete selection · `←` `→` step · `⌘Z` / `⇧⌘Z` undo / redo · `⌘S` save ·
-`⌘⇧2` start / stop recording
+`Space` play / pause · `S` split at the playhead · `Delete` remove the selected clip or zoom ·
+`←` `→` step a frame · `Home` / `End` jump · `⌘Z` / `⇧⌘Z` undo / redo ·
+`Ctrl/⌘ + scroll` zoom the timeline · `⌘⇧R` / `Ctrl+Shift+R` start / stop recording
 
 ## How it is built
 
-| Piece | Where | What it does |
-| --- | --- | --- |
-| `screencraft-core` | `crates/core` | Pure Rust: project model, spring physics, timeline mapping, auto-zoom generation and the per-frame camera / cursor render track. Unit tested. |
-| App shell | `src-tauri` | Tauri 2 app: capture, input and caret tracking, project IO, native preview proxy and frame server, audio levelling, compression, windows and menus. Platform code lives in per-feature folders (`capture/`, `proxy/`, `srcframes/`, `jpegio/`, `inputlog/`, `meter/`, `compress/`) with `macos.rs` (ScreenCaptureKit, AVFoundation, ImageIO) and `windows.rs` (Windows.Graphics.Capture, Media Foundation, WIC) backends. |
-| UI | `ui` | Plain ES modules, no bundler: recorder bar, editor, canvas compositor and timeline. Exports with WebCodecs. |
+| Crate | What it does |
+| --- | --- |
+| `screencraft-core` (`crates/core`) | Pure Rust: project model, spring physics, timeline mapping, auto-zoom generation, per-frame camera / cursor render track. |
+| `screencraft-capture` | One `Capturer` per platform (ScreenCaptureKit, DXGI Desktop Duplication, PipeWire + portal), constant-frame-rate resampler, cursor / click / key logging. |
+| `screencraft-audio` | cpal microphone and loopback streams on a shared clock, and the pure `StreamAligner` that turns timestamped blocks into gap-free 48 kHz stereo. |
+| `screencraft-encode` | Sans-I/O: BGRA to I420, H.264 / AV1 / VP9 and Opus encoders, MP4 and WebM muxers that emit `WriteAt` operations, an MP4 demuxer and the `Exporter` state machine. |
+| `screencraft-render` | The wgpu compositor (WGSL) and the CPU-side scene builder. Shared by the preview and the exporter. |
+| `screencraft-engine` | The recording session, project packages, frame / audio sources and the export job. |
+| `screencraft` (`crates/app`) | The egui application, plus `screencraft-shot`, a headless screenshot tool. |
 
-Some details worth knowing:
+Things worth knowing:
 
-- **Preview proxy.** The editor never plays a `<video>` element. Rust decodes the
-  recording once into a small JPEG strip next to the project and serves frames on
-  demand over a custom `sc://` scheme; audio is decoded and scheduled with WebAudio.
-  This avoids a WebKit / AVFoundation player deadlock and makes scrubbing instant.
-  Paused frames are re-fetched at full resolution.
-- **Export** reads full-resolution source frames natively, paints them with the same
-  compositor code as the preview, and encodes with WebCodecs plus a bundled MP4
-  muxer (`ui/vendor`, MIT). No ffmpeg is required.
-- **Wallpapers** are generated procedurally; no third-party artwork is bundled.
+- **One timeline.** Every stream is stamped on a single monotonic clock; time zero is the first
+  video frame, and the audio aligners pad or trim to it.
+- **Sans-I/O muxing.** `Exporter` takes frames and PCM and returns `WriteAt { offset, data }`
+  operations. Files, memory buffers and threads belong to the caller (`FileSink`, `MemorySink`,
+  `ThreadedExporter`), which is what makes the output reproducible and easy to test.
+- **The editor never previews a `<video>`.** A worker thread decodes the recording's H.264 and the
+  compositor draws exactly what the exporter will.
+- **Wallpapers and cursors** are generated procedurally; no third-party artwork is bundled.
 
-A `.screencraft` package contains `screen.mp4`, optional `camera.mp4` and `mic.m4a`,
-`input.json` (cursor, clicks, keys, caret), `project.json`, and generated
-`proxy-*` / `mic-leveled-*` cache files that are safe to delete.
+A `.screencraft` package contains `screen.mp4` (H.264 video plus one Opus track per audio source),
+`input.json` (cursor, clicks, keys) and `project.json`.
 
 ## Development
 
 ```bash
-cargo test -p screencraft-core     # unit tests for the core crate
-python3 scripts/make-sounds.py     # regenerate the click / typing sounds (needs numpy)
-cargo check -p screencraft         # type-check the app
-./scripts/bundle.sh --install      # rebuild and reinstall
+cargo test --workspace --release        # unit and end-to-end tests (needs a GPU adapter for render tests)
+cargo run --release -p screencraft      # run the app
+cargo run --release -p screencraft-engine --example make_demo -- /tmp/demo     # synthetic recording
+cargo run --release -p screencraft --bin screencraft-shot -- out.png --open /tmp/demo/Demo.screencraft --dark
+cargo run --release -p screencraft-engine --example export -- /tmp/demo/Demo.screencraft out.mp4 h264 1080 30
+python3 scripts/gen-notices.py          # refresh THIRD-PARTY-NOTICES.md after dependency changes
 ```
+
+Build with `--features vp9` (and `VPX_STATIC=1`, libvpx installed) to enable VP9.
+
+Environment variables for testing: `SCREENCRAFT_RECORDINGS_DIR` (library folder),
+`SCREENCRAFT_OPEN` (open a package at start), `SCREENCRAFT_AUTORECORD=<seconds>` (record the main
+display, report, quit).
 
 ## License
 
 This project is licensed under the MIT License. By using this software, you agree that the authors are not liable for any issues, damages, or claims arising from its use.
 
 See [LICENSE](LICENSE) for the full text, [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for the open-source
-components ScreenCraft uses (including whisper.cpp), and [COMPLIANCE.md](COMPLIANCE.md) for the legal and
-compliance guide. The [website](https://screencraft.mdnlabs.dev) has the privacy policy, terms and cookie policy.
+components ScreenCraft uses, and [COMPLIANCE.md](COMPLIANCE.md) for the legal and compliance guide. The
+[website](https://screencraft.mdnlabs.dev) has the privacy policy, terms and cookie policy.
 
 ## Known limitations
 
-- macOS and Windows only. The two ports share the UI and `screencraft-core`; native capture, decoding and encoding are separate per-platform modules (see below).
-- Windows: no standalone compressor yet, and the installer is unsigned.
-- Preview proxies are large (roughly 2–3 MB per second of recording); delete the
-  `proxy-*` files in a project folder to reclaim space.
-- Export is not real-time; long 60 fps projects take a while.
-- Typing focus depends on the focused app exposing its text caret through
-  Accessibility; otherwise the position is estimated from keystrokes.
+- Hardware encoding is implemented for H.264 on macOS (VideoToolbox). Windows and Linux use the
+  software encoders; the Media Foundation and VAAPI paths are not written yet.
+- The Windows and Linux capture backends compile and are exercised by unit tests of their pure
+  parts, but have had much less real-world testing than macOS.
+- Linux: click and key logging only on X11; the portal chooser decides the source.
+- Area recording is set with sliders on the home screen, not by dragging on the desktop.
+- Recordings are decoded in software (OpenH264), so very large sources (5K+) scrub and export slower
+  than real time.
+- Not carried over from the 0.3 web UI: camera bubble, captions, annotations, key display, device
+  frames, transitions, music tracks, sound effects, GIF export, compressor and update check.
 - No code signing or notarisation; macOS and Windows will warn on first launch.
-- Caption generation needs a one-off model download (78–488 MB) and runs on the CPU/GPU of your machine; accuracy depends on the model you pick and the audio quality.

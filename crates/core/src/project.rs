@@ -52,6 +52,11 @@ pub struct Media {
     /// Separately recorded microphone track (so its volume can differ from system audio).
     pub mic: Option<String>,
     pub mic_offset_ms: f64,
+    /// Index of the system-audio track inside `screen` (packages written by the native
+    /// recorder keep every audio stream in the one MP4).
+    pub system_track: Option<u32>,
+    /// Index of the microphone track inside `screen`.
+    pub mic_track: Option<u32>,
 }
 
 impl Default for Media {
@@ -69,6 +74,8 @@ impl Default for Media {
             has_microphone: false,
             mic: None,
             mic_offset_ms: 0.0,
+            system_track: None,
+            mic_track: None,
         }
     }
 }
@@ -375,6 +382,12 @@ pub struct CursorConfig {
     pub click_sound_volume: f64,
     /// Tilt the cursor in the direction of movement.
     pub rotate_with_velocity: bool,
+    /// A soft coloured disc under the pointer so viewers can follow it.
+    pub highlight: bool,
+    /// Radius of the disc in points of the recorded screen.
+    pub highlight_size: f64,
+    pub highlight_color: String,
+    pub highlight_opacity: f64,
 }
 
 impl Default for CursorConfig {
@@ -391,6 +404,10 @@ impl Default for CursorConfig {
             click_sound: None,
             click_sound_volume: 0.25,
             rotate_with_velocity: false,
+            highlight: false,
+            highlight_size: 36.0,
+            highlight_color: "#ffd84a".into(),
+            highlight_opacity: 0.35,
         }
     }
 }

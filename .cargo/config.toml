@@ -1,0 +1,7 @@
+# The ScreenCaptureKit bridge links the Swift runtime through @rpath; the system copy lives
+# in /usr/lib/swift on macOS 12+.
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]

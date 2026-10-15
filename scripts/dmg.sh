@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 
 ./scripts/bundle.sh
 
-VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' src-tauri/tauri.conf.json | head -1)"
+VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
 VOL="ScreenCraft"
 OUT="dist/ScreenCraft-${VERSION}.dmg"
 RW="dist/.ScreenCraft-rw.dmg"

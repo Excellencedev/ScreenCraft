@@ -1,0 +1,60 @@
+//! Small persistent preferences (recording folder, last-used capture options).
+
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Prefs {
+    pub recordings_dir: PathBuf,
+    pub fps: u32,
+    pub max_long_side: u32,
+    pub system_audio: bool,
+    pub microphone: bool,
+    pub microphone_id: Option<String>,
+    pub export_dir: Option<PathBuf>,
+}
+
+impl Default for Prefs {
+    fn default() -> Self {
+        let base = dirs::video_dir().or_else(dirs::home_dir).unwrap_or_else(|| PathBuf::from("."));
+        Self {
+            recordings_dir: base.join("ScreenCraft"),
+            fps: 60,
+            max_long_side: 2560,
+            system_audio: true,
+            microphone: false,
+            microphone_id: None,
+            export_dir: None,
+        }
+    }
+}
+
+fn path() -> Option<PathBuf> {
+    dirs::config_dir().map(|d| d.join("ScreenCraft").join("settings.json"))
+}
+
+impl Prefs {
+    pub fn load() -> Self {
+        let mut p: Self = path()
+            .and_then(|p| std::fs::read(p).ok())
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+        // Handy for tests and demos: point the library somewhere else without touching settings.
+        if let Some(dir) = std::env::var_os("SCREENCRAFT_RECORDINGS_DIR") {
+            p.recordings_dir = dir.into();
+        }
+        p
+    }
+
+    pub fn save(&self) {
+        if let Some(p) = path() {
+            if let Some(dir) = p.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            if let Ok(json) = serde_json::to_vec_pretty(self) {
+                let _ = std::fs::write(p, json);
+            }
+        }
+    }
+}

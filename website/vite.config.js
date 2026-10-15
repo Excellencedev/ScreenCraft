@@ -4,7 +4,7 @@ import { resolve, join } from 'node:path';
 import { marked } from 'marked';
 
 const root = import.meta.dirname;
-const appVersion = JSON.parse(readFileSync(join(root, '../src-tauri/tauri.conf.json'), 'utf8')).version;
+const appVersion = readFileSync(join(root, '../Cargo.toml'), 'utf8').match(/^version = "([^"]+)"/m)[1];
 const partial = (n) => readFileSync(join(root, 'src/partials', n + '.html'), 'utf8');
 
 // Every .html file (outside node_modules/dist) becomes a page.

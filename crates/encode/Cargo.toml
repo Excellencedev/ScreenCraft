@@ -1,0 +1,18 @@
+[package]
+name = "screencraft-encode"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sans-I/O video/audio encoding, MP4 + WebM muxing and MP4 demuxing for ScreenCraft"
+
+[features]
+default = []
+# VP9 through libvpx (needs libvpx on the build machine; set VPX_STATIC=1 to link it statically).
+vp9 = ["dep:env-libvpx-sys"]
+
+[dependencies]
+openh264 = "0.9"
+rav1e = { version = "0.8", default-features = false, features = ["threading"] }
+audiopus = "0.3.0-rc.0"
+thiserror = "2"
+env-libvpx-sys = { version = "5.1", features = ["generate"], optional = true }

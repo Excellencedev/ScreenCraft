@@ -17,7 +17,7 @@ Unicode true
   !define OUT_FILE "ScreenCraft-Setup.exe"
 !endif
 !ifndef ICON_PATH
-  !define ICON_PATH "..\src-tauri\icons\icon.ico"
+  !define ICON_PATH "..\assets\icons\icon.ico"
 !endif
 
 Name "ScreenCraft"
@@ -50,28 +50,10 @@ VIAddVersionKey "FileDescription" "ScreenCraft installer"
 VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "LegalCopyright" "MIT License"
 
-; The app draws its UI with the Microsoft Edge WebView2 runtime, which ships with
-; Windows 11 and current Windows 10. If it is missing, run Microsoft's own bootstrapper.
-Function EnsureWebView2
-  ReadRegStr $0 HKLM "SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" "pv"
-  ${If} $0 != ""
-    Return
-  ${EndIf}
-  ReadRegStr $0 HKCU "Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" "pv"
-  ${If} $0 != ""
-    Return
-  ${EndIf}
-  DetailPrint "Installing the WebView2 runtime..."
-  nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing https://go.microsoft.com/fwlink/p/?LinkId=2124703 -OutFile $\'$TEMP\MicrosoftEdgeWebview2Setup.exe$\'"'
-  ExecWait '"$TEMP\MicrosoftEdgeWebview2Setup.exe" /silent /install'
-  Delete "$TEMP\MicrosoftEdgeWebview2Setup.exe"
-FunctionEnd
-
 Section "ScreenCraft"
   SetOutPath "$INSTDIR"
   File "/oname=ScreenCraft.exe" "${EXE_PATH}"
   File "/oname=ScreenCraft.ico" "${ICON_PATH}"
-  Call EnsureWebView2
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   CreateShortCut "$SMPROGRAMS\ScreenCraft.lnk" "$INSTDIR\ScreenCraft.exe" "" "$INSTDIR\ScreenCraft.ico"

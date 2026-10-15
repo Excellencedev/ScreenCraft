@@ -1,0 +1,9 @@
+[package]
+name = "screencraft-audio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Microphone and system-audio capture with timestamp alignment for ScreenCraft"
+
+[dependencies]
+cpal = "0.17"

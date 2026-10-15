@@ -10,117 +10,89 @@ This file is the authoritative list. The same text is published at
 
 ---
 
-## whisper.cpp (automatic captions)
+## Codecs and media libraries
 
-- **Component(s)**: the C/C++ inference library, statically linked into the ScreenCraft executable
-- **Used by**: *Captions → Generate captions* (on-device speech recognition)
-- **License**: **MIT**, Copyright (c) 2023-2026 The ggml authors
-- **Upstream**: <https://github.com/ggml-org/whisper.cpp>
-- **Corresponding source**: built from our fork, <https://github.com/MarshallNickolauson/whisper.cpp>, which is a git submodule at `third_party/whisper-rs-sys/whisper.cpp` in this repository (the `whisper-rs-sys` build script is vendored alongside it, with a small patch to read the newer version declaration)
-- **Why it ships**: it runs the Whisper model on the user's own machine so no audio is uploaded
+- **OpenH264** (software H.264 encoder and decoder): **BSD-2-Clause**, Copyright (c) 2013 Cisco Systems.
+  Upstream <https://github.com/cisco/openh264>, built from source by the `openh264` crate.
+  *Patent note:* Cisco's patent licence for H.264 covers only the binaries Cisco itself distributes.
+  Because ScreenCraft compiles OpenH264 from source, whoever redistributes a build is responsible for
+  any H.264 licensing the use of that build requires (see COMPLIANCE.md). On macOS the hardware
+  encoder in VideoToolbox is used by default instead.
+- **rav1e** (AV1 encoder): **BSD-2-Clause** with the Alliance for Open Media patent licence,
+  Copyright (c) The rav1e contributors. <https://github.com/xiph/rav1e>
+- **libopus** (audio encoder / decoder, via `audiopus`): **BSD-3-Clause**, Copyright (c) Xiph.Org
+  Foundation and contributors. <https://opus-codec.org>
+- **libvpx** (VP9 encoder, only in builds made with `--features vp9`): **BSD-3-Clause** with the WebM
+  patent grant, Copyright (c) The WebM Project authors. <https://www.webmproject.org>
 
-## ggml (tensor library inside whisper.cpp)
+## UI and graphics
 
-- **License**: **MIT**, Copyright (c) 2023-2026 The ggml authors
-- **Upstream**: <https://github.com/ggml-org/ggml>
-- **Used by**: whisper.cpp (statically linked; Metal backend on macOS, CPU elsewhere)
-
-## whisper-rs / whisper-rs-sys
-
-- **License**: **Unlicense** (public domain dedication)
-- **Upstream**: <https://codeberg.org/tazz4843/whisper-rs>
-- **Used by**: Rust bindings that call whisper.cpp
-
-## OpenAI Whisper model weights (downloaded on request)
-
-- **Component(s)**: `ggml-tiny.en.bin`, `ggml-base.en.bin`, `ggml-small.en.bin`, `ggml-base.bin`
-- **Used by**: *Captions → Generate captions*. **Not bundled.** Downloaded only when the user starts caption generation and stored in the app data folder.
-- **License**: **MIT**, Copyright (c) 2022 OpenAI. The ggml conversions are published by the whisper.cpp project.
-- **Upstream**: <https://github.com/openai/whisper> and <https://huggingface.co/ggerganov/whisper.cpp>
-- **Notes**: model files are fetched directly from Hugging Face to the user's device; ScreenCraft does not host or redistribute them.
-
----
-
-## mp4-muxer (JavaScript, bundled in the UI)
-
-- **Component(s)**: `ui/vendor/mp4-muxer.mjs`
-- **Used by**: MP4 export
-- **License**: **MIT**, Copyright (c) 2023 Vanilagy (full text: `ui/vendor/mp4-muxer.LICENSE`)
-- **Upstream**: <https://github.com/Vanilagy/mp4-muxer>
-
-## gifenc (JavaScript, bundled in the UI)
-
-- **Component(s)**: `ui/vendor/gifenc.esm.js`
-- **Used by**: GIF export
-- **License**: **MIT**, Copyright (c) 2017 Matt DesLauriers (full text: `ui/vendor/gifenc.LICENSE.md`)
-- **Upstream**: <https://github.com/mattdesl/gifenc> (by Matt DesLauriers)
-
----
-
-## Tauri and the web view
-
-- **Tauri 2** and its plugins: **MIT OR Apache-2.0**, <https://tauri.app>
-- **WKWebView** (macOS): part of the operating system, used under Apple's system terms.
-- **Microsoft Edge WebView2 Runtime** (Windows): not bundled. If missing, the installer runs Microsoft's own bootstrapper, which is subject to Microsoft's WebView2 license terms (<https://developer.microsoft.com/microsoft-edge/webview2/>).
+- **egui / eframe / egui-wgpu / egui-winit**: **MIT OR Apache-2.0**, <https://github.com/emilk/egui>.
+  The default fonts egui ships (Ubuntu-Light, Hack, NotoEmoji, emoji-icon-font) are used under their
+  own licences (Ubuntu Font Licence 1.0, MIT, SIL OFL 1.1, OFL).
+- **wgpu / naga**: **MIT OR Apache-2.0**, <https://github.com/gfx-rs/wgpu>
+- **tiny-skia** (cursor artwork rasteriser): **BSD-3-Clause**, <https://github.com/linebender/tiny-skia>
+- **winit**: **Apache-2.0**, <https://github.com/rust-windowing/winit>
+- **cpal** (microphone and loopback streams): **Apache-2.0**, <https://github.com/RustAudio/cpal>
+- **PipeWire / ashpd** (Linux screen capture through the desktop portal): PipeWire is **MIT**
+  (<https://pipewire.org>, linked dynamically from the system); `ashpd` is **MIT**.
 
 ## Operating-system frameworks
 
-ScreenCaptureKit, AVFoundation, VideoToolbox, ImageIO, Accelerate (macOS) and Windows.Graphics.Capture, Media Foundation, WASAPI, WIC (Windows) are system components used through their public APIs. They are not redistributed.
-
-## symphonia (MPL-2.0 notice)
-
-Audio decoding uses the `symphonia` crates, licensed under the **Mozilla Public License 2.0**. They are used
-unmodified, as published on crates.io, and linked into the executable. Their source is available at
-<https://github.com/pdeljanov/Symphonia>. MPL-2.0 is a file-level copyleft: it applies to those files only
-and places no obligations on the rest of ScreenCraft. The same applies to the other MPL-2.0 crates in the
-list below (`cssparser`, `selectors`, `dtoa-short`, `option-ext`), all unmodified.
+ScreenCaptureKit, VideoToolbox, CoreAudio, CoreMedia (macOS), DXGI Desktop Duplication, Direct3D 11, WASAPI
+(Windows) and PipeWire / xdg-desktop-portal (Linux) are system components used through their public
+APIs. They are not redistributed.
 
 ## Assets created for ScreenCraft
 
-The application icon, procedural wallpapers, cursor artwork, device frames and the click/keyboard sounds
-(`ui/sounds/*.wav`, generated by `scripts/make-sounds.py`) were created for this project and are covered
-by the MIT License. No third-party artwork, fonts or audio samples are bundled.
+The application icon, procedural wallpapers and the vector cursor artwork were created for this project
+and are covered by the MIT License. No third-party artwork, fonts (beyond egui's defaults, above) or audio
+samples are bundled.
 
 ---
 
 ## Rust crates
 
-Resolved from `Cargo.lock` (all targets, including build tooling). Grouped by license identifier. Where a
-crate is offered under several licenses, ScreenCraft elects the most permissive option (MIT or Apache-2.0).
+Resolved from `Cargo.lock` (all targets, including build tooling) by `scripts/gen-notices.py`. Grouped by
+license identifier. Where a crate is offered under several licenses, ScreenCraft elects the most
+permissive option (MIT or Apache-2.0).
 
-- **MIT OR Apache-2.0** (257): android_system_properties 0.1.6, anyhow 1.0.104, apple-cf 0.11.0, apple-metal 0.10.0, async-broadcast 0.7.2, async-recursion 1.2.0, async-trait 0.1.92, base64 0.21.7, base64 0.22.1, base64 0.23.1, bitflags 1.3.2, bitflags 2.13.2, block-buffer 0.10.4, bs58 0.5.1, bumpalo 3.20.3, camino 1.2.6, cargo-platform 0.1.9, cc 1.8.0, cfg-expr 0.15.8, cfg-if 1.0.5, chrono 0.4.45, cmake 0.1.58, cookie 0.18.2, core-foundation 0.10.1, core-foundation-sys 0.8.7, core-graphics 0.25.0, core-graphics-types 0.2.0, cpufeatures 0.2.17, crc32fast 1.5.2, crossbeam-channel 0.5.17, crossbeam-queue 0.3.14, crossbeam-utils 0.8.23, crypto-common 0.1.7, defmt 1.1.1, defmt-macros 1.1.1, defmt-parser 1.0.0, deranged 0.5.8, digest 0.10.7, dirs 7.0.0, dirs-sys 0.5.0, displaydoc 0.2.7, doom-fish-utils 0.4.1, dtoa 1.0.11, dyn-clone 1.0.20, either 1.19.0, embed_plist 1.2.2, enumflags2 0.7.12, enumflags2_derive 0.7.12, erased-serde 0.4.10, errno 0.3.14, fdeflate 0.3.7, field-offset 0.3.6, find-msvc-tools 0.1.14, flate2 1.1.10, foreign-types 0.5.0, foreign-types-macros 0.2.4, foreign-types-shared 0.3.1, form_urlencoded 1.2.2, futures-channel 0.3.34, futures-core 0.3.34, futures-executor 0.3.34, futures-io 0.3.34, futures-macro 0.3.34, futures-sink 0.3.34, futures-task 0.3.34, futures-util 0.3.34, getrandom 0.2.17, getrandom 0.3.4, getrandom 0.4.3, glob 0.3.4, hashbrown 0.12.3, hashbrown 0.17.1, heck 0.4.1, heck 0.5.0, hermit-abi 0.5.3, hex 0.4.3, html5ever 0.39.0, http 1.5.0, httparse 1.10.1, iana-time-zone 0.1.65, iana-time-zone-haiku 0.1.2, ident_case 1.0.1, idna 1.1.0, ipnet 2.12.2, itertools 0.13.0, itoa 1.0.18, jni 0.21.1, jni-sys 0.3.1, jni-sys 0.4.1, jni-sys-macros 0.4.1, js-sys 0.3.106, json-patch 4.2.0, jsonptr 0.7.1, keyboard-types 0.7.0, keyboard-types 0.8.3, lazy_static 1.5.1, libc 0.2.190, lock_api 0.4.14, log 0.4.34, markup5ever 0.39.0, mime 0.3.17, minimal-lexical 0.2.1, ndk 0.9.0, ndk-context 0.1.1, ndk-sys 0.6.0+11769913, num-complex 0.4.6, num-conv 0.2.2, num-integer 0.1.47, num-traits 0.2.19, once_cell 1.21.4, ordered-stream 0.2.0, parking_lot 0.12.5, parking_lot_core 0.9.12, percent-encoding 2.3.2, piper 0.2.5, pkg-config 0.3.34, png 0.17.16, png 0.18.1, powerfmt 0.2.1, prettyplease 0.2.37, primal-check 0.3.4, proc-macro-crate 1.3.1, proc-macro-crate 2.0.2, proc-macro-crate 3.5.0, proc-macro-error 1.0.4, proc-macro-error-attr 1.0.4, proc-macro2 1.0.107, quote 1.0.47, ref-cast 1.0.27, ref-cast-impl 1.0.27, regex 1.13.1, regex-automata 0.4.18, regex-lite 0.1.9, regex-syntax 0.8.11, reqwest 0.13.5, rustc_version 0.4.1, rustfft 6.4.1, rustls-pki-types 1.15.1, rustversion 1.0.23, scopeguard 1.2.0, screencapturekit 11.0.0, semver 1.0.28, serde 1.0.229, serde-untagged 0.1.9, serde_core 1.0.229, serde_derive 1.0.229, serde_derive_internals 0.29.1, serde_json 1.0.154, serde_repr 0.1.21, serde_spanned 0.6.9, serde_spanned 1.1.2, serde_with 3.24.0, serde_with_macros 3.24.0, serialize-to-javascript 0.1.2, serialize-to-javascript-impl 0.1.2, servo_arc 0.4.3, sha2 0.10.9, shlex 1.3.0, shlex 2.0.1, signal-hook-registry 1.4.8, siphasher 1.0.4, smallvec 1.16.3, socket2 0.6.5, softbuffer 0.4.8, stable_deref_trait 1.2.1, strength_reduce 0.2.4, string_cache 0.9.0, string_cache_codegen 0.6.1, swift-rs 1.0.9, syn 1.0.109, syn 2.0.119, syn 3.0.8, system-deps 6.2.2, tao-macros 0.1.4, tempfile 3.27.0, tendril 0.5.1, thiserror 1.0.69, thiserror 2.0.21, thiserror-impl 1.0.69, thiserror-impl 2.0.21, time 0.3.55, time-core 0.1.9, time-macros 0.2.32, toml 0.8.2, toml 1.1.8+spec-1.1.0, toml_datetime 0.6.3, toml_datetime 1.1.2+spec-1.1.0, toml_edit 0.19.15, toml_edit 0.20.2, toml_edit 0.25.17+spec-1.1.0, toml_parser 1.1.5+spec-1.1.0, toml_writer 1.1.3+spec-1.1.0, transpose 0.2.3, tray-icon 0.25.1, typeid 1.0.3, typenum 1.20.1, unicode-segmentation 1.13.3, ureq 2.12.1, url 2.5.8, version_check 0.9.5, wasm-bindgen 0.2.129, wasm-bindgen-futures 0.4.79, wasm-bindgen-macro 0.2.129, wasm-bindgen-macro-support 0.2.129, wasm-bindgen-shared 0.2.129, wasm-streams 0.5.0, web-sys 0.3.106, web-time 1.1.0, web_atoms 0.2.6, winapi 0.3.9, winapi-i686-pc-windows-gnu 0.4.0, winapi-x86_64-pc-windows-gnu 0.4.0, windows 0.62.2, windows-collections 0.3.2, windows-core 0.62.2, windows-future 0.3.2, windows-implement 0.60.2, windows-interface 0.59.3, windows-link 0.2.1, windows-numerics 0.3.1, windows-result 0.4.1, windows-strings 0.5.1, windows-sys 0.45.0, windows-sys 0.52.0, windows-sys 0.59.0, windows-sys 0.60.2, windows-sys 0.61.2, windows-targets 0.42.2, windows-targets 0.52.6, windows-targets 0.53.5, windows-threading 0.2.1, windows-version 0.1.7, windows_aarch64_gnullvm 0.42.2, windows_aarch64_gnullvm 0.52.6, windows_aarch64_gnullvm 0.53.1, windows_aarch64_msvc 0.42.2, windows_aarch64_msvc 0.52.6, windows_aarch64_msvc 0.53.1, windows_i686_gnu 0.42.2, windows_i686_gnu 0.52.6, windows_i686_gnu 0.53.1, windows_i686_gnullvm 0.52.6, windows_i686_gnullvm 0.53.1, windows_i686_msvc 0.42.2, windows_i686_msvc 0.52.6, windows_i686_msvc 0.53.1, windows_x86_64_gnu 0.42.2, windows_x86_64_gnu 0.52.6, windows_x86_64_gnu 0.53.1, windows_x86_64_gnullvm 0.42.2, windows_x86_64_gnullvm 0.52.6, windows_x86_64_gnullvm 0.53.1, windows_x86_64_msvc 0.42.2, windows_x86_64_msvc 0.52.6, windows_x86_64_msvc 0.53.1, x11rb 0.13.2, x11rb-protocol 0.13.2
-- **MIT** (116): atk 0.18.2, atk-sys 0.18.2, block2 0.6.2, bytes 1.12.1, cairo-rs 0.18.5, cairo-sys-rs 0.18.2, cargo_metadata 0.19.2, cfb 0.14.0, combine 4.6.8, darling 0.24.1, darling_core 0.24.1, darling_macro 0.24.1, derive_more 2.1.1, derive_more-impl 2.1.1, dlopen2 0.8.2, dlopen2_derive 0.4.3, dom_query 0.28.0, embed-resource 3.0.12, endi 1.1.1, extended 0.1.0, fs_extra 1.3.0, gdk 0.18.2, gdk-pixbuf 0.18.5, gdk-pixbuf-sys 0.18.0, gdk-sys 0.18.2, gdkwayland-sys 0.18.2, gdkx11 0.18.2, gdkx11-sys 0.18.2, generic-array 0.14.7, gio 0.18.4, gio-sys 0.18.1, glib 0.18.5, glib-macros 0.18.5, glib-sys 0.18.1, gobject-sys 0.18.0, gtk 0.18.2, gtk-sys 0.18.2, gtk3-macros 0.18.2, http-body 1.1.0, http-body-util 0.1.5, http-range 0.1.5, hyper 1.12.0, hyper-util 0.1.21, ico 0.5.0, infer 0.22.0, is-docker 0.2.0, is-wsl 0.4.0, javascriptcore-rs 1.1.2, javascriptcore-rs-sys 1.1.1, libredox 0.1.25, memoffset 0.9.1, mio 1.2.4, new_debug_unreachable 1.0.6, nom 7.1.3, objc2 0.6.5, objc2-encode 4.1.0, objc2-foundation 0.3.2, open 5.4.4, pango 0.18.3, pango-sys 0.18.0, phf 0.13.1, phf_codegen 0.13.1, phf_generator 0.13.1, phf_macros 0.13.1, phf_shared 0.13.1, plist 1.10.1, precomputed-hash 0.1.1, quick-xml 0.42.0, redox_syscall 0.5.18, redox_users 0.5.3, rfd 0.16.0, schemars 0.8.22, schemars 0.9.0, schemars 1.2.2, schemars_derive 0.8.22, simd-adler32 0.3.10, slab 0.4.12, soup3 0.5.0, soup3-sys 0.5.0, strsim 0.11.1, synstructure 0.14.0, tauri-winres 0.3.6, tokio 1.53.2, tokio-util 0.7.20, tower 0.5.3, tower-http 0.6.11, tower-layer 0.3.3, tower-service 0.3.3, tracing 0.1.44, tracing-attributes 0.1.31, tracing-core 0.1.36, try-lock 0.2.5, uds_windows 1.2.1, urlpattern 0.6.0, version-compare 0.2.1, vswhom 0.1.0, vswhom-sys 0.1.3, want 0.3.2, webkit2gtk 2.0.2, webkit2gtk-sys 2.0.2, webview2-com 0.39.1, webview2-com-macros 0.8.1, webview2-com-sys 0.39.1, winnow 0.5.40, winnow 1.0.4, winreg 0.56.0, x11 2.21.0, x11-dl 2.21.0, zbus 5.19.0, zbus_macros 5.19.0, zbus_names 4.3.4, zcheapstr 1.1.0, zmij 1.0.23, zvariant 5.15.0, zvariant_derive 5.15.0, zvariant_utils 4.2.0
-- **Apache-2.0 OR MIT** (55): async-channel 2.5.0, async-executor 1.14.0, async-io 2.6.0, async-lock 3.4.2, async-process 2.5.0, async-signal 0.2.14, async-task 4.7.1, atomic-waker 1.1.2, autocfg 1.5.1, bit-set 0.8.0, bit-vec 0.8.0, blocking 1.7.0, cargo_toml 1.0.1, cesu8 1.1.0, cexpr 0.6.0, concurrent-queue 2.5.0, ctor 1.0.13, dbus 0.9.12, equivalent 1.0.2, event-listener 5.4.2, event-listener-strategy 0.5.4, fastrand 2.5.0, fnv 1.0.7, futures-lite 2.6.1, global-hotkey 0.8.0, idna_adapter 1.2.2, indexmap 1.9.3, indexmap 2.14.2, libappindicator 0.9.0, libappindicator-sys 0.9.0, libdbus-sys 0.2.7, muda 0.20.0, parking 2.2.1, pin-project-lite 0.2.17, polling 3.11.0, portable-atomic 1.15.0, portable-atomic-util 0.2.8, rustc-hash 2.1.3, tauri 2.12.3, tauri-build 2.7.2, tauri-codegen 2.7.2, tauri-macros 2.7.2, tauri-plugin 2.7.1, tauri-plugin-dialog 2.8.2, tauri-plugin-fs 2.7.0, tauri-plugin-global-shortcut 2.4.1, tauri-plugin-opener 2.7.1, tauri-runtime 2.12.1, tauri-runtime-wry 2.12.1, tauri-utils 2.10.1, utf8_iter 1.0.4, uuid 1.28.0, window-vibrancy 0.8.1, wry 0.57.0, zeroize 1.9.1
-- **Zlib OR Apache-2.0 OR MIT** (26): bytemuck 1.25.2, dispatch2 0.3.1, objc2-app-kit 0.3.2, objc2-av-foundation 0.3.2, objc2-avf-audio 0.3.2, objc2-cloud-kit 0.3.2, objc2-core-audio 0.3.2, objc2-core-audio-types 0.3.2, objc2-core-data 0.3.2, objc2-core-foundation 0.3.2, objc2-core-graphics 0.3.2, objc2-core-image 0.3.2, objc2-core-location 0.3.2, objc2-core-media 0.3.2, objc2-core-text 0.3.2, objc2-core-video 0.3.2, objc2-exception-helper 0.1.1, objc2-image-io 0.3.2, objc2-io-surface 0.3.2, objc2-media-toolbox 0.3.2, objc2-metal 0.3.2, objc2-quartz-core 0.3.2, objc2-ui-kit 0.3.2, objc2-user-notifications 0.3.2, objc2-web-kit 0.3.2, tinyvec 1.13.3
-- **MPL-2.0** (19): cssparser 0.37.0, cssparser-macros 0.7.1, dtoa-short 0.3.5, option-ext 0.2.0, selectors 0.38.0, symphonia 0.6.1, symphonia-bundle-flac 0.6.1, symphonia-bundle-mp3 0.6.1, symphonia-codec-aac 0.6.1, symphonia-codec-adpcm 0.6.1, symphonia-codec-pcm 0.6.1, symphonia-codec-vorbis 0.6.1, symphonia-common 0.6.1, symphonia-core 0.6.1, symphonia-format-isomp4 0.6.1, symphonia-format-mkv 0.6.1, symphonia-format-ogg 0.6.1, symphonia-format-riff 0.6.1, symphonia-metadata 0.6.1
-- **Unicode-3.0** (18): icu_collections 2.3.0, icu_locale_core 2.3.0, icu_normalizer 2.3.0, icu_normalizer_data 2.3.0, icu_properties 2.3.0, icu_properties_data 2.3.0, icu_provider 2.3.1, litemap 0.8.3, potential_utf 0.1.6, tinystr 0.8.4, writeable 0.6.4, yoke 0.8.3, yoke-derive 0.8.4, zerofrom 0.1.8, zerofrom-derive 0.1.8, zerotrie 0.2.5, zerovec 0.11.8, zerovec-derive 0.11.6
-- **Unlicense OR MIT** (11): aho-corasick 1.1.5, byteorder 1.5.0, jiff 0.2.38, jiff-core 0.1.1, jiff-static 0.2.38, jiff-tzdb 0.1.9, jiff-tzdb-platform 0.1.3, memchr 2.8.3, same-file 1.0.6, walkdir 2.5.0, winapi-util 0.1.11
-- **Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT** (5): linux-raw-sys 0.12.1, rustix 1.1.5, wasi 0.11.1+wasi-snapshot-preview1, wasip2 1.0.4+wasi-0.2.12, wit-bindgen 0.57.1
-- **BSD-3-Clause** (4): alloc-no-stdlib 3.0.0, alloc-stdlib 0.3.0, bindgen 0.72.1, subtle 2.6.1
-- **Apache-2.0** (4): clang-sys 1.9.1, gethostname 1.1.0, sync_wrapper 1.0.2, tao 0.37.1
-- **ISC** (4): libloading 0.7.4, libloading 0.8.9, rustls-webpki 0.103.15, untrusted 0.9.0
-- **Zlib** (2): foldhash 0.2.0, zlib-rs 0.6.8
-- **MIT OR Zlib OR Apache-2.0** (2): miniz_oxide 0.8.9, miniz_oxide 0.9.1
+<!-- crates:start -->
+- **MIT OR Apache-2.0** (262): accesskit 0.24.1, accesskit_atspi_common 0.18.1, accesskit_consumer 0.35.0, accesskit_consumer 0.36.0, accesskit_consumer 0.38.0, accesskit_macos 0.26.3, accesskit_unix 0.21.1, accesskit_windows 0.32.1, ahash 0.8.12, aligned 0.4.3, allocator-api2 0.2.21, android-activity 0.6.1, android_system_properties 0.1.6, annotate-snippets 0.11.5, anstyle 1.0.14, anyhow 1.0.104, apple-cf 0.11.0, apple-metal 0.10.0, arbitrary 1.5.0, arboard 3.6.1, arrayvec 0.7.8, as-raw-xcb-connection 1.0.1, as-slice 0.2.1, ash 0.38.0+1.3.281, async-broadcast 0.7.2, async-recursion 1.2.0, async-trait 0.1.92, bitflags 1.3.2, bitflags 2.13.2, bitstream-io 4.10.0, bumpalo 3.20.3, cc 1.8.0, cfg-expr 0.20.10, cfg-if 1.0.5, cmake 0.1.58, core-foundation 0.10.1, core-foundation 0.9.4, core-foundation-sys 0.8.7, core-graphics 0.23.2, core-graphics 0.25.0, core-graphics-types 0.1.3, core-graphics-types 0.2.0, coreaudio-rs 0.14.2, crc32fast 1.5.2, crossbeam-channel 0.5.17, crossbeam-deque 0.8.8, crossbeam-epoch 0.9.21, crossbeam-queue 0.3.14, crossbeam-utils 0.8.23, dasp_sample 0.11.0, dirs 7.0.0, dirs-sys 0.5.0, document-features 0.2.12, doom-fish-utils 0.4.1, downcast-rs 1.2.1, ecolor 0.36.2, eframe 0.36.2, egui 0.36.2, egui-wgpu 0.36.2, egui-winit 0.36.2, egui_glow 0.36.2, either 1.19.0, emath 0.36.2, enumflags2 0.7.12, enumflags2_derive 0.7.12, epaint 0.36.2, errno 0.3.14, euclid 0.22.14, fdeflate 0.3.7, find-msvc-tools 0.1.14, flate2 1.1.10, font-types 0.12.6, foreign-types 0.3.2, foreign-types 0.5.0, foreign-types-macros 0.2.4, foreign-types-shared 0.1.1, foreign-types-shared 0.3.1, futures-core 0.3.34, futures-io 0.3.34, futures-macro 0.3.34, futures-task 0.3.34, futures-util 0.3.34, getrandom 0.3.4, getrandom 0.4.3, glob 0.3.4, gpu-allocator 0.28.0, guillotiere 0.7.0, half 2.7.1, hashbrown 0.16.1, hashbrown 0.17.1, heck 0.5.0, hermit-abi 0.5.3, hex 0.4.3, image 0.25.10, itertools 0.13.0, itertools 0.14.0, itertools 0.15.0, itoa 1.0.18, jni 0.21.1, jni 0.22.4, jni-macros 0.22.4, jni-sys 0.3.1, jni-sys 0.4.1, jni-sys-macros 0.4.1, jobserver 0.1.35, js-sys 0.3.106, keyboard-types 0.7.0, khronos-egl 6.0.0, lazy_static 1.5.1, libc 0.2.190, litrs 1.0.1, lock_api 0.4.14, log 0.4.34, memmap2 0.9.11, minimal-lexical 0.2.1, naga 30.0.1, naga-types 30.0.1, nasm-rs 0.3.2, ndk 0.9.0, ndk-context 0.1.1, ndk-sys 0.6.0+11769913, num-bigint 0.4.8, num-derive 0.4.2, num-integer 0.1.47, num-rational 0.4.2, num-traits 0.2.19, once_cell 1.21.4, ordered-stream 0.2.0, parking_lot 0.12.5, parking_lot_core 0.9.12, paste 1.0.15, pastey 0.1.1, percent-encoding 2.3.2, piper 0.2.5, pkg-config 0.3.34, plain 0.2.3, png 0.17.16, png 0.18.1, polycool 0.4.0, ppv-lite86 0.2.21, presser 0.3.1, proc-macro-crate 3.5.0, proc-macro2 1.0.107, profiling 1.0.18, profiling-procmacros 1.0.18, quick-error 2.0.1, quote 1.0.47, rand 0.9.5, rand_chacha 0.9.0, rand_core 0.9.5, range-alloc 0.1.5, raw-window-metal 1.1.0, rayon 1.12.0, rayon-core 1.13.0, read-fonts 0.41.0, regex 1.13.1, regex-automata 0.4.18, regex-syntax 0.8.11, renderdoc-sys 1.1.0, rustc_version 0.4.1, rustversion 1.0.23, scoped-tls 1.0.1, scopeguard 1.2.0, screencapturekit 11.0.0, semver 1.0.28, serde 1.0.229, serde_core 1.0.229, serde_derive 1.0.229, serde_json 1.0.154, serde_repr 0.1.21, serde_spanned 1.1.2, shlex 1.3.0, shlex 2.0.1, signal-hook-registry 1.4.8, simdutf8 0.1.5, siphasher 1.0.4, skrifa 0.44.0, smallvec 1.16.3, smol_str 0.2.2, stable_deref_trait 1.2.1, static_assertions 1.1.0, syn 2.0.119, syn 3.0.8, system-deps 7.0.8, tempfile 3.27.0, thiserror 1.0.69, thiserror 2.0.21, thiserror-impl 1.0.69, thiserror-impl 2.0.21, toml 1.1.8+spec-1.1.0, toml_datetime 1.1.2+spec-1.1.0, toml_edit 0.25.17+spec-1.1.0, toml_parser 1.1.5+spec-1.1.0, toml_writer 1.1.3+spec-1.1.0, type-map 0.5.1, unicode-segmentation 1.13.3, unicode-width 0.2.2, version_check 0.9.5, wasm-bindgen 0.2.129, wasm-bindgen-futures 0.4.79, wasm-bindgen-macro 0.2.129, wasm-bindgen-macro-support 0.2.129, wasm-bindgen-shared 0.2.129, web-sys 0.3.106, web-time 1.1.0, weezl 0.1.12, wgpu 30.0.1, wgpu-core 30.0.1, wgpu-core-deps-apple 30.0.1, wgpu-core-deps-emscripten 30.0.1, wgpu-core-deps-wasm 30.0.1, wgpu-core-deps-windows-linux-android 30.0.1, wgpu-hal 30.0.1, wgpu-naga-bridge 30.0.1, wgpu-types 30.0.1, winapi 0.3.9, winapi-i686-pc-windows-gnu 0.4.0, winapi-x86_64-pc-windows-gnu 0.4.0, windows 0.62.2, windows-collections 0.3.2, windows-core 0.62.2, windows-future 0.3.2, windows-implement 0.60.2, windows-interface 0.59.3, windows-link 0.2.1, windows-numerics 0.3.1, windows-result 0.4.1, windows-strings 0.5.1, windows-sys 0.45.0, windows-sys 0.52.0, windows-sys 0.59.0, windows-sys 0.60.2, windows-sys 0.61.2, windows-targets 0.42.2, windows-targets 0.52.6, windows-targets 0.53.5, windows-threading 0.2.1, windows_aarch64_gnullvm 0.42.2, windows_aarch64_gnullvm 0.52.6, windows_aarch64_gnullvm 0.53.1, windows_aarch64_msvc 0.42.2, windows_aarch64_msvc 0.52.6, windows_aarch64_msvc 0.53.1, windows_i686_gnu 0.42.2, windows_i686_gnu 0.52.6, windows_i686_gnu 0.53.1, windows_i686_gnullvm 0.52.6, windows_i686_gnullvm 0.53.1, windows_i686_msvc 0.42.2, windows_i686_msvc 0.52.6, windows_i686_msvc 0.53.1, windows_x86_64_gnu 0.42.2, windows_x86_64_gnu 0.52.6, windows_x86_64_gnu 0.53.1, windows_x86_64_gnullvm 0.42.2, windows_x86_64_gnullvm 0.52.6, windows_x86_64_gnullvm 0.53.1, windows_x86_64_msvc 0.42.2, windows_x86_64_msvc 0.52.6, windows_x86_64_msvc 0.53.1, x11rb 0.13.2, x11rb-protocol 0.13.2
+- **MIT** (117): aligned-vec 0.6.4, alsa-sys 0.4.0, android-properties 0.2.2, arg_enum_proc_macro 0.3.4, ashpd 0.13.13, av-scenechange 0.14.1, block 0.1.6, block2 0.5.1, block2 0.6.2, built 0.8.1, bytes 1.12.1, calloop 0.13.0, calloop 0.14.5, calloop-wayland-source 0.3.0, calloop-wayland-source 0.4.1, cfg_aliases 0.2.2, combine 4.6.8, cookie-factory 0.3.3, crunchy 0.2.4, dispatch 0.2.0, dlib 0.5.3, endi 1.1.1, equator 0.4.2, equator-macro 0.4.2, fax 0.2.7, glutin-winit 0.5.0, harfrust 0.12.0, interpolate_name 0.2.4, libm 0.2.16, libredox 0.1.25, libspa 0.10.1, libspa-sys 0.10.1, malloc_buf 0.0.6, maybe-rayon 0.1.1, memoffset 0.9.1, new_debug_unreachable 1.0.6, nom 7.1.3, nom 8.0.0, noop_proc_macro 0.3.0, objc 0.2.7, objc-sys 0.3.5, objc2 0.5.3, objc2 0.6.5, objc2-app-kit 0.2.2, objc2-cloud-kit 0.2.2, objc2-contacts 0.2.2, objc2-core-data 0.2.2, objc2-core-image 0.2.2, objc2-core-location 0.2.2, objc2-encode 4.1.0, objc2-foundation 0.2.2, objc2-foundation 0.3.2, objc2-link-presentation 0.2.2, objc2-metal 0.2.2, objc2-quartz-core 0.2.2, objc2-symbols 0.2.2, objc2-ui-kit 0.2.2, objc2-uniform-type-identifiers 0.2.2, objc2-user-notifications 0.2.2, orbclient 0.3.55, ordered-float 5.5.0, phf 0.13.1, phf_generator 0.13.1, phf_macros 0.13.1, phf_shared 0.13.1, pipewire 0.10.1, pipewire-sys 0.10.1, quick-xml 0.41.0, rdev 0.5.3, redox_syscall 0.4.1, redox_syscall 0.5.18, redox_syscall 0.9.4, redox_users 0.5.3, rfd 0.17.2, simd-adler32 0.3.10, simd_helpers 0.1.0, slab 0.4.12, smithay-client-toolkit 0.19.2, smithay-client-toolkit 0.20.0, smithay-clipboard 0.7.3, strict-num 0.1.1, tiff 0.11.3, tokio 1.53.2, tracing 0.1.44, tracing-attributes 0.1.31, tracing-core 0.1.36, uds_windows 1.2.1, version-compare 0.2.1, wayland-backend 0.3.17, wayland-client 0.31.15, wayland-csd-frame 0.3.0, wayland-cursor 0.31.14, wayland-protocols 0.32.13, wayland-protocols-experimental 20250721.0.1, wayland-protocols-misc 0.3.12, wayland-protocols-plasma 0.3.12, wayland-protocols-wlr 0.3.12, wayland-scanner 0.31.11, wayland-sys 0.31.11, winnow 1.0.4, x11 2.21.0, x11-dl 2.21.0, xcursor 0.3.11, xkbcommon-dl 0.4.2, xml-rs 0.8.29, y4m 0.8.0, zbus 5.19.0, zbus-lockstep 0.5.2, zbus-lockstep-macros 0.5.2, zbus_macros 5.19.0, zbus_names 4.3.4, zbus_xml 5.2.1, zcheapstr 1.1.0, zmij 1.0.23, zvariant 5.15.0, zvariant_derive 5.15.0, zvariant_utils 4.2.0
+- **Apache-2.0 OR MIT** (49): alsa 0.11.0, async-channel 2.5.0, async-executor 1.14.0, async-io 2.6.0, async-lock 3.4.2, async-process 2.5.0, async-signal 0.2.14, async-task 4.7.1, atomic-waker 1.1.2, atspi 0.29.0, atspi-common 0.13.0, atspi-proxies 0.13.0, autocfg 1.5.1, bit-set 0.10.0, bit-vec 0.9.1, blocking 1.7.0, cesu8 1.1.0, cexpr 0.6.0, color 0.3.3, concurrent-queue 2.5.0, equivalent 1.0.2, event-listener 5.4.2, event-listener-strategy 0.5.4, fastrand 2.5.0, fearless_simd 0.4.1, futures-lite 2.6.1, glifo 0.2.0, global-hotkey 0.8.0, indexmap 2.14.2, kurbo 0.13.1, linebender_resource_handle 0.1.1, no_std_io2 0.9.4, nohash-hasher 0.2.0, parking 2.2.1, peniko 0.6.1, pin-project 1.1.13, pin-project-internal 1.1.13, pin-project-lite 0.2.17, polling 3.11.0, pollster 0.4.0, pollster 1.0.1, portable-atomic 1.15.0, portable-atomic-util 0.2.8, rustc-hash 1.1.0, rustc-hash 2.1.3, simd_cesu8 1.2.0, uuid 1.28.0, vello_common 0.1.0, vello_cpu 0.1.0
+- **Zlib OR Apache-2.0 OR MIT** (21): bytemuck 1.25.2, bytemuck_derive 1.12.1, dispatch2 0.3.1, objc2-app-kit 0.3.2, objc2-audio-toolbox 0.3.2, objc2-avf-audio 0.3.2, objc2-cloud-kit 0.3.2, objc2-core-audio 0.3.2, objc2-core-audio-types 0.3.2, objc2-core-data 0.3.2, objc2-core-foundation 0.3.2, objc2-core-graphics 0.3.2, objc2-core-image 0.3.2, objc2-core-text 0.3.2, objc2-core-video 0.3.2, objc2-io-surface 0.3.2, objc2-metal 0.3.2, objc2-quartz-core 0.3.2, objc2-ui-kit 0.3.2, safe_arch 1.2.0, wide 1.7.1
+- **Apache-2.0** (14): accesskit_winit 0.32.2, clang-sys 1.9.1, codespan-reporting 0.13.1, cpal 0.17.3, gethostname 1.1.0, gl_generator 0.14.0, glutin 0.32.3, glutin_egl_sys 0.7.1, glutin_glx_sys 0.6.1, glutin_wgl_sys 0.6.1, khronos_api 3.1.0, spirv 0.4.0+sdk-1.4.341.0, unicode-general-category 1.1.0, winit 0.30.13
+- **Unlicense OR MIT** (7): aho-corasick 1.1.5, byteorder-lite 0.1.0, memchr 2.8.3, same-file 1.0.6, termcolor 1.4.1, walkdir 2.5.0, winapi-util 0.1.11
+- **Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT** (6): linux-raw-sys 0.12.1, linux-raw-sys 0.4.15, rustix 0.38.44, rustix 1.1.5, wasip2 1.0.4+wasi-0.2.12, wit-bindgen 0.57.1
+- **BSD-2-Clause** (6): arrayref 0.3.9, av1-grain 0.2.5, openh264 0.9.8, openh264-sys2 0.9.8, rav1e 0.8.1, v_frame 0.3.9
+- **MIT  OR  Apache-2.0** (6): cgl 0.3.2, cocoa 0.22.0, core-foundation 0.7.0, core-foundation-sys 0.7.0, core-graphics 0.19.2, core-graphics 0.21.0
+- **MIT OR Apache-2.0 OR Zlib** (6): cursor-icon 1.2.0, glow 0.17.0, raw-window-handle 0.6.2, xkeysym 0.2.1, zune-core 0.5.3, zune-jpeg 0.5.15
+- **BSD-3-Clause** (3): bindgen 0.72.1, tiny-skia 0.11.4, tiny-skia-path 0.11.4
+- **ISC** (3): audiopus 0.3.0-rc.0, audiopus_sys 0.2.2, libloading 0.8.9
+- **Zlib** (3): foldhash 0.2.0, slotmap 1.1.1, zlib-rs 0.6.8
+- **BSD-2-Clause OR Apache-2.0 OR MIT** (2): zerocopy 0.8.63, zerocopy-derive 0.8.63
+- **BSD-3-Clause OR Apache-2.0** (2): moxcms 0.8.1, pxfm 0.1.30
 - **BSD-3-Clause OR MIT OR Apache-2.0** (2): num_enum 0.7.6, num_enum_derive 0.7.6
+- **BSL-1.0** (2): clipboard-win 5.4.1, error-code 3.4.0
 - **MIT OR Apache-2.0 OR LGPL-2.1-or-later** (2): r-efi 5.3.0, r-efi 6.0.0
-- **MIT OR Apache-2.0 OR Zlib** (2): raw-window-handle 0.6.2, xkeysym 0.2.1
-- **CDLA-Permissive-2.0** (2): webpki-roots 0.26.11, webpki-roots 1.0.9
-- **Unlicense** (2): whisper-rs 0.16.0, whisper-rs-sys 0.15.0
-- **0BSD OR MIT OR Apache-2.0** (1): adler2 2.0.1
-- **BSD-3-Clause AND MIT** (1): brotli 9.0.0
-- **BSD-3-Clause OR MIT** (1): brotli-decompressor 6.0.1
-- **Apache-2.0 AND MIT** (1): dpi 0.1.2
-- **CC0-1.0 OR MIT-0 OR Apache-2.0** (1): dunce 1.0.5
-- **Apache-2.0 AND ISC** (1): ring 0.17.14
-- **Apache-2.0 OR ISC OR MIT** (1): rustls 0.23.45
-- **Apache-2.0 WITH LLVM-exception** (1): target-lexicon 0.12.16
+- **MIT OR Zlib OR Apache-2.0** (2): miniz_oxide 0.8.9, miniz_oxide 0.9.1
+- **(MIT OR Apache-2.0) AND NCSA** (1): libfuzzer-sys 0.4.13
+- **(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0** (1): epaint_default_fonts 0.36.2
 - **(MIT OR Apache-2.0) AND Unicode-3.0** (1): unicode-ident 1.0.27
+- **0BSD OR MIT OR Apache-2.0** (1): adler2 2.0.1
+- **Apache-2.0 AND MIT** (1): dpi 0.1.2
+- **Apache-2.0 OR GPL-2.0-only** (1): self_cell 1.3.0
+- **Apache-2.0 WITH LLVM-exception** (1): target-lexicon 0.13.5
+- **BSD-2-Clause OR MIT OR Apache-2.0** (1): mach2 0.5.0
+- **MPL-2.0** (1): option-ext 0.2.0
+<!-- crates:end -->
 
 ---
 
 ## License texts
 
-### MIT License (whisper.cpp, ggml, OpenAI Whisper, mp4-muxer, gifenc, and ScreenCraft itself)
+### MIT License (ScreenCraft itself, egui, wgpu and others)
 
 Each work above carries its own copyright line as stated in its section. The permission notice is:
 

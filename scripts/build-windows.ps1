@@ -4,8 +4,7 @@
 #   - Rust with the MSVC toolchain  (https://rustup.rs, and the "Desktop development
 #     with C++" workload from the Visual Studio Build Tools)
 #   - NSIS                          (winget install NSIS.NSIS)
-#   - CMake                         (winget install Kitware.CMake) - builds whisper.cpp for captions
-#   - LLVM (libclang)               (winget install LLVM.LLVM) - bindgen for whisper.cpp
+#   - CMake                         (winget install Kitware.CMake) - builds libopus
 #
 # Usage (from the repository root, in PowerShell):
 #   powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1
@@ -15,8 +14,8 @@ param([string]$Out = "ScreenCraft-Setup.exe")
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 
-# Load the Visual Studio C++ environment (INCLUDE/LIB/PATH) so bindgen's clang finds stdbool.h
-# and friends even when this isn't a "Developer PowerShell".
+# Load the Visual Studio C++ environment (INCLUDE/LIB/PATH) even when this isn't a
+# "Developer PowerShell".
 if (-not $env:INCLUDE) {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
     if (Test-Path $vswhere) {
@@ -38,22 +37,10 @@ if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
     else { throw "cmake not found - install it first (winget install Kitware.CMake), then open a new PowerShell" }
 }
 
-if (-not $env:LIBCLANG_PATH) {
-    foreach ($dir in @("$env:ProgramFiles\LLVM\bin", "${env:ProgramFiles(x86)}\LLVM\bin")) {
-        if (Test-Path (Join-Path $dir "libclang.dll")) { $env:LIBCLANG_PATH = $dir; break }
-    }
-}
-if (-not $env:LIBCLANG_PATH) { throw "libclang not found - install LLVM first (winget install LLVM.LLVM)" }
-
-# whisper.cpp comes from our fork, a git submodule under third_party/
-git submodule update --init --recursive
-if ($LASTEXITCODE -ne 0) { throw "git submodule update failed" }
-
 cargo build --release -p screencraft
 if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
 
-$conf = Get-Content src-tauri\tauri.conf.json -Raw | ConvertFrom-Json
-$version = $conf.version
+$version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches.Groups[1].Value
 
 $makensis = (Get-Command makensis -ErrorAction SilentlyContinue).Source
 if (-not $makensis) {
@@ -65,7 +52,7 @@ if (-not $makensis) {
 if (-not $makensis) { throw "makensis not found - install NSIS first (winget install NSIS.NSIS)" }
 
 $exe = (Resolve-Path "target\release\screencraft.exe").Path
-$ico = (Resolve-Path "src-tauri\icons\icon.ico").Path
+$ico = (Resolve-Path "assets\icons\icon.ico").Path
 $outPath = Join-Path (Get-Location) $Out
 
 & $makensis "/DVERSION=$version" "/DEXE_PATH=$exe" "/DICON_PATH=$ico" "/DOUT_FILE=$outPath" "scripts\installer.nsi"

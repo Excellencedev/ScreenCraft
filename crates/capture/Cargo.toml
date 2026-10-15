@@ -1,0 +1,41 @@
+[package]
+name = "screencraft-capture"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Platform screen capture backends (ScreenCaptureKit, DXGI Desktop Duplication, PipeWire) and input logging"
+
+[dependencies]
+screencraft-core = { path = "../core" }
+screencraft-audio = { path = "../audio" }
+serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+screencapturekit = { version = "11", features = ["macos_15_0"] }
+core-graphics = "0.25"
+core-foundation = "0.10"
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSCursor", "NSEvent", "NSWorkspace", "NSRunningApplication", "NSWindow", "NSResponder", "NSColor"] }
+objc2-foundation = "0.3.2"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_UI_HiDpi",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Threading",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "screencast"] }
+pipewire = "0.10"
+rdev = "0.5"
+pollster = "0.4"

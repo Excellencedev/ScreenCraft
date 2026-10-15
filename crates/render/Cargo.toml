@@ -1,0 +1,17 @@
+[package]
+name = "screencraft-render"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "wgpu compositor shared by the ScreenCraft preview and exporter"
+
+[dependencies]
+screencraft-core = { path = "../core" }
+screencraft-encode = { path = "../encode" }
+wgpu = "30"
+bytemuck = { version = "1", features = ["derive"] }
+tiny-skia = "0.11"
+pollster = "0.4"
+
+[dev-dependencies]
+screencraft-encode = { path = "../encode" }

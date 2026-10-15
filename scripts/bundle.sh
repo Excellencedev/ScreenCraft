@@ -3,7 +3,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-cargo build --release -p screencraft
+# VP9 comes from libvpx. Link it statically when it is installed (brew install libvpx);
+# otherwise build without it.
+FEATURES=""
+if pkg-config --exists vpx 2>/dev/null; then
+  FEATURES="--features vp9"
+  export VPX_STATIC=1
+fi
+cargo build --release -p screencraft $FEATURES
 
 APP="dist/ScreenCraft.app"
 rm -rf "$APP"
@@ -13,14 +20,14 @@ cp target/release/screencraft "$APP/Contents/MacOS/ScreenCraft"
 # icon.icns from the 1024px master (see scripts/make-icon.swift)
 ICONSET="$(mktemp -d)/ScreenCraft.iconset"
 mkdir -p "$ICONSET"
-MASTER=src-tauri/icons/icon-1024.png
+MASTER=assets/icons/icon-1024.png
 for s in 16 32 128 256 512; do
   sips -z $s $s "$MASTER" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
   sips -z $((s * 2)) $((s * 2)) "$MASTER" --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
 done
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/ScreenCraft.icns"
 
-VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' src-tauri/tauri.conf.json | head -1)"
+VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

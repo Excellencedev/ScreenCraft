@@ -1,5 +1,5 @@
 // Renders the ScreenCraft app icon (1024x1024) with CoreGraphics.
-// Usage: swift scripts/make-icon.swift src-tauri/icons/icon-1024.png
+// Usage: swift scripts/make-icon.swift assets/icons/icon-1024.png
 import AppKit
 import CoreGraphics
 
