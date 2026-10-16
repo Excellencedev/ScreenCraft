@@ -60,11 +60,6 @@ pub fn show(st: &mut EditorState, ui: &mut Ui) {
             if let Some(n) = pick {
                 st.edit(|p| p.config.styles.background.wallpaper = n);
             }
-            ui.add_space(4.0);
-            if kit::btn_line(ui, "Pick random wallpaper", false).clicked() {
-                let n = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.subsec_nanos()).unwrap_or(0) as usize) % WALLPAPERS.len();
-                st.edit(|p| p.config.styles.background.wallpaper = WALLPAPERS[n].name.to_string());
-            }
             let motions: Vec<(String, &str)> = MOTIONS.iter().map(|(a, b)| (a.to_string(), *b)).collect();
             seg(st, ui, Some("Motion"), &motions, if bg.motion.is_empty() { "none".to_string() } else { bg.motion.clone() }, |p, v| p.config.styles.background.motion = v);
         }
