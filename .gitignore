@@ -6,3 +6,4 @@ node_modules/
 reference/
 website/public/downloads/
 website/public/latest.json
+config.bat
