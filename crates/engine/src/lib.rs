@@ -4,11 +4,14 @@
 //! back for the editor and the exporter.
 
 pub mod audio_mix;
+pub mod compress;
 pub mod export;
+pub mod gif;
 pub mod package;
 pub mod recorder;
 pub mod source;
 
+pub use gif::{export_gif, GifReport};
 pub use export::{build_soundtrack, export_project, ExportOptions, ExportReport};
 pub use package::Package;
 pub use recorder::{Finished, LiveStats, RecordOptions, Recording};

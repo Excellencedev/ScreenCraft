@@ -13,6 +13,9 @@ pub struct Prefs {
     pub microphone: bool,
     pub microphone_id: Option<String>,
     pub export_dir: Option<PathBuf>,
+    /// Notify-only update check at startup (default on).
+    pub update_check: Option<bool>,
+    pub dismissed_update: Option<String>,
 }
 
 impl Default for Prefs {
@@ -26,6 +29,8 @@ impl Default for Prefs {
             microphone: false,
             microphone_id: None,
             export_dir: None,
+            update_check: None,
+            dismissed_update: None,
         }
     }
 }

@@ -7,3 +7,8 @@ description = "Microphone and system-audio capture with timestamp alignment for 
 
 [dependencies]
 cpal = "0.17"
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+# Pure-Rust decoders for MP3 / FLAC / Ogg / WAV. AAC is deliberately left out: on macOS the
+# operating system's own decoder handles it, and nothing patent-encumbered is bundled.
+symphonia = { version = "0.5", default-features = false, features = ["mp3", "flac", "ogg", "vorbis", "wav", "pcm"] }

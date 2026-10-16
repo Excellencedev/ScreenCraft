@@ -42,6 +42,40 @@ pub fn parse_color(s: &str) -> [f32; 4] {
     }
 }
 
+/// A small RGBA preview of wallpaper `name` (what the picker shows), drawn on the CPU the same way
+/// the web editor drew its swatches: a diagonal base gradient plus three soft radial blobs.
+pub fn thumbnail(name: &str, w: usize, h: usize) -> Vec<u8> {
+    let wp = wallpaper(name);
+    let (c0, c1) = (parse_color(wp.base[0]), parse_color(wp.base[1]));
+    let blobs: Vec<([f32; 4], f32, f32, f32)> = wp.blobs.iter().map(|b| (parse_color(b.0), b.1, b.2, b.3)).collect();
+    let (wf, hf) = (w as f32, h as f32);
+    let m = wf.max(hf);
+    let mut out = vec![0u8; w * h * 4];
+    for y in 0..h {
+        for x in 0..w {
+            let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
+            let t = ((px * wf + py * hf) / (wf * wf + hf * hf)).clamp(0.0, 1.0);
+            let mut c = [0f32; 3];
+            for k in 0..3 {
+                c[k] = c0[k] + (c1[k] - c0[k]) * t;
+            }
+            for (bc, bx, by, br) in &blobs {
+                let d = ((px - bx * wf).powi(2) + (py - by * hf).powi(2)).sqrt() / (br * m);
+                let a = (1.0 - d).clamp(0.0, 1.0) * (230.0 / 255.0);
+                for k in 0..3 {
+                    c[k] = c[k] * (1.0 - a) + bc[k] * a;
+                }
+            }
+            let o = (y * w + x) * 4;
+            out[o] = (c[0] * 255.0) as u8;
+            out[o + 1] = (c[1] * 255.0) as u8;
+            out[o + 2] = (c[2] * 255.0) as u8;
+            out[o + 3] = 255;
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
