@@ -614,6 +614,8 @@ fn about(st: &mut EditorState, ctx: &egui::Context) {
                         let mut on = updates::enabled();
                         ui.horizontal(|ui| {
                             ui.vertical(|ui| {
+                                // leave room for the switch on the right
+                                ui.set_max_width((ui.available_width() - 56.0).max(120.0));
                                 ui.spacing_mut().item_spacing.y = 2.0;
                                 para(ui, "Check for updates when ScreenCraft starts");
                                 ui.label(egui::RichText::new("Off means ScreenCraft never contacts the update server unless you press Check now.").size(12.0).color(MUTED));
