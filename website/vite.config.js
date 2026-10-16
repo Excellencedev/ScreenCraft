@@ -5,6 +5,8 @@ import { marked } from 'marked';
 
 const root = import.meta.dirname;
 const appVersion = readFileSync(join(root, '../Cargo.toml'), 'utf8').match(/^version = "([^"]+)"/m)[1];
+// Installers are named after the version: 0.4.0 -> screencraft_0_4_0.dmg / .exe
+const installerName = `screencraft_${appVersion.replaceAll('.', '_')}`;
 const partial = (n) => readFileSync(join(root, 'src/partials', n + '.html'), 'utf8');
 
 // Every .html file (outside node_modules/dist) becomes a page.
@@ -25,7 +27,8 @@ const partials = {
     order: 'pre',
     handler(html) {
       return html
-        .replaceAll('/downloads/ScreenCraft.dmg', `/downloads/ScreenCraft-${appVersion}.dmg`)
+        .replaceAll('/downloads/screencraft.dmg', `/downloads/${installerName}.dmg`)
+        .replaceAll('/downloads/screencraft.exe', `/downloads/${installerName}.exe`)
         .replace('<!--@header-->', partial('header'))
         .replace('<!--@footer-->', partial('footer'))
         .replace('<!--@docs-nav-->', partial('docs-nav'))

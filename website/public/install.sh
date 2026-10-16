@@ -2,7 +2,7 @@
 # ScreenCraft installer for macOS.
 #   curl -fsSL https://screencraft.mdnlabs.dev/install.sh | bash
 #
-# Downloads the latest ScreenCraft.dmg with curl (so macOS does not tag it as "downloaded from
+# Downloads the latest ScreenCraft disk image with curl (so macOS does not tag it as "downloaded from
 # the internet"), copies the app to Applications and opens it. Read it first if you like:
 # it only downloads the disk image from this website and copies the app out of it.
 set -euo pipefail
@@ -14,7 +14,6 @@ for s in "${SITES[@]}"; do
   u="$(curl -fsSL -m 10 "$s/latest.json" 2>/dev/null | sed -n 's/.*"mac": *"\([^"]*\)".*/\1/p' | head -1 || true)"
   [ -n "$u" ] && URLS+=("$u")
 done
-URLS+=("https://screencraft.mdnlabs.dev/downloads/ScreenCraft.dmg" "https://getscreencraft.pages.dev/downloads/ScreenCraft.dmg")
 
 if [ "$(uname -s)" != "Darwin" ]; then
   echo "This installer is for macOS. Windows users: https://screencraft.mdnlabs.dev/download" >&2
@@ -29,6 +28,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
+[ ${#URLS[@]} -gt 0 ] || { echo "Could not reach the ScreenCraft website. Check your connection and try again." >&2; exit 1; }
 echo "Downloading ScreenCraft..."
 ok=""
 for u in "${URLS[@]}"; do

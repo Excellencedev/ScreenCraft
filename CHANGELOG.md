@@ -10,7 +10,7 @@ features as 0.3. The Tauri / web UI is gone.
 - **Capture engines.** ScreenCaptureKit on macOS, DXGI Desktop Duplication on Windows and the
   xdg-desktop-portal ScreenCast + PipeWire stream on Linux (Wayland and X11), behind one `Capturer`
   trait. Frames are re-timed to a constant frame rate before encoding.
-- **Audio.** Microphone through cpal everywhere, system audio from ScreenCaptureKit (macOS), WASAPI
+- **Audio capture.** Microphone through cpal everywhere, system audio from ScreenCaptureKit (macOS), WASAPI
   loopback (Windows) and PulseAudio / PipeWire monitor sources (Linux). Every stream is stamped on one
   monotonic clock and aligned to the first video frame (gaps filled, overlap trimmed, drift nudged).
 - **Encoding.** New sans-I/O encode stack: H.264 through the operating system's own licensed codec
@@ -25,7 +25,7 @@ features as 0.3. The Tauri / web UI is gone.
   highlight, the **camera bubble and layouts**, **annotations** (including blur, pixelate and
   spotlight), shortcut display, **captions** (on-device whisper.cpp, SRT), watermark, and dissolve /
   fade / flash / blur / slide / zoom **transitions**.
-- **Audio.** Levels, **music** with fades and ducking under speech, click and typing **sound
+- **Audio editing.** Levels, **music** with fades and ducking under speech, click and typing **sound
   effects**, microphone levelling.
 - **Recorder.** The floating bar with Display / Window / Area (drag out the area), camera, microphone
   and system-audio inputs with meters, quality menu, Projects menu, countdown, HUD, discard, and the
