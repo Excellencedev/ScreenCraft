@@ -12,6 +12,12 @@ pub struct Prefs {
     pub system_audio: bool,
     pub microphone: bool,
     pub microphone_id: Option<String>,
+    pub microphone_name: String,
+    /// "display", "window" or "area" (a window or area pick does not survive a restart).
+    pub mode: String,
+    pub camera: bool,
+    pub camera_id: Option<String>,
+    pub camera_label: String,
     pub export_dir: Option<PathBuf>,
     /// Notify-only update check at startup (default on).
     pub update_check: Option<bool>,
@@ -23,11 +29,16 @@ impl Default for Prefs {
         let base = dirs::video_dir().or_else(dirs::home_dir).unwrap_or_else(|| PathBuf::from("."));
         Self {
             recordings_dir: base.join("ScreenCraft"),
-            fps: 60,
+            fps: 30,
             max_long_side: 2560,
             system_audio: true,
             microphone: false,
             microphone_id: None,
+            microphone_name: String::new(),
+            mode: "display".into(),
+            camera: false,
+            camera_id: None,
+            camera_label: String::new(),
             export_dir: None,
             update_check: None,
             dismissed_update: None,

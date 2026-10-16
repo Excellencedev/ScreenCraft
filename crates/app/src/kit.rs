@@ -13,6 +13,18 @@ pub fn text_width(ui: &Ui, text: &str, size: f32) -> f32 {
     ui.painter().layout_no_wrap(text.to_string(), font(size), Color32::WHITE).size().x
 }
 
+/// `text` shortened with an ellipsis so it fits `max_w` (CSS `text-overflow: ellipsis`).
+pub fn fit_text(ui: &Ui, text: &str, size: f32, max_w: f32) -> String {
+    if text_width(ui, text, size) <= max_w {
+        return text.to_string();
+    }
+    let mut s: String = text.to_string();
+    while !s.is_empty() && text_width(ui, &format!("{s}…"), size) > max_w {
+        s.pop();
+    }
+    format!("{}…", s.trim_end())
+}
+
 /// Text with CSS-style letter spacing; returns its width.
 pub fn spaced_text(ui: &Ui, pos: Pos2, text: &str, size: f32, color: Color32, spacing: f32) -> f32 {
     let mut x = pos.x;

@@ -35,10 +35,24 @@ pub struct RecordOptions {
     pub microphone: bool,
     pub microphone_id: Option<String>,
     pub output: Package,
+    pub camera: Option<CameraSpec>,
     /// `None` picks a bitrate from the resolution. Recordings are an editing master, so this
     /// is intentionally high.
     pub bitrate_kbps: Option<u32>,
     pub hardware: HwPreference,
+}
+
+/// The camera bubble: the hub that fans the live camera out, shared with the recorder's preview.
+#[derive(Clone)]
+pub struct CameraSpec {
+    pub id: Option<String>,
+    pub hub: Arc<screencraft_capture::camera::CameraHub>,
+}
+
+impl std::fmt::Debug for CameraSpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CameraSpec({:?})", self.id)
+    }
 }
 
 /// Counters the UI can poll while recording.
@@ -78,6 +92,7 @@ enum Ctl {
 }
 
 pub struct Recording {
+    camera: Option<crate::camera_rec::CameraRecorder>,
     capturer: Box<dyn Capturer>,
     audio: Option<AudioCapture>,
     tracker: Option<InputTracker>,
@@ -239,7 +254,17 @@ impl Recording {
                 .map_err(|e| e.to_string())?
         };
 
+        let camera = opts.camera.as_ref().and_then(|c| {
+            match crate::camera_rec::CameraRecorder::start(c.hub.clone(), opts.output.dir.join("camera.mp4"), clock.clone(), opts.hardware) {
+                Ok(r) => Some(r),
+                Err(e) => {
+                    eprintln!("[screencraft] camera not recorded: {e}");
+                    None
+                }
+            }
+        });
         let mut rec = Self {
+            camera,
             capturer,
             audio,
             tracker: Some(tracker),
@@ -282,6 +307,10 @@ impl Recording {
     }
 
     fn abort(&mut self) -> Result<(), String> {
+        if let Some(c) = self.camera.take() {
+            let _ = c.finish(0);
+            let _ = std::fs::remove_file(self.opts.output.dir.join("camera.mp4"));
+        }
         self.capturer.stop();
         if let Some(a) = self.audio.take() {
             a.stop();
@@ -312,6 +341,7 @@ impl Recording {
             .join()
             .map_err(|_| "recorder thread panicked".to_string())??;
 
+        let camera_done = self.camera.take().and_then(|c| c.finish(result.origin_ns));
         let zero = self.clock.epoch() + Duration::from_nanos(result.origin_ns);
         let log = self.tracker.take().map(|t| t.finish(zero, self.info.bounds)).unwrap_or_default();
         let json = serde_json::to_vec(&log).map_err(|e| e.to_string())?;
@@ -335,6 +365,8 @@ impl Recording {
             has_microphone: self.opts.microphone,
             system_track: sys_track,
             mic_track,
+            camera: camera_done.as_ref().map(|_| "camera.mp4".to_string()),
+            camera_offset_ms: camera_done.unwrap_or(0.0),
             ..Media::default()
         };
         let stem = self

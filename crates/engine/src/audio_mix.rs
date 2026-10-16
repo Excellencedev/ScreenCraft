@@ -22,17 +22,70 @@ pub struct Lane {
     pub gain: f32,
 }
 
+/// A music clip placed on the edited timeline.
+pub struct MusicPlay {
+    pub pcm: std::sync::Arc<Vec<f32>>,
+    pub offset_ms: f64,
+    pub in_ms: f64,
+    pub dur_ms: f64,
+    pub fade_in_ms: f64,
+    pub fade_out_ms: f64,
+}
+
+/// Everything besides the recorded tracks: music (with fades and ducking under speech) and the
+/// click / typing sound effects.
+#[derive(Default)]
+pub struct Extras {
+    pub music: Vec<MusicPlay>,
+    /// Master x music volume.
+    pub music_gain: f32,
+    /// Output-time ranges (ms) where someone speaks; the music ducks under them.
+    pub duck_ranges: Vec<[f64; 2]>,
+    pub duck_level: f32,
+    pub hits: Vec<crate::sfx::Hit>,
+}
+
+const ATTACK_MS: f64 = 150.0;
+const RELEASE_MS: f64 = 450.0;
+
+/// Music gain under speech at output time `t` (1 = untouched).
+fn duck_gain(ranges: &[[f64; 2]], level: f32, t: f64) -> f32 {
+    let lvl = level.clamp(0.02, 1.0);
+    let mut g = 1.0f32;
+    // ranges are sorted by start; only those near `t` matter
+    let hi = ranges.partition_point(|r| r[0] - ATTACK_MS <= t);
+    for r in ranges[..hi].iter().rev().take(8) {
+        let v = if t < r[0] {
+            1.0 - (1.0 - lvl) * ((t - (r[0] - ATTACK_MS)) / ATTACK_MS) as f32
+        } else if t <= r[1] {
+            lvl
+        } else if t < r[1] + RELEASE_MS {
+            lvl + (1.0 - lvl) * ((t - r[1]) / RELEASE_MS) as f32
+        } else {
+            1.0
+        };
+        g = g.min(v);
+    }
+    g
+}
+
 pub struct Soundtrack {
     slices: Vec<Slice>,
     starts: Vec<f64>,
     lanes: Vec<Lane>,
+    extras: Extras,
 }
 
 impl Soundtrack {
     pub fn new(project: &Project, lanes: Vec<Lane>) -> Self {
         let slices = project.scene.slices.clone();
         let starts = slice_output_starts(&slices);
-        Self { slices, starts, lanes }
+        Self { slices, starts, lanes, extras: Extras::default() }
+    }
+
+    pub fn with_extras(mut self, e: Extras) -> Self {
+        self.extras = e;
+        self
     }
 
     /// Interleaved stereo for output frames `[start, start + len)` at 48 kHz.
@@ -82,8 +135,62 @@ impl Soundtrack {
             }
             done += remain;
         }
+        self.mix_extras(&mut out, start_frame);
         screencraft_audio::mix::limit(&mut out);
         out
+    }
+
+    fn mix_extras(&self, out: &mut [f32], start_frame: u64) {
+        let len = out.len() / 2;
+        let (t0, t1) = (start_frame as f64 * 1000.0 / RATE, (start_frame + len as u64) as f64 * 1000.0 / RATE);
+        let e = &self.extras;
+        for m in &e.music {
+            let end = m.offset_ms + m.dur_ms;
+            if end <= t0 || m.offset_ms >= t1 {
+                continue;
+            }
+            for k in 0..len {
+                let t = (start_frame + k as u64) as f64 * 1000.0 / RATE;
+                if t < m.offset_ms || t >= end {
+                    continue;
+                }
+                let idx = (((m.in_ms + (t - m.offset_ms)) * RATE / 1000.0) as usize) * 2;
+                if idx + 1 >= m.pcm.len() {
+                    continue;
+                }
+                let fi = if m.fade_in_ms > 0.0 { ((t - m.offset_ms) / m.fade_in_ms).min(1.0) } else { 1.0 };
+                let fo = if m.fade_out_ms > 0.0 { ((end - t) / m.fade_out_ms).min(1.0) } else { 1.0 };
+                let g = e.music_gain * fi.min(fo) as f32 * duck_gain(&e.duck_ranges, e.duck_level, t);
+                out[k * 2] += m.pcm[idx] * g;
+                out[k * 2 + 1] += m.pcm[idx + 1] * g;
+            }
+        }
+        if !e.hits.is_empty() {
+            let (a, b) = (start_frame as i64, (start_frame + len as u64) as i64);
+            let first = e.hits.partition_point(|h| h.start_frame < a - 96_000);
+            for h in &e.hits[first..] {
+                if h.start_frame >= b {
+                    break;
+                }
+                let frames = (h.pcm.len() / 2) as f64 / h.rate;
+                if (h.start_frame as f64 + frames) < a as f64 {
+                    continue;
+                }
+                let from = (a - h.start_frame).max(0);
+                let last = h.pcm.len() / 2 - 1;
+                for k in from..(b - h.start_frame) {
+                    let pos = k as f64 * h.rate;
+                    if pos >= last as f64 {
+                        break;
+                    }
+                    let (i0, f) = (pos as usize, (pos - pos.floor()) as f32);
+                    let i1 = (i0 + 1).min(last);
+                    let o = ((h.start_frame + k - a) * 2) as usize;
+                    out[o] += (h.pcm[i0 * 2] * (1.0 - f) + h.pcm[i1 * 2] * f) * h.gain;
+                    out[o + 1] += (h.pcm[i0 * 2 + 1] * (1.0 - f) + h.pcm[i1 * 2 + 1] * f) * h.gain;
+                }
+            }
+        }
     }
 }
 

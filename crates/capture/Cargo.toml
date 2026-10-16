@@ -9,6 +9,7 @@ description = "Platform screen capture backends (ScreenCaptureKit, DXGI Desktop 
 screencraft-core = { path = "../core" }
 screencraft-audio = { path = "../audio" }
 serde = { version = "1", features = ["derive"] }
+nokhwa = { version = "0.10", default-features = false, features = ["input-native"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 screencapturekit = { version = "11", features = ["macos_15_0"] }

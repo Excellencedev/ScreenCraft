@@ -28,7 +28,8 @@ pub fn show(st: &mut EditorState, ui: &mut Ui) {
         let before = a.click_style.clone();
         seg(st, ui, Some("Click style"), &opts, a.click_style.clone(), |p, v| p.config.audio.click_style = v);
         if st.project.config.audio.click_style != before {
-            crate::sfx::preview("click", &st.project.config.audio.click_style.clone(), a.click_volume);
+            let (style, vol) = (st.project.config.audio.click_style.clone(), a.click_volume);
+            st.preview_sound("click", &style, vol);
         }
         slider(st, ui, "a-clickvol", "Click volume", a.click_volume, (0.0, 1.0, 0.01), pct, |p, v| p.config.audio.click_volume = v);
     }
@@ -38,7 +39,8 @@ pub fn show(st: &mut EditorState, ui: &mut Ui) {
         let before = a.key_style.clone();
         seg(st, ui, Some("Keyboard style"), &opts, a.key_style.clone(), |p, v| p.config.audio.key_style = v);
         if st.project.config.audio.key_style != before {
-            crate::sfx::preview("key", &st.project.config.audio.key_style.clone(), a.key_volume);
+            let (style, vol) = (st.project.config.audio.key_style.clone(), a.key_volume);
+            st.preview_sound("key", &style, vol);
         }
         slider(st, ui, "a-keyvol", "Typing volume", a.key_volume, (0.0, 1.0, 0.01), pct, |p, v| p.config.audio.key_volume = v);
     }

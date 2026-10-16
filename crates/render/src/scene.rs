@@ -144,8 +144,34 @@ fn kind_index(k: u8) -> u32 {
     (k as usize).min(CursorKind::ALL.len() - 1) as u32
 }
 
+/// A camera / cursor state that replaces the track's for one frame (motion blur sub-frames).
+#[derive(Clone, Copy, Debug)]
+pub struct CamOverride {
+    pub zoom: f64,
+    pub cx: f64,
+    pub cy: f64,
+    pub mx: f64,
+    pub my: f64,
+}
+
+impl CamOverride {
+    pub fn at(track: &RenderTrack, i: usize) -> Self {
+        let i = i.min(track.count.saturating_sub(1));
+        Self { zoom: track.zoom[i], cx: track.cx[i], cy: track.cy[i], mx: track.mx[i], my: track.my[i] }
+    }
+
+    pub fn lerp(a: Self, b: Self, f: f64) -> Self {
+        let l = |x: f64, y: f64| x + (y - x) * f;
+        Self { zoom: l(a.zoom, b.zoom), cx: l(a.cx, b.cx), cy: l(a.cy, b.cy), mx: l(a.mx, b.mx), my: l(a.my, b.my) }
+    }
+}
+
 /// Build the scene for output frame `i` of `track`.
 pub fn build_scene(p: &Project, track: &RenderTrack, i: usize, out: (u32, u32)) -> Scene {
+    build_scene_with(p, track, i, out, None)
+}
+
+pub fn build_scene_with(p: &Project, track: &RenderTrack, i: usize, out: (u32, u32), cam_override: Option<CamOverride>) -> Scene {
     let i = i.min(track.count.saturating_sub(1));
     let (w, h) = (out.0 as f64, out.1 as f64);
     let s = (h / 1080.0) as f32;
@@ -190,14 +216,14 @@ pub fn build_scene(p: &Project, track: &RenderTrack, i: usize, out: (u32, u32)) 
 
     // Points (recording units) to output px, through the camera.
     let rec_h_pts = (crop.height * p.media.bounds.height).max(1.0);
-    let zoom = track.zoom.get(i).copied().unwrap_or(1.0);
+    let zoom = cam_override.map(|c| c.zoom).unwrap_or_else(|| track.zoom.get(i).copied().unwrap_or(1.0));
     let points_to_px = (sr[3] as f64 / rec_h_pts * zoom) as f32;
 
     let cursor = if cfg.hide || track.cursor_alpha.get(i).copied().unwrap_or(0.0) < 0.01 {
         None
     } else {
         Some(CursorDraw {
-            pos: [track.mx[i] as f32, track.my[i] as f32],
+            pos: [cam_override.map(|c| c.mx).unwrap_or(track.mx[i]) as f32, cam_override.map(|c| c.my).unwrap_or(track.my[i]) as f32],
             size_px: (cfg.size as f32) * points_to_px,
             rotation: track.cursor_rotation.get(i).copied().unwrap_or(0.0) as f32,
             alpha: track.cursor_alpha[i] as f32,
@@ -252,7 +278,10 @@ pub fn build_scene(p: &Project, track: &RenderTrack, i: usize, out: (u32, u32)) 
     };
 
     // CPU layers: device frame, annotations, shortcuts, watermark, captions
-    let (cx, cy) = (track.cx.get(i).copied().unwrap_or(0.5), track.cy.get(i).copied().unwrap_or(0.5));
+    let (cx, cy) = match cam_override {
+        Some(c) => (c.cx, c.cy),
+        None => (track.cx.get(i).copied().unwrap_or(0.5), track.cy.get(i).copied().unwrap_or(0.5)),
+    };
     let (vw, vh) = (crop.width / zoom, crop.height / zoom);
     let geom = Geom {
         w: out.0 as f32,
@@ -289,7 +318,7 @@ pub fn build_scene(p: &Project, track: &RenderTrack, i: usize, out: (u32, u32)) 
         shadow_intensity: sh.intensity as f32,
         shadow_offset,
         crop: [crop.x as f32, crop.y as f32, crop.width as f32, crop.height as f32],
-        camera: [track.cx.get(i).copied().unwrap_or(0.5) as f32, track.cy.get(i).copied().unwrap_or(0.5) as f32, zoom as f32],
+        camera: [cx as f32, cy as f32, zoom as f32],
         bg_kind,
         bg_angle_rad: (bg.gradient_angle as f32).to_radians(),
         bg_drift: bg_motion == 1,

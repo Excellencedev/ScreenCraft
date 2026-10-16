@@ -22,6 +22,7 @@ fn main() {
         microphone: mic,
         microphone_id: None,
         output: package.clone(),
+        camera: None,
         bitrate_kbps: None,
         hardware: HwPreference::Auto,
     })

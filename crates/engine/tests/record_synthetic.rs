@@ -25,6 +25,7 @@ fn records_a_synthetic_screen_into_a_package() {
             microphone: false,
             microphone_id: None,
             output: package.clone(),
+            camera: None,
             bitrate_kbps: Some(4000),
             hardware: screencraft_encode::HwPreference::Software,
         },

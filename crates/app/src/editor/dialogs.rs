@@ -13,6 +13,8 @@ use std::sync::mpsc::{channel, Receiver};
 pub struct Dialogs {
     pub about: bool,
     pub raw: bool,
+    pub projects: bool,
+    pub projects_anchor: Option<Rect>,
     pub raw_anchor: Option<Rect>,
     pub presets_open: bool,
     pub presets_manage: bool,
@@ -34,6 +36,8 @@ impl Default for Dialogs {
         Self {
             about: false,
             raw: false,
+            projects: false,
+            projects_anchor: None,
             raw_anchor: None,
             presets_open: false,
             presets_manage: false,
@@ -194,9 +198,78 @@ fn popover(ctx: &egui::Context, id: &str, anchor: Rect, content: impl FnOnce(&mu
 }
 
 pub fn show(st: &mut EditorState, ctx: &egui::Context) {
+    projects_menu(st, ctx);
     presets_menu(st, ctx);
     raw_menu(st, ctx);
     about(st, ctx);
+}
+
+fn projects_menu(st: &mut EditorState, ctx: &egui::Context) {
+    if !st.dialogs.projects {
+        return;
+    }
+    let anchor = st.dialogs.projects_anchor.unwrap_or(Rect::from_min_size(Pos2::new(60.0, 40.0), Vec2::new(90.0, 32.0)));
+    let dir = st.package.dir.clone();
+    let root = crate::prefs::Prefs::load().recordings_dir;
+    let list = screencraft_engine::package::list_packages(&root);
+    let mut open: Option<std::path::PathBuf> = None;
+    let mut reveal_it = false;
+    let mut reveal_root = false;
+    let outside = {
+        // anchored under the button, left-aligned like the original
+        let mut o = false;
+        let area = egui::Area::new(egui::Id::new("projects-menu")).order(egui::Order::Foreground).fixed_pos(Pos2::new(anchor.left(), anchor.bottom() + 6.0)).show(ctx, |ui| {
+            egui::Frame::new()
+                .fill(PANEL_2)
+                .stroke(Stroke::new(1.0, LINE_2))
+                .corner_radius(CornerRadius::same(10))
+                .inner_margin(egui::Margin::same(6))
+                .shadow(egui::Shadow { offset: [0, 14], blur: 44, spread: 0, color: Color32::from_black_alpha(140) })
+                .show(ui, |ui| {
+                    ui.set_min_width(260.0);
+                    ui.set_max_width(320.0);
+                    ui.spacing_mut().item_spacing = Vec2::ZERO;
+                    let mut m = Menu { ui };
+                    m.header("Recent Projects");
+                    for (pkg, _) in list.iter().take(8) {
+                        let name = pkg.load_project().map(|p| p.name).unwrap_or_else(|_| pkg.dir.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default());
+                        if m.item(&name) {
+                            open = Some(pkg.dir.clone());
+                        }
+                    }
+                    if list.is_empty() {
+                        m.item("No projects yet");
+                    }
+                    m.hr();
+                    if m.item("Show this project in the file manager") {
+                        reveal_it = true;
+                    }
+                    if m.item("Open recordings folder") {
+                        reveal_root = true;
+                    }
+                });
+        });
+        if ctx.input(|i| i.pointer.any_pressed()) {
+            if let Some(p) = ctx.input(|i| i.pointer.interact_pos()) {
+                if !area.response.rect.contains(p) && !anchor.contains(p) {
+                    o = true;
+                }
+            }
+        }
+        o
+    };
+    if let Some(d) = open {
+        st.dialogs.projects = false;
+        st.open_request = Some(d);
+    } else if reveal_it {
+        st.dialogs.projects = false;
+        reveal(&dir.join(&st.project.media.screen));
+    } else if reveal_root {
+        st.dialogs.projects = false;
+        let _ = open_url(&root.to_string_lossy());
+    } else if outside {
+        st.dialogs.projects = false;
+    }
 }
 
 fn presets_menu(st: &mut EditorState, ctx: &egui::Context) {

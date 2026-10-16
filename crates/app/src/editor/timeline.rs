@@ -9,6 +9,7 @@ use crate::kit;
 use crate::theme::*;
 use eframe::egui::{self, Align2, Color32, CornerRadius, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Vec2};
 use screencraft_core::project::{Slice, ZoomRegion};
+use std::sync::Arc;
 
 const LABEL_W: f32 = 58.0;
 const RULER_H: f32 = 24.0;
@@ -80,6 +81,8 @@ struct Block {
     freeze: bool,
     /// For clips: the slice index.
     index: usize,
+    /// Music: waveform and the clip's window into the file (in ms, duration ms, file ms).
+    wave: Option<(Arc<Vec<f32>>, f64, f64, f64)>,
 }
 
 fn rng_to_zoom(v: f64) -> f64 {
@@ -229,6 +232,7 @@ fn body(st: &mut EditorState, ui: &mut egui::Ui) {
                 pill: Some(format!("{} → {}", x_text(first.time_scale), x_text(last.time_scale))),
                 freeze: false,
                 index: si,
+                wave: None,
             });
             if si > 0 {
                 markers.push((acc, si));
@@ -255,6 +259,7 @@ fn body(st: &mut EditorState, ui: &mut egui::Ui) {
             pill: if sped { Some(x_text(s.time_scale)) } else { None },
             freeze: s.freeze,
             index: si,
+                wave: None,
         });
         if si > 0 {
             markers.push((acc, si));
@@ -284,6 +289,7 @@ fn body(st: &mut EditorState, ui: &mut egui::Ui) {
                 pill: None,
                 freeze: false,
                 index: 0,
+                wave: None,
             });
         }
     }
@@ -308,6 +314,7 @@ fn body(st: &mut EditorState, ui: &mut egui::Ui) {
                 pill: None,
                 freeze: false,
                 index: 0,
+                wave: None,
             });
         }
     }
@@ -352,6 +359,7 @@ fn body(st: &mut EditorState, ui: &mut egui::Ui) {
             pill: None,
             freeze: false,
             index: 0,
+                wave: None,
         });
     }
     let note_lanes = lanes.len().max(1);
@@ -377,6 +385,7 @@ fn body(st: &mut EditorState, ui: &mut egui::Ui) {
                 pill: None,
                 freeze: false,
                 index: 0,
+                wave: None,
             });
         }
     }
@@ -397,6 +406,7 @@ fn body(st: &mut EditorState, ui: &mut egui::Ui) {
             pill: None,
             freeze: false,
             index: 0,
+            wave: st.peaks_for(&c.file, ui.ctx()).map(|p| (p, c.in_ms, c.dur_ms, c.file_dur_ms)),
         });
     }
 
@@ -957,6 +967,23 @@ fn paint_block(ui: &egui::Ui, p: &egui::Painter, b: &Block, r: Rect, dragging: b
             ic.rect_filled(pr, CornerRadius::same(10), bg);
             ic.text(pr.center(), Align2::CENTER_CENTER, pill, kit::font(11.0), b.text);
         } else if b.kind == Kind::Music {
+            if let Some((peaks, in_ms, dur_ms, file_ms)) = &b.wave {
+                let total = peaks.len() as f64;
+                let fd = if *file_ms > 0.0 { *file_ms } else { in_ms + dur_ms };
+                let (i0, i1) = (in_ms / fd * total, (in_ms + dur_ms) / fd * total);
+                let mid = r.center().y;
+                let mut x = r.min.x.max(inner.min.x - HANDLE_W).floor();
+                while x < r.max.x.min(inner.max.x + HANDLE_W) {
+                    let f0 = (x - r.min.x) as f64 / r.width() as f64;
+                    let f1 = (x + 1.0 - r.min.x) as f64 / r.width() as f64;
+                    let a = (i0 + (i1 - i0) * f0).floor().max(0.0) as usize;
+                    let bb = ((i0 + (i1 - i0) * f1).floor() as usize).max(a + 1);
+                    let m = (a..bb.min(peaks.len())).map(|i| peaks[i]).fold(0.0f32, f32::max);
+                    let bar = (m * r.height() * 0.9).max(1.0);
+                    clip.rect_filled(Rect::from_min_max(Pos2::new(x, mid - bar / 2.0), Pos2::new(x + 1.0, mid + bar / 2.0)), 0.0, Color32::from_white_alpha(191));
+                    x += 1.0;
+                }
+            }
             let mname = b.label.clone();
             let w = kit::text_width(ui, &mname, 11.0) + 12.0;
             let lr = Rect::from_min_size(Pos2::new(inner.min.x + 2.0, r.max.y - 3.0 - 17.0), Vec2::new(w.min(inner.width() - 4.0).max(10.0), 17.0));

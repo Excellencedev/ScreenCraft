@@ -49,7 +49,7 @@ impl Headless {
         if let Some(v) = raw.viewports.get_mut(&egui::ViewportId::ROOT) {
             v.native_pixels_per_point = Some(self.ppp);
         }
-        let out = self.ctx.run_ui(raw, |ui| ui_fn(ui));
+        let mut out = self.ctx.run_ui(raw, |ui| ui_fn(ui));
         let jobs = self.ctx.tessellate(out.shapes, out.pixels_per_point);
         let sd = ScreenDescriptor { size_in_pixels: self.size_px, pixels_per_point: out.pixels_per_point };
 
@@ -87,6 +87,7 @@ impl Headless {
         for id in &out.textures_delta.free {
             renderer.free_texture(id);
         }
+        out.textures_delta.clear();
         drop(renderer);
         queue.submit(extra.into_iter().chain(std::iter::once(enc.finish())));
         self.read_back()

@@ -22,6 +22,7 @@ fn record(dir: &std::path::Path) -> (Package, screencraft_core::project::Project
             microphone: false,
             microphone_id: None,
             output: package.clone(),
+            camera: None,
             bitrate_kbps: Some(4000),
             hardware: HwPreference::Software,
         },

@@ -10,6 +10,7 @@
 //! Cursor, click and key logging lives in `input`; `cfr` turns the irregular frame arrival
 //! into a constant frame rate.
 
+pub mod camera;
 pub mod cfr;
 pub mod input;
 pub mod pixels;

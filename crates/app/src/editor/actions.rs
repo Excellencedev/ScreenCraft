@@ -19,8 +19,40 @@ impl EditorState {
         screencraft_core::pace::idle_segments(&self.input, dur, speech.as_deref(), min_idle_ms.max(500.0), 250.0)
     }
 
+    /// Play one hit of a click / typing sound (when the style is picked in the Audio panel).
+    pub fn preview_sound(&mut self, kind: &str, style: &str, volume: f64) {
+        use screencraft_engine::audio_mix::{Extras, Soundtrack};
+        self.pause();
+        let set = screencraft_engine::sfx::load_set(kind, style);
+        let mut hits = screencraft_engine::sfx::place(&set, &[(0.0, 0)]);
+        for h in hits.iter_mut() {
+            h.gain *= (self.project.config.audio.volume * 2.0 * volume) as f32;
+        }
+        let st = Soundtrack::new(&self.project, vec![]).with_extras(Extras { hits, ..Default::default() });
+        if self.audio.is_none() {
+            self.audio = super::playback::AudioPlayback::new();
+        }
+        if let Some(a) = self.audio.as_mut() {
+            a.play(st, 0.0);
+        }
+    }
+
     /// Per-100 ms "someone is talking" flags from the microphone track.
     fn speech_flags(&self) -> Option<Vec<bool>> {
+        let ranges = screencraft_engine::mic_speech(&self.package, &self.project)?;
+        let n = (self.project.media.duration_ms / 100.0).ceil() as usize + 1;
+        let mut flags = vec![false; n];
+        for r in ranges {
+            let (a, b) = ((r[0].max(0.0) / 100.0) as usize, (r[1].max(0.0) / 100.0) as usize);
+            for f in flags.iter_mut().take(b + 1).skip(a) {
+                *f = true;
+            }
+        }
+        Some(flags)
+    }
+
+    #[allow(dead_code)]
+    fn speech_flags_old(&self) -> Option<Vec<bool>> {
         let track = self.project.media.mic_track?;
         let path = self.package.screen_path(&self.project);
         let peaks = super::waveform_peaks(&path, track as usize).ok()?;

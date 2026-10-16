@@ -26,6 +26,12 @@ fn main() {
     if args.iter().any(|a| a == "--bar") {
         app.dev_bar();
     }
+    if args.iter().any(|a| a == "--hud") {
+        app.dev_hud();
+    }
+    if let Some(m) = flag("--menu") {
+        app.dev_menu(&m);
+    }
     if let Some(p) = flag("--open") {
         app.open_package(&head.ctx, std::path::PathBuf::from(p));
         if let Some(ms) = flag("--seek").and_then(|s| s.parse::<f64>().ok()) {

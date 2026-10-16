@@ -74,6 +74,32 @@ pub const TABS: [(Tab, &str, &str); 9] = [
     (Tab::Pace, "pace", "Pace & transitions"),
 ];
 
+#[derive(Clone)]
+struct PreviewGeo {
+    out: (u32, u32),
+    sr: [f32; 4],
+    view_w: f32,
+    view_h: f32,
+    bounds: Vec<screencraft_render::overlay::Bound>,
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum DragMode {
+    Move,
+    Resize,
+    ArrowStart,
+    ArrowEnd,
+}
+
+#[derive(Clone)]
+struct AnnotDrag {
+    id: String,
+    mode: DragMode,
+    p0: Pos2,
+    start: (f64, f64, f64, f64, f64, f64),
+    content: bool,
+}
+
 /// Preview frame rate of the render track (editing); exports use their own.
 const TRACK_FPS: f64 = 60.0;
 
@@ -113,6 +139,9 @@ pub struct EditorState {
     /// Last rendered content rect in screen space (for the zoom-target picker).
     preview_content: Option<Rect>,
     pub preview_shown: Option<Rect>,
+    /// Last scene's annotation boxes and geometry (for the drag handles on the preview).
+    preview_geo: Option<PreviewGeo>,
+    annot_drag: Option<AnnotDrag>,
     pub preview_res: u32,
     pub swatches: HashMap<String, egui::TextureHandle>,
     pub panel: panels::PanelState,
@@ -121,6 +150,13 @@ pub struct EditorState {
     pub side_w: f32,
     pub tl_h: f32,
     pub wants_back: bool,
+    /// A project the user asked to open from this window's Projects menu.
+    pub open_request: Option<std::path::PathBuf>,
+    /// Waveform peaks (0..1, 3000 bins) of music files, filled in by a worker.
+    pub music_peaks: HashMap<String, Arc<Vec<f32>>>,
+    peaks_pending: std::collections::HashSet<String>,
+    peaks_tx: std::sync::mpsc::Sender<(String, Vec<f32>)>,
+    peaks_rx: std::sync::mpsc::Receiver<(String, Vec<f32>)>,
 }
 
 impl EditorState {
@@ -154,6 +190,7 @@ impl EditorState {
                 }
             });
         }
+        let (ptx, prx) = std::sync::mpsc::channel();
         let mut s = Self {
             package,
             project,
@@ -188,6 +225,8 @@ impl EditorState {
             id_counter: 0,
             preview_content: None,
             preview_shown: None,
+            preview_geo: None,
+            annot_drag: None,
             preview_res: 720,
             swatches: HashMap::new(),
             panel: panels::PanelState::default(),
@@ -196,6 +235,11 @@ impl EditorState {
             side_w: 340.0,
             tl_h: 350.0,
             wants_back: false,
+            open_request: None,
+            music_peaks: HashMap::new(),
+            peaks_pending: Default::default(),
+            peaks_tx: ptx,
+            peaks_rx: prx,
         };
         s.timeline.fit_pending = true;
         Ok(s)
@@ -332,10 +376,11 @@ impl EditorState {
     }
 
     fn restart_audio(&mut self) {
+        self.ensure_track();
         if let Some(a) = self.audio.as_mut() {
             a.stop();
             if self.playing {
-                if let Ok(Some(st)) = build_soundtrack(&self.package, &self.project) {
+                if let Ok(Some(st)) = build_soundtrack(&self.package, &self.project, &self.track) {
                     a.play(st, self.playhead_ms);
                 }
             }
@@ -415,9 +460,42 @@ impl EditorState {
                 self.save_now();
             }
         }
+        while let Ok((f, p)) = self.peaks_rx.try_recv() {
+            self.music_peaks.insert(f, Arc::new(p));
+            ctx.request_repaint();
+        }
         self.export.poll(ctx);
         self.panel.poll(ctx);
         self.take_caption_results();
+    }
+
+    /// Waveform of a music file, decoded in the background the first time it is asked for.
+    pub fn peaks_for(&mut self, file: &str, ctx: &egui::Context) -> Option<Arc<Vec<f32>>> {
+        if let Some(p) = self.music_peaks.get(file) {
+            return Some(p.clone());
+        }
+        if self.peaks_pending.insert(file.to_string()) {
+            let (tx, path, name, ctx) = (self.peaks_tx.clone(), self.package.dir.join(file), file.to_string(), ctx.clone());
+            std::thread::spawn(move || {
+                if let Some(pcm) = screencraft_engine::decode_music(&path) {
+                    const BINS: usize = 3000;
+                    let frames = pcm.len() / 2;
+                    let per = (frames / BINS).max(1);
+                    let mut out = vec![0f32; frames.div_ceil(per)];
+                    for (i, o) in out.iter_mut().enumerate() {
+                        let (a, b) = (i * per, ((i + 1) * per).min(frames));
+                        *o = (a..b).map(|f| pcm[f * 2].abs().max(pcm[f * 2 + 1].abs())).fold(0.0, f32::max);
+                    }
+                    let peak = out.iter().cloned().fold(0.0, f32::max);
+                    if peak > 0.0 {
+                        out.iter_mut().for_each(|v| *v /= peak);
+                    }
+                    let _ = tx.send((name, out));
+                    ctx.request_repaint();
+                }
+            });
+        }
+        None
     }
 
     // ---- selection helpers ------------------------------------------------------------
@@ -927,6 +1005,13 @@ impl EditorState {
             shown.min + Vec2::new(scene.screen[0] / w as f32 * shown.width(), scene.screen[1] / h as f32 * shown.height()),
             Vec2::new(scene.screen[2] / w as f32 * shown.width(), scene.screen[3] / h as f32 * shown.height()),
         ));
+        self.preview_geo = Some(PreviewGeo {
+            out: (w, h),
+            sr: scene.screen,
+            view_w: self.project.config.crop.width as f32 / self.track.zoom[i] as f32,
+            view_h: self.project.config.crop.height as f32 / self.track.zoom[i] as f32,
+            bounds: scene.layers.bounds.clone(),
+        });
         self.compositor.render(&scene);
         let view = self.compositor.target_view().unwrap();
         let mut renderer = self.render_state.renderer.write();
@@ -1026,8 +1111,9 @@ impl EditorState {
             let fg = if resp.hovered() { Color32::WHITE } else { Color32::from_rgb(0xcd, 0xd5, 0xe5) };
             icons::paint(ui, "folder", Rect::from_center_size(Pos2::new(rect.min.x + 10.0 + 8.0, rect.center().y), Vec2::splat(16.0)), fg);
             ui.painter().text(Pos2::new(rect.min.x + 10.0 + 16.0 + 8.0, rect.center().y), Align2::LEFT_CENTER, "Projects", kit::font(13.0), fg);
-            if resp.on_hover_text("Open another project or show this one in Finder").clicked() {
-                self.wants_back = true;
+            if resp.clone().on_hover_text("Open another project or show this one in Finder").clicked() {
+                self.dialogs.projects = !self.dialogs.projects;
+                self.dialogs.projects_anchor = Some(rect);
             }
             // Title
             ui.add_space(6.0);
@@ -1046,8 +1132,10 @@ impl EditorState {
                 } else if self.dialogs.presets_open && self.dialogs.presets_anchor.is_none() {
                     self.dialogs.presets_anchor = Some(r.rect);
                 }
-                if kit::pill(ui, Some("file"), "Raw", false, false, false, None).on_hover_text("Raw recording files").clicked() {
-                    self.dialogs.raw = true;
+                let r = kit::pill(ui, Some("file"), "Raw", false, false, false, None);
+                if r.clone().on_hover_text("Raw recording files").clicked() {
+                    self.dialogs.raw = !self.dialogs.raw;
+                    self.dialogs.raw_anchor = Some(r.rect);
                 }
                 let upd = self.dialogs.update_available();
                 let label = if upd { "Update available" } else { "Updates" };
@@ -1305,6 +1393,106 @@ impl EditorState {
                     }
                 }
             }
+        }
+        self.annotation_handles(ui);
+    }
+
+    /// Outline and drag handles of the selected annotation: the body moves it, the corner resizes
+    /// it, and an arrow's ends move on their own.
+    fn annotation_handles(&mut self, ui: &mut egui::Ui) {
+        let (Sel::Annot(id), Some(shown), Some(geo)) = (self.sel.clone(), self.preview_shown, self.preview_geo.clone()) else { return };
+        let Some(a) = self.project.scene.annotations.iter().find(|x| x.id == id).cloned() else { return };
+        let Some(b) = geo.bounds.iter().find(|x| x.id == id).cloned() else { return };
+        let k = shown.width() / geo.out.0 as f32; // canvas px -> screen points
+        let to_scr = |x: f32, y: f32| Pos2::new(shown.min.x + x * k, shown.min.y + y * k);
+        let u = geo.out.1 as f32 / 1080.0;
+        let accent = ACCENT_2;
+        // outline
+        let (r_outer, is_arrow) = (Rect::from_min_size(to_scr(b.rect[0], b.rect[1]), Vec2::new(b.rect[2] * k, b.rect[3] * k)), b.arrow.is_some());
+        if let Some([x1, y1, x2, y2]) = b.arrow {
+            for (x, y) in [(x1, y1), (x2, y2)] {
+                ui.painter().circle_filled(to_scr(x, y), 7.0 * u * k, accent);
+            }
+        } else {
+            let corners = [r_outer.left_top(), r_outer.right_top(), r_outer.right_bottom(), r_outer.left_bottom(), r_outer.left_top()];
+            for w in corners.windows(2) {
+                ui.painter().extend(egui::Shape::dashed_line(&[w[0], w[1]], Stroke::new(2.0 * u * k, accent), 6.0 * u * k, 4.0 * u * k));
+            }
+            if a.kind != "text" {
+                ui.painter().rect_filled(Rect::from_center_size(r_outer.right_bottom(), Vec2::splat(10.0 * u * k)), 0.0, accent);
+            }
+        }
+        // interaction
+        let resp = ui.interact(shown, ui.id().with("annot-drag"), Sense::click_and_drag());
+        let to_canvas = |p: Pos2| ((p.x - shown.min.x) / k, (p.y - shown.min.y) / k);
+        if resp.drag_started() {
+            if let Some(pos) = resp.interact_pointer_pos() {
+                let (px, py) = to_canvas(pos);
+                let near = |x: f32, y: f32, r: f32| ((px - x).powi(2) + (py - y).powi(2)).sqrt() <= r * u;
+                let mut mode = None;
+                if let Some([x1, y1, x2, y2]) = b.arrow {
+                    if near(x2, y2, 18.0) {
+                        mode = Some(DragMode::ArrowEnd);
+                    } else if near(x1, y1, 18.0) {
+                        mode = Some(DragMode::ArrowStart);
+                    } else {
+                        let (dx, dy) = (x2 - x1, y2 - y1);
+                        let len2 = (dx * dx + dy * dy).max(1e-6);
+                        let t = (((px - x1) * dx + (py - y1) * dy) / len2).clamp(0.0, 1.0);
+                        if ((px - (x1 + dx * t)).powi(2) + (py - (y1 + dy * t)).powi(2)).sqrt() <= 14.0 * u {
+                            mode = Some(DragMode::Move);
+                        }
+                    }
+                } else {
+                    let pad = 10.0 * u;
+                    let [bx, by, bw, bh] = b.rect;
+                    if px >= bx - pad && px <= bx + bw + pad && py >= by - pad && py <= by + bh + pad {
+                        mode = Some(if a.kind != "text" && near(bx + bw, by + bh, 18.0) { DragMode::Resize } else { DragMode::Move });
+                    }
+                }
+                let _ = is_arrow;
+                if let Some(mode) = mode {
+                    self.annot_drag = Some(AnnotDrag { id: id.clone(), mode, p0: pos, start: (a.x, a.y, a.w, a.h, a.x2, a.y2), content: a.space == "content" });
+                }
+            }
+        }
+        if resp.dragged() {
+            if let (Some(d), Some(pos)) = (self.annot_drag.clone(), resp.interact_pointer_pos()) {
+                let (dxc, dyc) = ((pos.x - d.p0.x) / k, (pos.y - d.p0.y) / k);
+                // canvas px -> annotation units
+                let (kx, ky) = if d.content { (geo.view_w as f64 / geo.sr[2] as f64, geo.view_h as f64 / geo.sr[3] as f64) } else { (1.0 / geo.out.0 as f64, 1.0 / geo.out.1 as f64) };
+                let (dx, dy) = (dxc as f64 * kx, dyc as f64 * ky);
+                let (id2, mode, s) = (d.id.clone(), d.mode, d.start);
+                self.edit_keyed(Some(&format!("annot-drag-{id2}")), |p| {
+                    if let Some(x) = p.scene.annotations.iter_mut().find(|x| x.id == id2) {
+                        match mode {
+                            DragMode::Move => {
+                                x.x = s.0 + dx;
+                                x.y = s.1 + dy;
+                                if x.kind == "arrow" {
+                                    x.x2 = s.4 + dx;
+                                    x.y2 = s.5 + dy;
+                                }
+                            }
+                            DragMode::Resize => {
+                                x.w = (s.2 + dx).max(0.01);
+                                x.h = (s.3 + dy).max(0.01);
+                            }
+                            DragMode::ArrowStart => {
+                                x.x = s.0 + dx;
+                                x.y = s.1 + dy;
+                            }
+                            DragMode::ArrowEnd => {
+                                x.x2 = s.4 + dx;
+                                x.y2 = s.5 + dy;
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        if resp.drag_stopped() {
+            self.annot_drag = None;
         }
     }
 }
