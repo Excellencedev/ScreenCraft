@@ -2,7 +2,7 @@
 //! Video4Linux), used for the live preview in the recorder and for recording the camera bubble.
 
 use nokhwa::pixel_format::RgbFormat;
-use nokhwa::utils::{ApiBackend, CameraFormat, CameraIndex, FrameFormat, RequestedFormat, RequestedFormatType, Resolution};
+use nokhwa::utils::{ApiBackend, CameraIndex, RequestedFormat, RequestedFormatType, Resolution};
 use nokhwa::Camera;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -101,11 +101,27 @@ pub fn start(id: Option<&str>, mut on_frame: impl FnMut(CamFrame) + Send + 'stat
     let join = std::thread::Builder::new()
         .name("screencraft-camera".into())
         .spawn(move || {
-            let want = RequestedFormat::new::<RgbFormat>(RequestedFormatType::Closest(CameraFormat::new(Resolution::new(1280, 720), FrameFormat::NV12, 30)));
-            let mut cam = match Camera::new(CameraIndex::Index(index), want) {
-                Ok(c) => c,
-                Err(e) => {
-                    let _ = ready_tx.send(Err(format!("could not open the camera: {e}")));
+            // Not every camera offers the exact format, so try a few ways of asking.
+            let tries = [
+                RequestedFormatType::HighestResolution(Resolution::new(1280, 720)),
+                RequestedFormatType::AbsoluteHighestFrameRate,
+                RequestedFormatType::None,
+            ];
+            let mut opened = None;
+            let mut last = String::new();
+            for t in tries {
+                match Camera::new(CameraIndex::Index(index), RequestedFormat::new::<RgbFormat>(t)) {
+                    Ok(c) => {
+                        opened = Some(c);
+                        break;
+                    }
+                    Err(e) => last = e.to_string(),
+                }
+            }
+            let mut cam = match opened {
+                Some(c) => c,
+                None => {
+                    let _ = ready_tx.send(Err(format!("could not open the camera: {last}")));
                     return;
                 }
             };
