@@ -152,6 +152,8 @@ pub struct EditorState {
     pub wants_back: bool,
     /// A project the user asked to open from this window's Projects menu.
     pub open_request: Option<std::path::PathBuf>,
+    /// Raw video to open in the compressor window.
+    pub compress_request: Option<std::path::PathBuf>,
     /// Waveform peaks (0..1, 3000 bins) of music files, filled in by a worker.
     pub music_peaks: HashMap<String, Arc<Vec<f32>>>,
     peaks_pending: std::collections::HashSet<String>,
@@ -236,6 +238,7 @@ impl EditorState {
             tl_h: 350.0,
             wants_back: false,
             open_request: None,
+            compress_request: None,
             music_peaks: HashMap::new(),
             peaks_pending: Default::default(),
             peaks_tx: ptx,
@@ -1516,6 +1519,8 @@ fn paint_stage_bg(ui: &egui::Ui, rect: Rect) {
     }
     p.with_clip_rect(rect).add(egui::Shape::mesh(mesh));
 }
+
+pub use dialogs::reveal;
 
 pub fn open_url(url: &str) -> std::io::Result<()> {
     #[cfg(target_os = "macos")]

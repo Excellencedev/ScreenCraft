@@ -1,5 +1,9 @@
 # Changelog
 
+## native-egui (unreleased)
+- Native egui/wgpu rebuild matching the 0.3 UI; OS-licensed H.264 only (no OpenH264).
+
+
 ## Unreleased
 
 ## 0.4.0: native rewrite

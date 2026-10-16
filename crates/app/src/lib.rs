@@ -2,6 +2,7 @@
 
 pub mod app;
 pub mod area;
+pub mod compressor;
 pub mod editor;
 pub mod headless;
 pub mod icons;

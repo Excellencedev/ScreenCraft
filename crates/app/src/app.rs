@@ -38,6 +38,7 @@ pub struct App {
     show_permissions: bool,
     /// Highlight outline on the screen while hovering a window in the menu.
     hover_window: Option<screencraft_capture::WindowInfo>,
+    compressor: Option<crate::compressor::Compressor>,
     quit: bool,
     discard_after_stop: bool,
     /// Native window handle (Windows), to keep the recording bar out of the capture.
@@ -144,6 +145,7 @@ impl App {
             area_picker: None,
             show_permissions: false,
             hover_window: None,
+            compressor: None,
             quit: false,
             discard_after_stop: false,
             native_window: None,
@@ -459,6 +461,7 @@ impl App {
 
         // editors, one window each
         let mut open_requests: Vec<std::path::PathBuf> = Vec::new();
+        let mut compress_requests: Vec<std::path::PathBuf> = Vec::new();
         let mut i = 0;
         while i < self.editors.len() {
             let (id, title) = (self.editors[i].id, self.editors[i].title.clone());
@@ -474,6 +477,9 @@ impl App {
                     if let Some(req) = ed.open_request.take() {
                         open_requests.push(req);
                     }
+                    if let Some(req) = ed.compress_request.take() {
+                        compress_requests.push(req);
+                    }
                 });
             }
             if self.editors[i].ed.project.name != self.editors[i].title {
@@ -485,6 +491,14 @@ impl App {
                 w.ed.save_now();
             } else {
                 i += 1;
+            }
+        }
+        if let Some(p) = compress_requests.pop() {
+            self.compressor = Some(crate::compressor::Compressor::new(Some(p)));
+        }
+        if let Some(mut c) = self.compressor.take() {
+            if c.show(&ctx) {
+                self.compressor = Some(c);
             }
         }
         for dir in open_requests {

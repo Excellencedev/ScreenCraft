@@ -419,6 +419,9 @@ fn raw_menu(st: &mut EditorState, ctx: &egui::Context) {
             action = Some(1);
         }
         m.hr();
+        if m.item("Open raw video in compressor…") {
+            action = Some(3);
+        }
         let fm = if cfg!(target_os = "macos") { "Finder" } else if cfg!(target_os = "windows") { "Explorer" } else { "the file manager" };
         if m.item(&format!("Show raw files in {fm}")) {
             action = Some(2);
@@ -438,6 +441,7 @@ fn raw_menu(st: &mut EditorState, ctx: &egui::Context) {
                     }
                 }
             }
+            3 => st.compress_request = Some(dir.join(&media.screen)),
             _ => reveal(&dir.join(&media.screen)),
         }
     } else if outside {

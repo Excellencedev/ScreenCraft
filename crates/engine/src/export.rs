@@ -139,6 +139,29 @@ fn analyse_mic(file: &Arc<Mp4File>, track: usize, key: (std::path::PathBuf, u32,
 
 const RATE_HZ: f64 = 48_000.0;
 
+/// A decoded audio file (0.3 recordings keep the microphone in its own `mic.m4a`) as a lane.
+struct PcmFile {
+    pcm: Arc<Vec<f32>>,
+    /// The file's clock runs `offset_ms` ahead of the recording's.
+    offset_ms: f64,
+}
+
+impl crate::audio_mix::PcmSource for PcmFile {
+    fn read(&mut self, start_ms: f64, frames: usize) -> Vec<f32> {
+        let first = ((start_ms + self.offset_ms) * RATE_HZ / 1000.0).round() as i64;
+        let mut out = vec![0f32; frames * 2];
+        for k in 0..frames {
+            let i = first + k as i64;
+            if i >= 0 && ((i as usize) * 2 + 1) < self.pcm.len() {
+                let m = (self.pcm[i as usize * 2] + self.pcm[i as usize * 2 + 1]) * 0.5;
+                out[k * 2] = m;
+                out[k * 2 + 1] = m;
+            }
+        }
+        out
+    }
+}
+
 /// Mic playback is always centred: both channels are averaged and sent to both ears (many mics
 /// deliver two channels with one of them empty).
 struct MonoAvg(AudioSource);
@@ -217,7 +240,7 @@ pub fn mic_speech(package: &Package, project: &Project) -> Option<Vec<[f64; 2]>>
 pub fn build_soundtrack(package: &Package, project: &Project, track: &screencraft_core::track::RenderTrack) -> Result<Option<Soundtrack>, String> {
     let a = &project.config.audio;
     let master = (a.volume.max(0.0) * 2.0) as f32;
-    let recorded = project.media.has_system_audio || project.media.has_microphone;
+    let recorded = project.media.has_system_audio || project.media.has_microphone || project.media.mic.is_some();
     let sc = &project.scene;
     let want_fx = a.click_sounds || a.key_sounds;
     if !recorded && sc.music_clips.is_empty() && !want_fx {
@@ -240,6 +263,12 @@ pub fn build_soundtrack(package: &Package, project: &Project, track: &screencraf
                 let level = mic.as_ref().map(|m| m.gain).unwrap_or(1.0);
                 lanes.push(Lane { source: Box::new(MonoAvg(src)), gain: master * a.mic_volume as f32 * level });
             }
+        }
+    }
+    // a separate microphone file from a 0.3 recording
+    if let (None, Some(rel), false) = (project.media.mic_track, project.media.mic.as_deref(), a.mute_microphone) {
+        if let Some(pcm) = decode_music(&package.dir.join(rel)) {
+            lanes.push(Lane { source: Box::new(PcmFile { pcm, offset_ms: project.media.mic_offset_ms }), gain: master * a.mic_volume as f32 * 4.0 });
         }
     }
     let mut extras = crate::audio_mix::Extras { music_gain: master * a.music_volume as f32, duck_level: a.duck_level as f32, ..Default::default() };
