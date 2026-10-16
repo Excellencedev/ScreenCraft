@@ -11,6 +11,9 @@ screencraft-encode = { path = "../encode" }
 wgpu = "30"
 bytemuck = { version = "1", features = ["derive"] }
 tiny-skia = "0.11"
+skrifa = "0.44"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff"] }
+base64 = "0.22"
 pollster = "0.4"
 
 [dev-dependencies]

@@ -1,16 +1,32 @@
-//! The wgpu side of the compositor.
+//! The wgpu side of the compositor: a main pass (background, screen, cursor ...), a camera pass,
+//! a CPU-overlay pass and a transition pass, all into one texture the editor shows and the
+//! exporter reads back.
 
 use crate::cursors::{build_atlas, CELL, HOTSPOT, KINDS, STYLES};
 use crate::scene::{BackgroundKind, Scene};
 use screencraft_encode::I420;
+use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+
+/// Which picture an `I420` frame is for.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Slot {
+    Screen = 0,
+    /// The other clip's picture during a cross-dissolve.
+    Screen2 = 1,
+    Camera = 2,
+    Camera2 = 3,
+}
 
 struct Planes {
     y: wgpu::Texture,
     u: wgpu::Texture,
     v: wgpu::Texture,
+    yv: wgpu::TextureView,
+    uv: wgpu::TextureView,
+    vv: wgpu::TextureView,
     w: u32,
     h: u32,
 }
@@ -22,17 +38,34 @@ struct Target {
     h: u32,
 }
 
+struct Layer {
+    tex: wgpu::Texture,
+    view: wgpu::TextureView,
+    w: u32,
+    h: u32,
+}
+
 pub struct Compositor {
     device: wgpu::Device,
     queue: wgpu::Queue,
-    pipeline: wgpu::RenderPipeline,
-    layout: wgpu::BindGroupLayout,
+    main_layout: wgpu::BindGroupLayout,
+    main_pipeline: wgpu::RenderPipeline,
+    post_pipeline: wgpu::RenderPipeline,
+    cam_layout: wgpu::BindGroupLayout,
+    cam_pipeline: wgpu::RenderPipeline,
+    blit_layout: wgpu::BindGroupLayout,
+    blit_pipeline: wgpu::RenderPipeline,
     uniform: wgpu::Buffer,
+    cam_uniform: wgpu::Buffer,
     sampler: wgpu::Sampler,
     atlas_view: wgpu::TextureView,
-    planes: Option<Planes>,
-    bind: Option<wgpu::BindGroup>,
+    slots: [Option<Planes>; 4],
+    dummy: Planes,
+    clear_layer: wgpu::TextureView,
+    layers: [Option<Layer>; 3],
+    bg_tex: Option<(Arc<(u32, u32, Vec<u8>)>, wgpu::Texture, wgpu::TextureView)>,
     target: Option<Target>,
+    work: Option<Target>,
     readback: Option<(wgpu::Buffer, u32)>,
 }
 
@@ -70,80 +103,80 @@ fn shader_source() -> String {
     include_str!("shader.wgsl").replace("//HOTSPOTS//", &hs)
 }
 
+fn make_planes(device: &wgpu::Device, w: u32, h: u32) -> Planes {
+    let y = plane(device, w, h, "plane-y");
+    let u = plane(device, w / 2, h / 2, "plane-u");
+    let v = plane(device, w / 2, h / 2, "plane-v");
+    Planes { yv: y.create_view(&Default::default()), uv: u.create_view(&Default::default()), vv: v.create_view(&Default::default()), y, u, v, w, h }
+}
+
+fn be<'a>(binding: u32, v: &'a wgpu::TextureView) -> wgpu::BindGroupEntry<'a> {
+    wgpu::BindGroupEntry { binding, resource: wgpu::BindingResource::TextureView(v) }
+}
+
+fn tex_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::FRAGMENT,
+        ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: true }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false },
+        count: None,
+    }
+}
+
+fn sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry { binding, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering), count: None }
+}
+
+fn uniform_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::FRAGMENT,
+        ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+        count: None,
+    }
+}
+
+fn pipeline(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, module: &wgpu::ShaderModule, fs: &str, blend: Option<wgpu::BlendState>, label: &str) -> wgpu::RenderPipeline {
+    let pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some(label), bind_group_layouts: &[Some(layout)], immediate_size: 0 });
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some(label),
+        layout: Some(&pl),
+        vertex: wgpu::VertexState { module, entry_point: Some("vs"), compilation_options: Default::default(), buffers: &[] },
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        fragment: Some(wgpu::FragmentState {
+            module,
+            entry_point: Some(fs),
+            compilation_options: Default::default(),
+            targets: &[Some(wgpu::ColorTargetState { format: FORMAT, blend, write_mask: wgpu::ColorWrites::ALL })],
+        }),
+        multiview_mask: None,
+        cache: None,
+    })
+}
+
 impl Compositor {
     /// Use a device the caller already has (the editor shares egui's).
     pub fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
-        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("screencraft-compose"),
-            source: wgpu::ShaderSource::Wgsl(shader_source().into()),
-        });
-        let tex_entry = |binding| wgpu::BindGroupLayoutEntry {
-            binding,
-            visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                view_dimension: wgpu::TextureViewDimension::D2,
-                multisampled: false,
-            },
-            count: None,
-        };
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        let main_module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("screencraft-compose"), source: wgpu::ShaderSource::Wgsl(shader_source().into()) });
+        let cam_module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("screencraft-camera"), source: wgpu::ShaderSource::Wgsl(include_str!("camera.wgsl").into()) });
+        let blit_module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("screencraft-blit"), source: wgpu::ShaderSource::Wgsl(include_str!("blit.wgsl").into()) });
+        let main_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("compose-layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                tex_entry(1),
-                tex_entry(2),
-                tex_entry(3),
-                tex_entry(4),
-                wgpu::BindGroupLayoutEntry {
-                    binding: 5,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
+            entries: &[uniform_entry(0), tex_entry(1), tex_entry(2), tex_entry(3), tex_entry(4), sampler_entry(5), tex_entry(6), tex_entry(7), tex_entry(8), tex_entry(9), tex_entry(10), tex_entry(11), tex_entry(12)],
         });
-        let pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("compose-pl"),
-            bind_group_layouts: &[Some(&layout)],
-            immediate_size: 0,
+        let cam_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("camera-layout"),
+            entries: &[uniform_entry(0), tex_entry(1), tex_entry(2), tex_entry(3), sampler_entry(4), tex_entry(5), tex_entry(6), tex_entry(7)],
         });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("compose"),
-            layout: Some(&pl),
-            vertex: wgpu::VertexState {
-                module: &module,
-                entry_point: Some("vs"),
-                compilation_options: Default::default(),
-                buffers: &[],
-            },
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            fragment: Some(wgpu::FragmentState {
-                module: &module,
-                entry_point: Some("fs"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState { format: FORMAT, blend: None, write_mask: wgpu::ColorWrites::ALL })],
-            }),
-            multiview_mask: None,
-            cache: None,
-        });
-        let uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("compose-uniform"),
-            size: 25 * 16,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let blit_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("blit-layout"), entries: &[tex_entry(0), sampler_entry(1)] });
+        let main_pipeline = pipeline(device, &main_layout, &main_module, "fs", None, "compose");
+        let post_pipeline = pipeline(device, &main_layout, &main_module, "fs_post", None, "compose-post");
+        let cam_pipeline = pipeline(device, &cam_layout, &cam_module, "fs", Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING), "camera");
+        let blit_pipeline = pipeline(device, &blit_layout, &blit_module, "fs", Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING), "blit");
+        let uniform = device.create_buffer(&wgpu::BufferDescriptor { label: Some("compose-uniform"), size: 48 * 16, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+        let cam_uniform = device.create_buffer(&wgpu::BufferDescriptor { label: Some("camera-uniform"), size: 8 * 16, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
@@ -169,106 +202,166 @@ impl Compositor {
             &atlas,
         );
         let atlas_view = atlas_tex.create_view(&Default::default());
-        let mut c = Self {
+        let clear_tex = device.create_texture_with_data(
+            queue,
+            &wgpu::TextureDescriptor {
+                label: Some("clear-layer"),
+                size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: FORMAT,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            },
+            wgpu::util::TextureDataOrder::LayerMajor,
+            &[0, 0, 0, 0],
+        );
+        let clear_layer = clear_tex.create_view(&Default::default());
+        let dummy = make_planes(device, 2, 2);
+        for (p, v) in [(&dummy.y, 16u8), (&dummy.u, 128), (&dummy.v, 128)] {
+            write_plane(queue, p, &[v; 1], 1, 1);
+        }
+        Self {
             device: device.clone(),
             queue: queue.clone(),
-            pipeline,
-            layout,
+            main_layout,
+            main_pipeline,
+            post_pipeline,
+            cam_layout,
+            cam_pipeline,
+            blit_layout,
+            blit_pipeline,
             uniform,
+            cam_uniform,
             sampler,
             atlas_view,
-            planes: None,
-            bind: None,
+            slots: [None, None, None, None],
+            dummy,
+            clear_layer,
+            layers: [None, None, None],
+            bg_tex: None,
             target: None,
+            work: None,
             readback: None,
-        };
-        c.upload(&I420::new(2, 2));
-        c
+        }
     }
 
     /// A compositor on its own device (export, tests). Prefers a discrete/high-performance GPU.
     pub fn headless() -> Result<Self, String> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            ..Default::default()
-        }))
-        .map_err(|e| format!("no GPU adapter: {e}"))?;
-        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
-            .map_err(|e| format!("GPU device: {e}"))?;
+        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions { power_preference: wgpu::PowerPreference::HighPerformance, ..Default::default() }))
+            .map_err(|e| format!("no GPU adapter: {e}"))?;
+        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).map_err(|e| format!("GPU device: {e}"))?;
         Ok(Self::new(&device, &queue))
     }
 
-    /// Upload the current source picture.
+    /// Upload the current screen picture.
     pub fn upload(&mut self, f: &I420) {
-        let (w, h) = (f.width, f.height);
-        let need_new = !matches!(&self.planes, Some(p) if p.w == w && p.h == h);
+        self.upload_slot(Slot::Screen, f);
+    }
+
+    pub fn upload_slot(&mut self, slot: Slot, f: &I420) {
+        let (w, h) = (f.width & !1, f.height & !1);
+        let i = slot as usize;
+        let need_new = !matches!(&self.slots[i], Some(p) if p.w == w && p.h == h);
         if need_new {
-            let y = plane(&self.device, w, h, "plane-y");
-            let u = plane(&self.device, w / 2, h / 2, "plane-u");
-            let v = plane(&self.device, w / 2, h / 2, "plane-v");
-            self.bind = Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("compose-bind"),
-                layout: &self.layout,
-                entries: &[
-                    wgpu::BindGroupEntry { binding: 0, resource: self.uniform.as_entire_binding() },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::TextureView(&y.create_view(&Default::default())),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(&u.create_view(&Default::default())),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: wgpu::BindingResource::TextureView(&v.create_view(&Default::default())),
-                    },
-                    wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(&self.atlas_view) },
-                    wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.sampler) },
-                ],
-            }));
-            self.planes = Some(Planes { y, u, v, w, h });
+            self.slots[i] = Some(make_planes(&self.device, w, h));
         }
-        let p = self.planes.as_ref().unwrap();
+        let p = self.slots[i].as_ref().unwrap();
         write_plane(&self.queue, &p.y, &f.y, w, h);
         write_plane(&self.queue, &p.u, &f.u, w / 2, h / 2);
         write_plane(&self.queue, &p.v, &f.v, w / 2, h / 2);
     }
 
-    fn ensure_target(&mut self, w: u32, h: u32) {
-        if matches!(&self.target, Some(t) if t.w == w && t.h == h) {
+    /// Forget a slot's picture (nothing to blend / no camera).
+    pub fn clear_slot(&mut self, slot: Slot) {
+        self.slots[slot as usize] = None;
+    }
+
+    pub fn has_slot(&self, slot: Slot) -> bool {
+        self.slots[slot as usize].is_some()
+    }
+
+    fn ensure_target(device: &wgpu::Device, t: &mut Option<Target>, w: u32, h: u32, label: &str) {
+        if matches!(t, Some(x) if x.w == w && x.h == h) {
             return;
         }
-        let tex = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("compose-target"),
+        let tex = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some(label),
             size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                | wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_SRC,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
         let view = tex.create_view(&Default::default());
-        self.target = Some(Target { tex, view, w, h });
-        self.readback = None;
+        *t = Some(Target { tex, view, w, h });
     }
 
-    fn uniforms(scene: &Scene) -> [[f32; 4]; 25] {
-        let mut u = [[0f32; 4]; 25];
+    fn upload_layer(&mut self, i: usize, px: &tiny_skia::Pixmap) {
+        let (w, h) = (px.width(), px.height());
+        if !matches!(&self.layers[i], Some(l) if l.w == w && l.h == h) {
+            let tex = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("overlay-layer"),
+                size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: FORMAT,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            });
+            let view = tex.create_view(&Default::default());
+            self.layers[i] = Some(Layer { tex, view, w, h });
+        }
+        let l = self.layers[i].as_ref().unwrap();
+        self.queue.write_texture(
+            wgpu::TexelCopyTextureInfo { texture: &l.tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            px.data(),
+            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(w * 4), rows_per_image: Some(h) },
+            wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+        );
+    }
+
+    fn upload_bg(&mut self, img: &Arc<(u32, u32, Vec<u8>)>) {
+        if matches!(&self.bg_tex, Some((a, _, _)) if Arc::ptr_eq(a, img)) {
+            return;
+        }
+        let (w, h, data) = (img.0, img.1, &img.2);
+        let tex = self.device.create_texture_with_data(
+            &self.queue,
+            &wgpu::TextureDescriptor {
+                label: Some("bg-image"),
+                size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            },
+            wgpu::util::TextureDataOrder::LayerMajor,
+            data,
+        );
+        let view = tex.create_view(&Default::default());
+        self.bg_tex = Some((img.clone(), tex, view));
+    }
+
+    fn uniforms(scene: &Scene) -> [[f32; 4]; 48] {
+        let mut u = [[0f32; 4]; 48];
         u[0] = [scene.out.0 as f32, scene.out.1 as f32, scene.source.0 as f32, scene.source.1 as f32];
-        u[1] = scene.content;
+        u[1] = scene.screen;
         u[2] = [scene.radius_px, scene.shadow_blur_px, scene.shadow_intensity, scene.time_s];
-        u[3] = [scene.shadow_offset[0], scene.shadow_offset[1], 0.0, 0.0];
         u[4] = [scene.camera[0], scene.camera[1], scene.camera[2], 0.0];
         u[5] = scene.crop;
         let kind = match scene.bg_kind {
             BackgroundKind::Solid => 0.0,
             BackgroundKind::Gradient => 1.0,
             BackgroundKind::Wallpaper => 2.0,
+            BackgroundKind::Image => 3.0,
         };
         u[6] = [kind, scene.bg_angle_rad, if scene.bg_drift { 1.0 } else { 0.0 }, 0.0];
         u[7] = scene.bg0;
@@ -291,21 +384,111 @@ impl Compositor {
         }
         u[23] = scene.ripple_color;
         u[24] = [scene.points_to_px, scene.ripple_line_px, 0.0, 0.0];
+        u[25] = scene.shadow_box;
+        u[3] = [scene.shadow_offset[0], scene.shadow_offset[1], scene.shadow_radius_px, 0.0];
+        u[26] = [scene.screen_alpha, scene.dissolve, scene.bg_motion as f32, scene.bg_blur_px];
+        u[27] = [
+            if scene.layers.under.is_some() { 1.0 } else { 0.0 },
+            if scene.layers.content.is_some() { 1.0 } else { 0.0 },
+            0.0,
+            scene.layers.effects.len().min(8) as f32,
+        ];
+        if let Some(img) = &scene.bg_image {
+            u[28] = [img.0 as f32, img.1 as f32, 0.0, 0.0];
+        }
+        for (i, e) in scene.layers.effects.iter().take(8).enumerate() {
+            u[29 + i] = e.rect;
+            u[37 + i] = [e.kind as f32, e.cell_px, e.radius_px, 0.0];
+        }
+        if let Some((k, p)) = scene.transition {
+            u[44] = [k as f32, p, 0.0, 0.0];
+        }
         u
     }
 
-    /// Draw `scene` into the internal target and return its view (for egui) .
+    fn main_bind(&self, work: &wgpu::TextureView) -> wgpu::BindGroup {
+        let s0 = self.slots[Slot::Screen as usize].as_ref().unwrap_or(&self.dummy);
+        let s1 = self.slots[Slot::Screen2 as usize].as_ref().unwrap_or(&self.dummy);
+        let view = |i: usize| self.layers[i].as_ref().map(|l| &l.view).unwrap_or(&self.clear_layer);
+        let bg = self.bg_tex.as_ref().map(|b| &b.2).unwrap_or(&self.clear_layer);
+        let e = be;
+        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("compose-bind"),
+            layout: &self.main_layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: self.uniform.as_entire_binding() },
+                e(1, &s0.yv),
+                e(2, &s0.uv),
+                e(3, &s0.vv),
+                e(4, &self.atlas_view),
+                wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.sampler) },
+                e(6, &s1.yv),
+                e(7, &s1.uv),
+                e(8, &s1.vv),
+                e(9, view(0)),
+                e(10, view(1)),
+                e(11, bg),
+                e(12, work),
+            ],
+        })
+    }
+
+    /// Draw `scene` into the internal target and return its view (for egui).
     pub fn render(&mut self, scene: &Scene) -> &wgpu::TextureView {
-        self.ensure_target(scene.out.0, scene.out.1);
+        let (w, h) = scene.out;
+        Self::ensure_target(&self.device, &mut self.target, w, h, "compose-target");
+        let post = scene.transition.is_some();
+        if post {
+            Self::ensure_target(&self.device, &mut self.work, w, h, "compose-work");
+        }
+        // CPU layers
+        match &scene.layers.under {
+            Some(p) => self.upload_layer(0, p),
+            None => self.layers[0] = None,
+        }
+        match &scene.layers.content {
+            Some(p) => self.upload_layer(1, p),
+            None => self.layers[1] = None,
+        }
+        match &scene.layers.top {
+            Some(p) => self.upload_layer(2, p),
+            None => self.layers[2] = None,
+        }
+        if let Some(img) = &scene.bg_image {
+            self.upload_bg(img);
+        }
         let u = Self::uniforms(scene);
         self.queue.write_buffer(&self.uniform, 0, bytemuck::cast_slice(&u));
-        let target = self.target.as_ref().unwrap();
+
+        // camera uniform
+        let cam_planes = self.slots[Slot::Camera as usize].as_ref();
+        let cam = scene.cam.filter(|_| cam_planes.is_some());
+        if let (Some(c), Some(cp)) = (cam, cam_planes) {
+            let c2 = self.slots[Slot::Camera2 as usize].as_ref();
+            let blend2 = if c2.is_some() { c.blend2 } else { 0.0 };
+            let mut cu = [[0f32; 4]; 8];
+            cu[0] = [w as f32, h as f32, cp.w as f32, cp.h as f32];
+            cu[1] = c.rect;
+            cu[2] = [c.radius, c.alpha, c.shadow, c.border];
+            cu[3] = c.border_color;
+            cu[4] = [c.mirror, h as f32 / 1080.0, blend2, c2.map(|p| p.w as f32).unwrap_or(1.0)];
+            cu[5] = [c2.map(|p| p.h as f32).unwrap_or(1.0), 0.0, 0.0, 0.0];
+            self.queue.write_buffer(&self.cam_uniform, 0, bytemuck::cast_slice(&cu));
+        }
+
+        let main_view_is_work = post;
+        let work_view_for_bind = if post { &self.work.as_ref().unwrap().view } else { &self.target.as_ref().unwrap().view };
+        // The main pass never samples `work`; bind a harmless texture there.
+        let dummy_bind = self.main_bind(&self.clear_layer);
+        let _ = work_view_for_bind;
+        let main_target = if main_view_is_work { &self.work.as_ref().unwrap().view } else { &self.target.as_ref().unwrap().view };
+
         let mut enc = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("compose") });
         {
             let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("compose"),
+                label: Some("compose-main"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &target.view,
+                    view: main_target,
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: wgpu::StoreOp::Store },
@@ -315,8 +498,87 @@ impl Compositor {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, self.bind.as_ref().unwrap(), &[]);
+            pass.set_pipeline(&self.main_pipeline);
+            pass.set_bind_group(0, &dummy_bind, &[]);
+            pass.draw(0..3, 0..1);
+        }
+        if let (Some(_), Some(cp)) = (cam, cam_planes) {
+            let c2 = self.slots[Slot::Camera2 as usize].as_ref().unwrap_or(&self.dummy);
+            let e = be;
+            let bind = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("camera-bind"),
+                layout: &self.cam_layout,
+                entries: &[
+                    wgpu::BindGroupEntry { binding: 0, resource: self.cam_uniform.as_entire_binding() },
+                    e(1, &cp.yv),
+                    e(2, &cp.uv),
+                    e(3, &cp.vv),
+                    wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::Sampler(&self.sampler) },
+                    e(5, &c2.yv),
+                    e(6, &c2.uv),
+                    e(7, &c2.vv),
+                ],
+            });
+            let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("compose-camera"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: main_target,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.cam_pipeline);
+            pass.set_bind_group(0, &bind, &[]);
+            pass.draw(0..3, 0..1);
+        }
+        if let Some(top) = &self.layers[2] {
+            let bind = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("blit-bind"),
+                layout: &self.blit_layout,
+                entries: &[
+                    wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&top.view) },
+                    wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&self.sampler) },
+                ],
+            });
+            let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("compose-top"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: main_target,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.blit_pipeline);
+            pass.set_bind_group(0, &bind, &[]);
+            pass.draw(0..3, 0..1);
+        }
+        if post {
+            let bind = self.main_bind(&self.work.as_ref().unwrap().view);
+            let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("compose-post"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.target.as_ref().unwrap().view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: wgpu::StoreOp::Store },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.post_pipeline);
+            pass.set_bind_group(0, &bind, &[]);
             pass.draw(0..3, 0..1);
         }
         self.queue.submit(Some(enc.finish()));

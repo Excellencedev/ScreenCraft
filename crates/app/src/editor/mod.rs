@@ -19,14 +19,14 @@ use screencraft_core::project::Project;
 use screencraft_core::timeline::output_to_source;
 use screencraft_core::track::{compute_track, RenderTrack};
 use screencraft_engine::{build_soundtrack, FrameTable, Package};
-use screencraft_render::{build_scene, output_size, Compositor};
+use screencraft_render::{build_scene, output_size, Compositor, Slot};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 pub use export_ui::ExportState;
 use playback::AudioPlayback;
-use preview::PreviewWorker;
+use preview::{PreviewWorker, Want};
 
 /// What is selected on the timeline.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -97,7 +97,8 @@ pub struct EditorState {
     play_anchor: Option<(Instant, f64)>,
     table: FrameTable,
     worker: PreviewWorker,
-    uploaded_index: Option<usize>,
+    uploaded_key: Option<(usize, Option<usize>, Option<usize>)>,
+    cam_table: Option<FrameTable>,
     compositor: Compositor,
     render_state: eframe::egui_wgpu::RenderState,
     tex: Option<(egui::TextureId, (u32, u32))>,
@@ -136,7 +137,7 @@ impl EditorState {
                 ..Default::default()
             });
         }
-        let worker = PreviewWorker::spawn(screen.clone(), ctx.clone());
+        let worker = PreviewWorker::spawn(package.clone(), project.clone(), ctx.clone());
         let compositor = Compositor::new(&render_state.device, &render_state.queue);
 
         // Waveform peaks, computed once in the background.
@@ -172,7 +173,8 @@ impl EditorState {
             play_anchor: None,
             table,
             worker,
-            uploaded_index: None,
+            uploaded_key: None,
+            cam_table: None,
             compositor,
             render_state,
             tex: None,
@@ -881,19 +883,35 @@ impl EditorState {
         }
         let i = self.frame_index();
         let t_src = self.track.t_src[i];
-        let want = self.table.index_at(t_src);
-        self.worker.request(want);
+        let want_screen = self.table.index_at(t_src);
+        let off = self.project.media.camera_offset_ms;
+        if self.cam_table.is_none() && self.worker.has_camera {
+            if let Some(c) = &self.project.media.camera {
+                self.cam_table = FrameTable::open(&self.package.dir.join(c)).ok();
+            }
+        }
+        let want_cam = self.cam_table.as_ref().map(|t| t.index_at(t_src + off));
+        let other = self.track.other_alpha.get(i).filter(|a| **a > 0.003).map(|_| self.track.other_t_src[i]);
+        let want_other = other.map(|t| self.table.index_at(t));
+        let key = (want_screen, want_cam, want_other);
+        self.worker.request(Want { t_src, other_t: other, key });
         if let Some(r) = self.worker.poll() {
             match r {
                 Ok(r) => {
                     // Upload whatever arrived, even if the playhead moved on: it is the freshest.
-                    self.compositor.upload(&r.frame);
-                    self.uploaded_index = Some(r.index);
+                    self.compositor.upload(&r.frames.screen);
+                    for (slot, f) in [(Slot::Screen2, &r.frames.screen2), (Slot::Camera, &r.frames.camera), (Slot::Camera2, &r.frames.camera2)] {
+                        match f {
+                            Some(f) => self.compositor.upload_slot(slot, f),
+                            None => self.compositor.clear_slot(slot),
+                        }
+                    }
+                    self.uploaded_key = Some(r.key);
                 }
                 Err(e) => self.error = Some(e),
             }
         }
-        if self.uploaded_index != Some(want) {
+        if self.uploaded_key != Some(key) {
             ui.ctx().request_repaint_after(Duration::from_millis(8));
         }
 
@@ -906,8 +924,8 @@ impl EditorState {
         let shown = Rect::from_center_size(rect.center(), size);
         let scene = build_scene(&self.project, &self.track, i, (w, h));
         self.preview_content = Some(Rect::from_min_size(
-            shown.min + Vec2::new(scene.content[0] / w as f32 * shown.width(), scene.content[1] / h as f32 * shown.height()),
-            Vec2::new(scene.content[2] / w as f32 * shown.width(), scene.content[3] / h as f32 * shown.height()),
+            shown.min + Vec2::new(scene.screen[0] / w as f32 * shown.width(), scene.screen[1] / h as f32 * shown.height()),
+            Vec2::new(scene.screen[2] / w as f32 * shown.width(), scene.screen[3] / h as f32 * shown.height()),
         ));
         self.compositor.render(&scene);
         let view = self.compositor.target_view().unwrap();

@@ -4151,10 +4151,13 @@ dependencies = [
 name = "screencraft-render"
 version = "0.4.0"
 dependencies = [
+ "base64",
  "bytemuck",
+ "image",
  "pollster 0.4.0",
  "screencraft-core",
  "screencraft-encode",
+ "skrifa",
  "tiny-skia",
  "wgpu",
 ]

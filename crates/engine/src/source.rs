@@ -274,3 +274,72 @@ impl AudioSource {
         Ok(out)
     }
 }
+
+/// Everything the compositor needs for one output frame.
+pub struct Frames {
+    pub screen: Arc<I420>,
+    /// The other clip's picture during a cross-dissolve.
+    pub screen2: Option<Arc<I420>>,
+    pub camera: Option<Arc<I420>>,
+    pub camera2: Option<Arc<I420>>,
+}
+
+/// The screen recording and (when there is one) the camera recording, decoded on demand. A second
+/// decoder for each is opened only while a cross-dissolve needs the other clip's picture.
+pub struct MultiSource {
+    screen: VideoSource,
+    screen2: Option<VideoSource>,
+    camera: Option<VideoSource>,
+    camera2: Option<VideoSource>,
+    screen_path: std::path::PathBuf,
+    camera_path: Option<std::path::PathBuf>,
+    camera_offset_ms: f64,
+}
+
+impl MultiSource {
+    pub fn open(package: &crate::Package, project: &screencraft_core::project::Project) -> Result<Self, String> {
+        let screen_path = package.screen_path(project);
+        let screen = VideoSource::open(&screen_path)?;
+        let camera_path = project.media.camera.as_ref().map(|c| package.dir.join(c)).filter(|p| p.exists());
+        // A camera file that cannot be decoded (an unsupported codec) just leaves the camera out.
+        let camera = camera_path.as_ref().and_then(|p| match VideoSource::open(p) {
+            Ok(v) => Some(v),
+            Err(e) => {
+                eprintln!("[screencraft] camera not shown: {e}");
+                None
+            }
+        });
+        Ok(Self { screen, screen2: None, camera, camera2: None, screen_path, camera_path, camera_offset_ms: project.media.camera_offset_ms })
+    }
+
+    pub fn has_camera(&self) -> bool {
+        self.camera.is_some()
+    }
+
+    /// Source-frame indexes of the screen and camera for a source time (for change detection).
+    pub fn indexes(&self, t_src: f64) -> (usize, Option<usize>) {
+        (self.screen.index_at(t_src), self.camera.as_ref().map(|c| c.index_at(t_src + self.camera_offset_ms)))
+    }
+
+    pub fn fetch(&mut self, t_src: f64, other_t: Option<f64>) -> Result<Frames, String> {
+        let screen = self.screen.frame_at(t_src)?;
+        let camera = match self.camera.as_mut() {
+            Some(c) => c.frame_at(t_src + self.camera_offset_ms).ok(),
+            None => None,
+        };
+        let (mut screen2, mut camera2) = (None, None);
+        if let Some(t2) = other_t {
+            if self.screen2.is_none() {
+                self.screen2 = VideoSource::open(&self.screen_path).ok();
+            }
+            screen2 = self.screen2.as_mut().and_then(|s| s.frame_at(t2).ok());
+            if self.camera.is_some() {
+                if self.camera2.is_none() {
+                    self.camera2 = self.camera_path.as_ref().and_then(|p| VideoSource::open(p).ok());
+                }
+                camera2 = self.camera2.as_mut().and_then(|s| s.frame_at(t2 + self.camera_offset_ms).ok());
+            }
+        }
+        Ok(Frames { screen, screen2, camera, camera2 })
+    }
+}

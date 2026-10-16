@@ -15,4 +15,4 @@ pub use gif::{export_gif, GifReport};
 pub use export::{build_soundtrack, export_project, ExportOptions, ExportReport};
 pub use package::Package;
 pub use recorder::{Finished, LiveStats, RecordOptions, Recording};
-pub use source::{AudioSource, FrameTable, VideoSource};
+pub use source::{AudioSource, FrameTable, Frames, MultiSource, VideoSource};

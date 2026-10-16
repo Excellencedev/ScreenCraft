@@ -170,6 +170,7 @@ impl Mp4File {
         let len = src.len();
         let mut pos = 0u64;
         let mut moov: Option<Vec<u8>> = None;
+        let mut moofs: Vec<(u64, Vec<u8>)> = Vec::new();
         while pos + 8 <= len {
             let mut h = [0u8; 16];
             let n = ((len - pos).min(16)) as usize;
@@ -190,7 +191,10 @@ impl Mp4File {
                 let mut buf = vec![0u8; (size - hdr) as usize];
                 src.read_at(pos + hdr, &mut buf)?;
                 moov = Some(buf);
-                break;
+            } else if &typ == b"moof" && size < 64 * 1024 * 1024 {
+                let mut buf = vec![0u8; (size - hdr) as usize];
+                src.read_at(pos + hdr, &mut buf)?;
+                moofs.push((pos, buf));
             }
             pos += size;
         }
@@ -212,6 +216,10 @@ impl Mp4File {
                 }
             }
         }
+        // Fragmented MP4 (what a browser's MediaRecorder writes): the samples live in moof boxes.
+        if !moofs.is_empty() {
+            parse_fragments(&moov, &moofs, &mut tracks)?;
+        }
         let duration_us = tracks.iter().map(|t| t.duration_us).max().unwrap_or(0);
         Ok(Self { src, tracks, duration_us })
     }
@@ -229,6 +237,103 @@ impl Mp4File {
         self.src.read_at(s.offset, &mut buf)?;
         Ok(buf)
     }
+}
+
+/// Defaults from `mvex/trex`: (track id, sample duration, size, flags).
+fn trex_defaults(moov: &[u8]) -> Vec<(u32, u32, u32, u32)> {
+    let mut out = Vec::new();
+    if let Some(mvex) = find(moov, b"mvex") {
+        for (t, b) in boxes(mvex) {
+            if &t == b"trex" && b.len() >= 24 {
+                let g = |i: usize| u32::from_be_bytes(b[i..i + 4].try_into().unwrap());
+                out.push((g(4), g(12), g(16), g(20)));
+            }
+        }
+    }
+    out
+}
+
+fn parse_fragments(moov: &[u8], moofs: &[(u64, Vec<u8>)], tracks: &mut [Track]) -> Result<()> {
+    let trex = trex_defaults(moov);
+    // per track: next decode time in track units
+    let mut next_dts: Vec<i64> = vec![0; tracks.len()];
+    let mut seen_tfdt: Vec<bool> = vec![false; tracks.len()];
+    for (moof_pos, body) in moofs {
+        for (t, traf) in boxes(body) {
+            if &t != b"traf" {
+                continue;
+            }
+            let Some(tfhd) = find(traf, b"tfhd") else { continue };
+            let mut c = Cur::new(tfhd);
+            let flags = c.u32()? & 0x00FF_FFFF;
+            let track_id = c.u32()?;
+            let Some(ti) = tracks.iter().position(|t| t.id == track_id) else { continue };
+            let (_, d_dur, d_size, d_flags) = trex.iter().find(|x| x.0 == track_id).copied().unwrap_or((track_id, 0, 0, 0));
+            let (mut def_dur, mut def_size, mut def_flags) = (d_dur, d_size, d_flags);
+            let mut base = *moof_pos;
+            if flags & 0x1 != 0 {
+                base = c.u64()?;
+            }
+            if flags & 0x2 != 0 {
+                c.skip(4)?;
+            }
+            if flags & 0x8 != 0 {
+                def_dur = c.u32()?;
+            }
+            if flags & 0x10 != 0 {
+                def_size = c.u32()?;
+            }
+            if flags & 0x20 != 0 {
+                def_flags = c.u32()?;
+            }
+            let ts = tracks[ti].timescale as i64;
+            if let Some(tfdt) = find(traf, b"tfdt") {
+                let mut c = Cur::new(tfdt);
+                let v = c.u8()?;
+                c.skip(3)?;
+                next_dts[ti] = if v == 1 { c.u64()? as i64 } else { c.u32()? as i64 };
+                seen_tfdt[ti] = true;
+            }
+            for (t, trun) in boxes(traf) {
+                if &t != b"trun" {
+                    continue;
+                }
+                let mut c = Cur::new(trun);
+                let ver = c.u8()?;
+                let f = ((c.u8()? as u32) << 16) | ((c.u8()? as u32) << 8) | c.u8()? as u32;
+                let count = c.u32()?;
+                let mut off = if f & 0x1 != 0 { base as i64 + c.u32()? as i32 as i64 } else { base as i64 };
+                let first_flags = if f & 0x4 != 0 { Some(c.u32()?) } else { None };
+                for n in 0..count {
+                    let dur = if f & 0x100 != 0 { c.u32()? } else { def_dur };
+                    let size = if f & 0x200 != 0 { c.u32()? } else { def_size };
+                    let sflags = if f & 0x400 != 0 { c.u32()? } else if n == 0 && first_flags.is_some() { first_flags.unwrap() } else { def_flags };
+                    let cts = if f & 0x800 != 0 {
+                        let v = c.u32()?;
+                        if ver == 0 { v as i64 } else { v as i32 as i64 }
+                    } else {
+                        0
+                    };
+                    let dts = next_dts[ti];
+                    tracks[ti].samples.push(SampleRef {
+                        offset: off as u64,
+                        size,
+                        dts_us: dts * 1_000_000 / ts,
+                        pts_us: (dts + cts) * 1_000_000 / ts,
+                        key: sflags & 0x0001_0000 == 0,
+                    });
+                    next_dts[ti] += dur as i64;
+                    off += size as i64;
+                }
+            }
+        }
+    }
+    for (i, t) in tracks.iter_mut().enumerate() {
+        if !t.samples.is_empty() && t.duration_us == 0 {
+            t.duration_us = next_dts[i] * 1_000_000 / t.timescale as i64;
+        }
+    }
+    Ok(())
 }
 
 fn parse_trak(trak: &[u8]) -> Result<Option<Track>> {

@@ -9,6 +9,13 @@ fn solid(w: u32, h: u32, rgba: [u8; 4]) -> screencraft_encode::I420 {
     to_i420(&px, w, h, (w * 4) as usize, PixelOrder::Rgba, 2)
 }
 
+fn place(s: &mut screencraft_render::Scene, r: [f32; 4]) {
+    s.content = r;
+    s.screen = r;
+    s.shadow_rect = r;
+    s.shadow_box = r;
+}
+
 fn compositor() -> Option<Compositor> {
     match Compositor::headless() {
         Ok(c) => Some(c),
@@ -33,7 +40,7 @@ fn screen_is_framed_by_background_and_shows_the_source() {
     let Some(mut c) = compositor() else { return };
     c.upload(&solid(64, 36, [220, 30, 40, 255]));
     let mut s = plain_scene((320, 240), (64, 36));
-    s.content = [20.0, 20.0, 280.0, 200.0];
+    place(&mut s, [20.0, 20.0, 280.0, 200.0]);
     let _ = c.render(&s);
     let img = c.read_rgba().unwrap();
     assert_eq!(img.len(), 320 * 240 * 4);
@@ -51,7 +58,7 @@ fn corners_are_rounded() {
     let Some(mut c) = compositor() else { return };
     c.upload(&solid(16, 16, [255, 255, 255, 255]));
     let mut s = plain_scene((200, 200), (16, 16));
-    s.content = [20.0, 20.0, 160.0, 160.0];
+    place(&mut s, [20.0, 20.0, 160.0, 160.0]);
     s.radius_px = 40.0;
     let _ = c.render(&s);
     let img = c.read_rgba().unwrap();
@@ -75,7 +82,7 @@ fn zoom_crops_into_the_source() {
     }
     c.upload(&to_i420(&px_data, w, h, (w * 4) as usize, PixelOrder::Rgba, 1));
     let mut s = plain_scene((128, 128), (64, 64));
-    s.content = [0.0, 0.0, 128.0, 128.0];
+    place(&mut s, [0.0, 0.0, 128.0, 128.0]);
     // 4x zoom centred on the right half: everything is white
     s.camera = [0.75, 0.5, 4.0];
     let _ = c.render(&s);
@@ -95,7 +102,7 @@ fn cursor_and_click_effect_draw_on_top() {
     let Some(mut c) = compositor() else { return };
     c.upload(&solid(64, 64, [60, 120, 200, 255]));
     let mut s = plain_scene((256, 256), (64, 64));
-    s.content = [0.0, 0.0, 256.0, 256.0];
+    place(&mut s, [0.0, 0.0, 256.0, 256.0]);
     let base = {
         let _ = c.render(&s);
         c.read_rgba().unwrap()

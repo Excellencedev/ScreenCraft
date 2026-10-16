@@ -2,7 +2,7 @@
 
 use crate::audio_mix::{Lane, Soundtrack};
 use crate::package::Package;
-use crate::source::{AudioSource, VideoSource};
+use crate::source::AudioSource;
 use screencraft_core::project::Project;
 use screencraft_core::track::compute_track;
 use screencraft_encode::color::{default_threads, to_i420, PixelOrder};
@@ -11,7 +11,7 @@ use screencraft_encode::{
     AudioConfig, Container, Effort, ExportSettings, ExportSummary, FileSink, HwPreference, ThreadedExporter, VideoCodec,
     VideoConfig, I420,
 };
-use screencraft_render::{build_scene, output_size, Compositor};
+use screencraft_render::{build_scene, output_size, Compositor, Slot};
 use std::path::Path;
 use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
@@ -103,32 +103,24 @@ pub fn export_project(
     let (w, h) = output_size(project, opts.resolution.max(144));
     let (w, h) = (even_down(w), even_down(h));
 
-    let screen_path = package.screen_path(project);
-    // Decode on its own thread; the decoder is not Send, so it is created over there.
-    let src_idx: Vec<f64> = track.t_src.clone();
-    let (ftx, frx) = sync_channel::<Result<Arc<I420>, String>>(4);
-    let decode_path = screen_path.clone();
+    // Decode on its own thread; the decoders are not Send, so they are created over there.
+    let src_idx: Vec<(f64, Option<f64>)> = (0..track.count)
+        .map(|i| (track.t_src[i], track.other_alpha.get(i).filter(|a| **a > 0.003).map(|_| track.other_t_src[i])))
+        .collect();
+    let (ftx, frx) = sync_channel::<Result<crate::source::Frames, String>>(4);
+    let (dp, dproj) = (package.clone(), project.clone());
     let decoder = std::thread::Builder::new()
         .name("screencraft-export-decode".into())
         .spawn(move || {
-            let mut v = match VideoSource::open(&decode_path) {
-                Ok(v) => v,
+            let mut m = match crate::source::MultiSource::open(&dp, &dproj) {
+                Ok(m) => m,
                 Err(e) => {
                     let _ = ftx.send(Err(e));
                     return;
                 }
             };
-            let mut last: Option<(usize, Arc<I420>)> = None;
-            for t in src_idx {
-                let idx = v.index_at(t);
-                let frame = match &last {
-                    Some((i, f)) if *i == idx => Ok(f.clone()),
-                    _ => v.frame(idx).map(|f| {
-                        last = Some((idx, f.clone()));
-                        f
-                    }),
-                };
-                if ftx.send(frame).is_err() {
+            for (t, other) in src_idx {
+                if ftx.send(m.fetch(t, other)).is_err() {
                     return;
                 }
             }
@@ -180,8 +172,14 @@ pub fn export_project(
         });
         let mut produce = || -> Result<(), String> {
             for i in 0..track.count {
-                let frame = frx.recv().map_err(|_| "decoder stopped".to_string())??;
-                gpu.upload(&frame);
+                let frames = frx.recv().map_err(|_| "decoder stopped".to_string())??;
+                gpu.upload(&frames.screen);
+                for (slot, f) in [(Slot::Screen2, &frames.screen2), (Slot::Camera, &frames.camera), (Slot::Camera2, &frames.camera2)] {
+                    match f {
+                        Some(f) => gpu.upload_slot(slot, f),
+                        None => gpu.clear_slot(slot),
+                    }
+                }
                 let scene = build_scene(project, &track, i, (w, h));
                 gpu.render(&scene);
                 let rgba = gpu.read_rgba()?;

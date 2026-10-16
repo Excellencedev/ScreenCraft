@@ -1,16 +1,20 @@
 //! Everything the compositor needs for one output frame, derived on the CPU from the project
 //! and the render track. Pure and unit-tested; no GPU types in here.
 
+use crate::layout;
+use crate::overlay::{self, Geom, Layers};
 use crate::wallpapers::{parse_color, wallpaper};
 use screencraft_core::input::CursorKind;
 use screencraft_core::project::{ClickEffect, Project, Rect};
 use screencraft_core::track::RenderTrack;
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BackgroundKind {
     Solid,
     Gradient,
     Wallpaper,
+    Image,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -33,12 +37,43 @@ pub struct Ripple {
     pub ring: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+/// The camera picture: a rounded box that can be the whole frame, with its look.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CameraDraw {
+    pub rect: [f32; 4],
+    pub alpha: f32,
+    pub radius: f32,
+    pub shadow: f32,
+    pub border: f32,
+    pub mirror: f32,
+    pub border_color: [f32; 4],
+    /// How much of the other clip's camera picture to blend in (cross-dissolve).
+    pub blend2: f32,
+}
+
+#[derive(Clone, Debug)]
 pub struct Scene {
     pub out: (u32, u32),
     pub source: (u32, u32),
-    /// Screen rectangle in output px: x, y, w, h.
+    /// The plain content rectangle in output px (before a camera layout moves the screen).
     pub content: [f32; 4],
+    /// Where the screen is drawn: x, y, w, h (follows the camera layout).
+    pub screen: [f32; 4],
+    pub screen_alpha: f32,
+    /// What the shadow and device frame hug (the current layout's screen).
+    pub shadow_rect: [f32; 4],
+    /// The shape the drop shadow follows: the screen, plus its device frame (x, y, w, h) and corner radius.
+    pub shadow_box: [f32; 4],
+    pub shadow_radius_px: f32,
+    pub cam: Option<CameraDraw>,
+    /// Cross-dissolve: how much of the other clip's screen picture shows.
+    pub dissolve: f32,
+    /// Cut transition on the finished frame: (kind 1 fade, 2 flash, 3 blur, 4 slide, 5 zoom, signed progress).
+    pub transition: Option<(u32, f32)>,
+    pub layers: Layers,
+    pub bg_motion: u32,
+    pub bg_blur_px: f32,
+    pub bg_image: Option<Arc<(u32, u32, Vec<u8>)>>,
     pub radius_px: f32,
     pub shadow_blur_px: f32,
     pub shadow_intensity: f32,
@@ -98,9 +133,11 @@ pub fn content_rect(p: &Project, w: f64, h: f64) -> [f32; 4] {
     let pad = p.config.styles.padding_ratio * w.min(h);
     let (aw, ah) = (w - 2.0 * pad, h - 2.0 * pad);
     let a = content_aspect(p);
-    let ch = ah.min(aw / a);
+    let dv = crate::devices::insets(&p.config.styles.device);
+    // the screen's height, with the device frame around it fitting the padded area
+    let ch = (ah / (1.0 + dv.top + dv.bottom)).min(aw / (a + 2.0 * dv.side));
     let cw = ch * a;
-    [((w - cw) / 2.0) as f32, ((h - ch) / 2.0) as f32, cw as f32, ch as f32]
+    [((w - cw) / 2.0) as f32, ((h - (1.0 + dv.top + dv.bottom) * ch) / 2.0 + dv.top * ch) as f32, cw as f32, ch as f32]
 }
 
 fn kind_index(k: u8) -> u32 {
@@ -116,11 +153,17 @@ pub fn build_scene(p: &Project, track: &RenderTrack, i: usize, out: (u32, u32)) 
     let crop: Rect = p.config.crop;
     let content = content_rect(p, w, h);
 
+    // camera layout: where the screen and the camera go, eased between layouts
+    let has_cam = p.media.camera.is_some();
+    let (geo, g_cur) = layout::frame_geo(p, track, i, out.0 as f32, out.1 as f32, content, has_cam);
+    let sr = geo.sr;
+
     let bg = &st.background;
     let wp = wallpaper(&bg.wallpaper);
     let (bg_kind, bg0, bg1) = match bg.kind.as_str() {
         "color" => (BackgroundKind::Solid, parse_color(&bg.color), parse_color(&bg.color)),
         "gradient" => (BackgroundKind::Gradient, parse_color(&bg.gradient_from), parse_color(&bg.gradient_to)),
+        "image" => (BackgroundKind::Image, [0.07, 0.07, 0.07, 1.0], [0.07, 0.07, 0.07, 1.0]),
         _ => (BackgroundKind::Wallpaper, parse_color(wp.base[0]), parse_color(wp.base[1])),
     };
     let mut blobs = [[0f32; 3]; 3];
@@ -129,6 +172,18 @@ pub fn build_scene(p: &Project, track: &RenderTrack, i: usize, out: (u32, u32)) 
         blobs[k] = [b.1, b.2, b.3];
         blob_colors[k] = parse_color(b.0);
     }
+    let bg_motion = if bg.kind == "wallpaper" {
+        match bg.motion.as_str() {
+            "drift" => 1,
+            "bokeh" => 2,
+            "waves" => 3,
+            "dust" => 4,
+            _ => 0,
+        }
+    } else {
+        0
+    };
+    let bg_image = if bg.kind == "image" { bg.image.as_deref().and_then(crate::assets::bg_image) } else { None };
 
     let t_out_ms = i as f64 * 1000.0 / track.fps.max(1.0);
     let cfg = &p.config.cursor;
@@ -136,7 +191,7 @@ pub fn build_scene(p: &Project, track: &RenderTrack, i: usize, out: (u32, u32)) 
     // Points (recording units) to output px, through the camera.
     let rec_h_pts = (crop.height * p.media.bounds.height).max(1.0);
     let zoom = track.zoom.get(i).copied().unwrap_or(1.0);
-    let points_to_px = (content[3] as f64 / rec_h_pts * zoom) as f32;
+    let points_to_px = (sr[3] as f64 / rec_h_pts * zoom) as f32;
 
     let cursor = if cfg.hide || track.cursor_alpha.get(i).copied().unwrap_or(0.0) < 0.01 {
         None
@@ -170,10 +225,65 @@ pub fn build_scene(p: &Project, track: &RenderTrack, i: usize, out: (u32, u32)) 
     let dist = sh.distance as f32 * s;
     let shadow_offset = if sh.directional { [ang.cos() * dist * 0.5, ang.sin() * dist * 0.5] } else { [0.0, dist * 0.3] };
 
+    // the shadow hugs the screen and, with a device frame, the whole device
+    let dv = crate::devices::insets(&st.device);
+    let shadow_box = if dv.side + dv.top + dv.bottom > 0.0 {
+        let r = g_cur.sr;
+        (
+            [r[0] - dv.side as f32 * r[3], r[1] - dv.top as f32 * r[3], r[2] + 2.0 * dv.side as f32 * r[3], r[3] * (1.0 + (dv.top + dv.bottom) as f32)],
+            st.corner_radius as f32 * s + dv.side as f32 * r[3],
+        )
+    } else {
+        (g_cur.sr, st.corner_radius as f32 * s)
+    };
+
+    // camera box
+    let cam = if has_cam && geo.ca > 0.01 {
+        let other = track.other_alpha.get(i).copied().unwrap_or(0.0) as f32;
+        Some(CameraDraw { rect: geo.cr, alpha: geo.ca, radius: geo.rad, shadow: geo.shadow, border: geo.border, mirror: geo.mir, border_color: geo.bcol, blend2: if other > 0.003 { other.min(1.0) } else { 0.0 } })
+    } else {
+        None
+    };
+    let dissolve = track.other_alpha.get(i).copied().unwrap_or(0.0) as f32;
+    let dissolve = if dissolve > 0.003 { dissolve.min(1.0) } else { 0.0 };
+    let transition = match (track.trans_kind.get(i).copied().unwrap_or(0), track.trans_p.get(i).copied().unwrap_or(0.0) as f32) {
+        (k, pr) if k > 0 && k != 6 && ease_k(pr.abs()) > 0.002 => Some((k as u32, pr)),
+        _ => None,
+    };
+
+    // CPU layers: device frame, annotations, shortcuts, watermark, captions
+    let (cx, cy) = (track.cx.get(i).copied().unwrap_or(0.5), track.cy.get(i).copied().unwrap_or(0.5));
+    let (vw, vh) = (crop.width / zoom, crop.height / zoom);
+    let geom = Geom {
+        w: out.0 as f32,
+        h: out.1 as f32,
+        sr,
+        content_r: content,
+        view: [(cx - vw / 2.0) as f32, (cy - vh / 2.0) as f32, vw as f32, vh as f32],
+        zoom: zoom as f32,
+        screen_radius: st.corner_radius as f32 * s,
+        t_src: track.t_src.get(i).copied().unwrap_or(0.0),
+        t_out_ms,
+        screen_alpha: geo.sa,
+    };
+    let layers = overlay::build(p, &geom, &track.combos, out, g_cur.sr);
+
     Scene {
         out,
         source: (p.media.width, p.media.height),
         content,
+        screen: sr,
+        screen_alpha: geo.sa,
+        shadow_rect: g_cur.sr,
+        shadow_box: shadow_box.0,
+        shadow_radius_px: shadow_box.1,
+        cam,
+        dissolve,
+        transition,
+        layers,
+        bg_motion,
+        bg_blur_px: if bg.kind == "color" { 0.0 } else { bg.blur as f32 * s },
+        bg_image,
         radius_px: st.corner_radius as f32 * s,
         shadow_blur_px: sh.blur as f32 * 2.0 * s,
         shadow_intensity: sh.intensity as f32,
@@ -182,7 +292,7 @@ pub fn build_scene(p: &Project, track: &RenderTrack, i: usize, out: (u32, u32)) 
         camera: [track.cx.get(i).copied().unwrap_or(0.5) as f32, track.cy.get(i).copied().unwrap_or(0.5) as f32, zoom as f32],
         bg_kind,
         bg_angle_rad: (bg.gradient_angle as f32).to_radians(),
-        bg_drift: bg.kind == "wallpaper" && bg.motion != "none",
+        bg_drift: bg_motion == 1,
         bg0,
         bg1,
         blobs,
@@ -199,6 +309,11 @@ pub fn build_scene(p: &Project, track: &RenderTrack, i: usize, out: (u32, u32)) 
     }
 }
 
+pub fn ease_k(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
 /// A scene with nothing in it but the screen, for tests and thumbnails.
 pub fn plain_scene(out: (u32, u32), source: (u32, u32)) -> Scene {
     let a = source.0 as f32 / source.1 as f32;
@@ -209,6 +324,18 @@ pub fn plain_scene(out: (u32, u32), source: (u32, u32)) -> Scene {
         out,
         source,
         content: [(w - cw) / 2.0, (h - ch) / 2.0, cw, ch],
+        screen: [(w - cw) / 2.0, (h - ch) / 2.0, cw, ch],
+        screen_alpha: 1.0,
+        shadow_rect: [(w - cw) / 2.0, (h - ch) / 2.0, cw, ch],
+        shadow_box: [(w - cw) / 2.0, (h - ch) / 2.0, cw, ch],
+        shadow_radius_px: 0.0,
+        cam: None,
+        dissolve: 0.0,
+        transition: None,
+        layers: Layers::default(),
+        bg_motion: 0,
+        bg_blur_px: 0.0,
+        bg_image: None,
         radius_px: 0.0,
         shadow_blur_px: 1.0,
         shadow_intensity: 0.0,
