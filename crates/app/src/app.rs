@@ -40,6 +40,8 @@ pub struct App {
     hover_window: Option<screencraft_capture::WindowInfo>,
     compressor: Option<crate::compressor::Compressor>,
     pending_open: Vec<std::path::PathBuf>,
+    /// Recordings just finished: their zooms are generated the first time they open.
+    fresh: Vec<std::path::PathBuf>,
     quit: bool,
     discard_after_stop: bool,
     /// Native window handle (Windows), to keep the recording bar out of the capture.
@@ -76,7 +78,14 @@ impl App {
             return;
         }
         match EditorState::open(Package::open(dir), ctx, self.render_state.clone()) {
-            Ok(ed) => {
+            Ok(mut ed) => {
+                if let Some(i) = self.fresh.iter().position(|d| *d == ed.package.dir) {
+                    self.fresh.remove(i);
+                    if ed.project.scene.zooms.is_empty() {
+                        ed.auto_zoom();
+                        ed.save_now();
+                    }
+                }
                 self.next_editor += 1;
                 let title = ed.project.name.clone();
                 self.editors.push(EditorWin { id: ViewportId::from_hash_of(("editor", self.next_editor)), ed: Box::new(ed), title });
@@ -148,6 +157,7 @@ impl App {
             hover_window: None,
             compressor: None,
             pending_open: Vec::new(),
+            fresh: Vec::new(),
             quit: false,
             discard_after_stop: false,
             native_window: None,
@@ -293,7 +303,10 @@ impl App {
                         Ok(f) if discard => {
                             let _ = std::fs::remove_dir_all(&f.package.dir);
                         }
-                        Ok(f) => self.pending_open.push(f.package.dir.clone()),
+                        Ok(f) => {
+                            self.fresh.push(f.package.dir.clone());
+                            self.pending_open.push(f.package.dir.clone());
+                        }
                         Err(e) => self.rec.show_error(e),
                     }
                 }
