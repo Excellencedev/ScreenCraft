@@ -14,7 +14,10 @@ const version = readFileSync(join(root, 'Cargo.toml'), 'utf8').match(/^version =
 const stem = `screencraft_${version.replaceAll('.', '_')}`;
 const names = [`${stem}.dmg`, `${stem}.exe`];
 for (const f of names) {
-  if (!existsSync(join(root, f))) throw new Error(`missing ${f} in the repository root`);
+  if (!existsSync(join(root, f))) {
+    if (f.endsWith('.exe')) { console.warn(`WARNING: ${f} not in the repository root; the Windows download will 404 until it is added`); continue; }
+    throw new Error(`missing ${f} in the repository root`);
+  }
   copyFileSync(join(root, f), join(out, f));
 }
 // drop installers of other versions
