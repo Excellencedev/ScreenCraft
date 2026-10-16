@@ -39,6 +39,7 @@ pub struct App {
     /// Highlight outline on the screen while hovering a window in the menu.
     hover_window: Option<screencraft_capture::WindowInfo>,
     compressor: Option<crate::compressor::Compressor>,
+    pending_open: Vec<std::path::PathBuf>,
     quit: bool,
     discard_after_stop: bool,
     /// Native window handle (Windows), to keep the recording bar out of the capture.
@@ -146,6 +147,7 @@ impl App {
             show_permissions: false,
             hover_window: None,
             compressor: None,
+            pending_open: Vec::new(),
             quit: false,
             discard_after_stop: false,
             native_window: None,
@@ -291,7 +293,7 @@ impl App {
                         Ok(f) if discard => {
                             let _ = std::fs::remove_dir_all(&f.package.dir);
                         }
-                        Ok(f) => self.open_package(ctx, f.package.dir.clone()),
+                        Ok(f) => self.pending_open.push(f.package.dir.clone()),
                         Err(e) => self.rec.show_error(e),
                     }
                 }
@@ -333,7 +335,7 @@ impl App {
                     ctx.send_viewport_cmd(ViewportCommand::Close);
                 }
             }
-            Action::OpenProject(dir) => self.open_package(ctx, dir),
+            Action::OpenProject(dir) => self.pending_open.push(dir),
             Action::PickArea => self.pick_area(ctx),
             Action::HoverWindow(w) => self.hover_window = w,
             Action::ShowPermissions => self.show_permissions = true,
@@ -486,7 +488,12 @@ impl App {
                 ctx.show_viewport_immediate(id, builder, |ui, _class| {
                     ed.ui(ui);
                     if ui.ctx().input(|i| i.viewport().close_requested()) {
-                        close = true;
+                        if ed.dirty {
+                            ui.ctx().send_viewport_cmd(ViewportCommand::CancelClose);
+                            ed.close_prompt = Some(crate::editor::CloseIntent::Window);
+                        } else {
+                            close = true;
+                        }
                     }
                     if let Some(req) = ed.open_request.take() {
                         open_requests.push(req);
@@ -496,8 +503,32 @@ impl App {
                     }
                 });
             }
-            if self.editors[i].ed.project.name != self.editors[i].title {
-                self.editors[i].title = self.editors[i].ed.project.name.clone();
+            let title = format!("{}{}", self.editors[i].ed.project.name, if self.editors[i].ed.dirty { " *" } else { "" });
+            if title != self.editors[i].title {
+                self.editors[i].title = title;
+            }
+            // the answer to a save prompt
+            if let Some(ans) = self.editors[i].ed.close_answer.take() {
+                use crate::editor::{Answer, CloseIntent};
+                let intent = self.editors[i].ed.close_prompt.take();
+                match ans {
+                    Answer::Cancel => {}
+                    Answer::Save | Answer::Discard => {
+                        if ans == Answer::Save {
+                            self.editors[i].ed.save_now();
+                        } else {
+                            self.editors[i].ed.dirty = false;
+                        }
+                        match intent {
+                            Some(CloseIntent::Window) => close = true,
+                            Some(CloseIntent::Open(p)) => {
+                                self.editors[i].ed.close_after_open = true;
+                                open_requests.push(p);
+                            }
+                            None => {}
+                        }
+                    }
+                }
             }
             if close {
                 let mut w = self.editors.remove(i);
@@ -515,7 +546,19 @@ impl App {
                 self.compressor = Some(c);
             }
         }
+        open_requests.extend(std::mem::take(&mut self.pending_open));
         for dir in open_requests {
+            // opening another project replaces the ones on screen, asking about unsaved edits first
+            if self.editors.iter().any(|e| e.ed.package.dir == dir) {
+                continue;
+            }
+            if let Some(e) = self.editors.iter_mut().find(|e| e.ed.dirty && !e.ed.close_after_open) {
+                e.ed.close_prompt = Some(crate::editor::CloseIntent::Open(dir));
+                continue;
+            }
+            for mut w in self.editors.drain(..) {
+                w.ed.pause();
+            }
             self.open_package(&ctx, dir);
         }
 

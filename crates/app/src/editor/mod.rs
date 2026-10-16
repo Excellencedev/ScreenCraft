@@ -49,6 +49,22 @@ impl Sel {
     }
 }
 
+/// What the save prompt is guarding.
+#[derive(Clone, PartialEq, Debug)]
+pub enum CloseIntent {
+    /// This window is closing.
+    Window,
+    /// Another project is about to replace this one.
+    Open(std::path::PathBuf),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Answer {
+    Save,
+    Discard,
+    Cancel,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Tab {
     Appearance,
@@ -121,6 +137,8 @@ pub struct EditorState {
     playing: bool,
     rate: f64,
     play_anchor: Option<(Instant, f64)>,
+    /// True while the soundtrack is playing: the playhead then follows the audio device's clock.
+    audio_clock: bool,
     table: FrameTable,
     worker: PreviewWorker,
     uploaded_key: Option<(usize, Option<usize>, Option<usize>)>,
@@ -134,6 +152,14 @@ pub struct EditorState {
     wave_rx: Option<std::sync::mpsc::Receiver<Vec<f32>>>,
     pub export: ExportState,
     dirty_since: Option<Instant>,
+    /// Edits not yet saved: switching projects or closing asks first.
+    pub dirty: bool,
+    /// Asking what to do with unsaved edits before this window closes or another project opens.
+    pub close_prompt: Option<CloseIntent>,
+    /// The user's answer to `close_prompt`, collected by the app.
+    pub close_answer: Option<Answer>,
+    /// Set once the user decided to replace this project (its edits are settled).
+    pub close_after_open: bool,
     pub error: Option<String>,
     id_counter: u64,
     /// Last rendered content rect in screen space (for the zoom-target picker).
@@ -210,6 +236,7 @@ impl EditorState {
             playing: false,
             rate: 1.0,
             play_anchor: None,
+            audio_clock: false,
             table,
             worker,
             uploaded_key: None,
@@ -223,6 +250,10 @@ impl EditorState {
             wave_rx: Some(wrx),
             export: ExportState::default(),
             dirty_since: None,
+            dirty: false,
+            close_prompt: None,
+            close_answer: None,
+            close_after_open: false,
             error: None,
             id_counter: 0,
             preview_content: None,
@@ -323,6 +354,7 @@ impl EditorState {
     /// Mark the project edited by the UI: recompute the track and schedule a save.
     fn changed(&mut self) {
         self.track_dirty = true;
+        self.dirty = true;
         self.dirty_since = Some(Instant::now());
         if self.playing {
             self.restart_audio();
@@ -376,15 +408,18 @@ impl EditorState {
             self.error = Some(e);
         }
         self.dirty_since = None;
+        self.dirty = false;
     }
 
     fn restart_audio(&mut self) {
         self.ensure_track();
+        self.audio_clock = false;
         if let Some(a) = self.audio.as_mut() {
             a.stop();
             if self.playing {
                 if let Ok(Some(st)) = build_soundtrack(&self.package, &self.project, &self.track) {
                     a.play(st, self.playhead_ms);
+                    self.audio_clock = self.rate == 1.0;
                 }
             }
         }
@@ -408,6 +443,7 @@ impl EditorState {
     pub fn pause(&mut self) {
         self.playing = false;
         self.rate = 1.0;
+        self.audio_clock = false;
         self.play_anchor = None;
         if let Some(a) = self.audio.as_mut() {
             a.stop();
@@ -441,7 +477,11 @@ impl EditorState {
     pub fn tick(&mut self, ctx: &egui::Context) {
         if self.playing {
             if let Some((t0, p0)) = self.play_anchor {
-                let t = p0 + t0.elapsed().as_secs_f64() * 1000.0 * self.rate;
+                // with sound, the device's own clock drives the picture; it waits for the first samples
+                let t = match (&self.audio, self.audio_clock) {
+                    (Some(a), true) => p0 + a.position_ms(),
+                    _ => p0 + t0.elapsed().as_secs_f64() * 1000.0 * self.rate,
+                };
                 let d = self.duration_ms();
                 if t >= d {
                     self.playhead_ms = d;
@@ -456,11 +496,6 @@ impl EditorState {
             if let Ok(p) = rx.try_recv() {
                 self.waveform = Some(Arc::new(p));
                 self.wave_rx = None;
-            }
-        }
-        if let Some(t) = self.dirty_since {
-            if t.elapsed() > Duration::from_millis(900) {
-                self.save_now();
             }
         }
         while let Ok((f, p)) = self.peaks_rx.try_recv() {
@@ -859,6 +894,7 @@ impl EditorState {
                 }
                 if self.playing {
                     self.rate = 2.0;
+                    self.audio_clock = false;
                     self.play_anchor = Some((Instant::now(), self.playhead_ms));
                 }
             }
@@ -1089,6 +1125,7 @@ impl EditorState {
         }
         export_ui::show(self, &ctx);
         dialogs::show(self, &ctx);
+        dialogs::save_prompt(self, &ctx);
         self.wants_back
     }
 

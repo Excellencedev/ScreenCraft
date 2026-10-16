@@ -11,6 +11,8 @@ use std::time::Duration;
 struct Shared {
     buf: Mutex<VecDeque<f32>>,
     generation: AtomicU64,
+    /// Samples the device actually took from the buffer since `play` (silence from underruns is not counted).
+    consumed: AtomicU64,
 }
 
 pub struct AudioPlayback {
@@ -27,14 +29,22 @@ impl AudioPlayback {
         let conf = device.default_output_config().ok()?;
         let rate = conf.sample_rate();
         let channels = conf.channels() as usize;
-        let shared = Arc::new(Shared { buf: Mutex::new(VecDeque::new()), generation: AtomicU64::new(0) });
+        let shared = Arc::new(Shared { buf: Mutex::new(VecDeque::new()), generation: AtomicU64::new(0), consumed: AtomicU64::new(0) });
         let sc = conf.config();
         let sh = shared.clone();
         let fill = move |out: &mut [f32]| {
             let mut b = sh.buf.lock().unwrap();
+            let mut n = 0u64;
             for s in out.iter_mut() {
-                *s = b.pop_front().unwrap_or(0.0);
+                *s = match b.pop_front() {
+                    Some(v) => {
+                        n += 1;
+                        v
+                    }
+                    None => 0.0,
+                };
             }
+            sh.consumed.fetch_add(n, Ordering::Relaxed);
         };
         let err = |e| eprintln!("[screencraft] audio output error: {e}");
         let stream = match conf.sample_format() {
@@ -69,6 +79,7 @@ impl AudioPlayback {
     pub fn play(&mut self, mut soundtrack: Soundtrack, start_ms: f64) {
         let gen = self.shared.generation.fetch_add(1, Ordering::SeqCst) + 1;
         self.shared.buf.lock().unwrap().clear();
+        self.shared.consumed.store(0, Ordering::Relaxed);
         let shared = self.shared.clone();
         let (rate, channels) = (self.rate, self.channels);
         std::thread::Builder::new()
@@ -127,6 +138,12 @@ impl AudioPlayback {
                 }
             })
             .ok();
+    }
+
+    /// How much of the soundtrack the device has played since `play` (ms): the clock that picture
+    /// and captions follow, so they can never drift from what is heard.
+    pub fn position_ms(&self) -> f64 {
+        self.shared.consumed.load(Ordering::Relaxed) as f64 / self.channels as f64 / self.rate as f64 * 1000.0
     }
 
     pub fn stop(&mut self) {

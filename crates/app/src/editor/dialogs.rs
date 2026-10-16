@@ -710,3 +710,49 @@ fn about(st: &mut EditorState, ctx: &egui::Context) {
         st.dialogs.about = false;
     }
 }
+
+/// "Save changes to ...?" over the editor, shown before the window closes or another project opens.
+pub fn save_prompt(st: &mut EditorState, ctx: &egui::Context) {
+    if st.close_prompt.is_none() {
+        return;
+    }
+    let screen = ctx.content_rect();
+    egui::Area::new(egui::Id::new("save-dim")).order(egui::Order::Middle).fixed_pos(screen.min).show(ctx, |ui| {
+        ui.allocate_rect(screen, Sense::click());
+        ui.painter().rect_filled(screen, 0.0, Color32::from_rgba_unmultiplied(4, 7, 12, 158));
+    });
+    let mut answer = None;
+    egui::Window::new("save-ask")
+        .title_bar(false)
+        .collapsible(false)
+        .resizable(false)
+        .order(egui::Order::Foreground)
+        .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
+        .fixed_size(Vec2::new(350.0, 0.0))
+        .frame(egui::Frame::new().fill(PANEL).stroke(Stroke::new(1.0, LINE_2)).corner_radius(CornerRadius::same(12)).inner_margin(egui::Margin::same(20)).shadow(egui::Shadow { offset: [0, 20], blur: 60, spread: 0, color: Color32::from_black_alpha(140) }))
+        .show(ctx, |ui| {
+            ui.spacing_mut().item_spacing = Vec2::new(8.0, 6.0);
+            ui.label(egui::RichText::new(format!("Save changes to “{}”?", st.project.name)).strong().size(15.0).color(TEXT));
+            ui.label(egui::RichText::new("Your edits will be lost if you don't save them.").size(12.5).color(MUTED));
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                if kit::pill(ui, None, "Don't Save", false, false, false, None).clicked() {
+                    answer = Some(super::Answer::Discard);
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if kit::primary(ui, None, "Save").clicked() {
+                        answer = Some(super::Answer::Save);
+                    }
+                    if kit::pill(ui, None, "Cancel", false, false, false, None).clicked() {
+                        answer = Some(super::Answer::Cancel);
+                    }
+                });
+            });
+        });
+    if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+        answer = Some(super::Answer::Cancel);
+    }
+    if let Some(a) = answer {
+        st.close_answer = Some(a);
+    }
+}
