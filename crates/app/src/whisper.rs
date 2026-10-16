@@ -8,7 +8,7 @@ use screencraft_engine::Package;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+use whisper_rs::{DtwMode, DtwModelPreset, DtwParameters, FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 pub struct Caption {
     pub text: String,
@@ -109,7 +109,21 @@ fn to_16k(mono: &[f32], rate: u32) -> Vec<f32> {
 /// Run the model over 16 kHz mono samples. Timestamps are shifted back by `offset_ms`
 /// (the microphone clock runs `offset_ms` ahead of the recording's).
 fn recognize(model_file: &Path, pcm: &[f32], model: &str, language: &str, offset_ms: f64, on_progress: impl FnMut(i32) + 'static) -> Result<Vec<Caption>, String> {
-    let ctx = WhisperContext::new_with_params(model_file.to_str().ok_or("bad model path")?, WhisperContextParameters::default()).map_err(|e| format!("could not load the model: {e}"))?;
+    // DTW token timestamps align each word to the audio far better than the default estimate
+    let preset = match model {
+        "tiny.en" => Some(DtwModelPreset::TinyEn),
+        "base.en" => Some(DtwModelPreset::BaseEn),
+        "small.en" => Some(DtwModelPreset::SmallEn),
+        "base" => Some(DtwModelPreset::Base),
+        "large-v3-turbo-q5_0" => Some(DtwModelPreset::LargeV3Turbo),
+        _ => None,
+    };
+    let mut cp = WhisperContextParameters::default();
+    cp.flash_attn = false;
+    if let Some(p) = preset {
+        cp.dtw_parameters(DtwParameters { mode: DtwMode::ModelPreset { model_preset: p }, ..Default::default() });
+    }
+    let ctx = WhisperContext::new_with_params(model_file.to_str().ok_or("bad model path")?, cp).map_err(|e| format!("could not load the model: {e}"))?;
     let mut state = ctx.create_state().map_err(|e| e.to_string())?;
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
     let threads = std::thread::available_parallelism().map(|n| n.get() as i32).unwrap_or(4).min(8);
@@ -140,15 +154,54 @@ fn recognize(model_file: &Path, pcm: &[f32], model: &str, language: &str, offset
         if text.is_empty() || text.starts_with("[_") || (text.starts_with('[') && text.ends_with(']')) || (text.starts_with('(') && text.ends_with(')')) || text.starts_with('♪') {
             continue;
         }
-        // centiseconds on the microphone clock; the project uses the source clock
-        let s = (seg.start_timestamp() as f64 * 10.0 - offset_ms).max(0.0);
-        let e = seg.end_timestamp() as f64 * 10.0 - offset_ms;
-        if e <= 0.0 {
-            continue;
-        }
-        words.push((text, s, e));
+        // centiseconds on the microphone clock
+        words.push((text, seg.start_timestamp() as f64 * 10.0, seg.end_timestamp() as f64 * 10.0));
     }
-    Ok(chunk(clean(words)))
+    // snap each word's edges to the voice in the audio, then move to the project's source clock
+    let refined = refine(words, pcm);
+    let shifted: Vec<(String, f64, f64)> = refined.into_iter().map(|(t, s, e)| (t, (s - offset_ms).max(0.0), e - offset_ms)).filter(|w| w.2 > 0.0).collect();
+    Ok(chunk(clean(shifted)))
+}
+
+/// Pull word boundaries onto the nearest voice onset / offset in the audio. Whisper's own times can
+/// lag or lead by a few hundred milliseconds, which shows as captions drifting out of step and then
+/// catching up; the signal energy pins them down.
+fn refine(words: Vec<(String, f64, f64)>, pcm16k: &[f32]) -> Vec<(String, f64, f64)> {
+    const FRAME: usize = 160; // 10 ms at 16 kHz
+    let n = pcm16k.len() / FRAME;
+    if n < 10 {
+        return words;
+    }
+    let e: Vec<f32> = (0..n).map(|i| (pcm16k[i * FRAME..(i + 1) * FRAME].iter().map(|x| x * x).sum::<f32>() / FRAME as f32).sqrt()).collect();
+    let mut sorted = e.clone();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let noise = sorted[n / 5].max(1e-5);
+    let at = |ms: f64| ((ms / 10.0).round().max(0.0) as usize).min(n - 1);
+    words
+        .into_iter()
+        .map(|(text, t0, t1)| {
+            let (a, b) = (at(t0 - 220.0), at(t0 + 260.0));
+            let peak = e[a..=b.max(a)].iter().cloned().fold(0.0, f32::max);
+            let thr = (noise * 3.0).max(peak * 0.22);
+            // rising edge closest to the estimated start
+            let mut best: Option<usize> = None;
+            for i in a.max(1)..=b {
+                if e[i] > thr && e[i - 1] <= thr && best.map(|k| (i as f64 * 10.0 - t0).abs() < (k as f64 * 10.0 - t0).abs()).unwrap_or(true) {
+                    best = Some(i);
+                }
+            }
+            let s = best.map(|i| (i as f64 * 10.0 - 10.0).max(0.0)).filter(|s| (s - t0).abs() <= 240.0).unwrap_or(t0);
+            let (c, d) = (at(t1 - 240.0), at(t1 + 240.0));
+            let mut fall: Option<usize> = None;
+            for i in c.max(1)..=d {
+                if e[i] <= thr && e[i - 1] > thr && fall.map(|k| (i as f64 * 10.0 - t1).abs() < (k as f64 * 10.0 - t1).abs()).unwrap_or(true) {
+                    fall = Some(i);
+                }
+            }
+            let en = fall.map(|i| i as f64 * 10.0 + 20.0).filter(|x| (x - t1).abs() <= 260.0 && *x > s + 40.0).unwrap_or(t1.max(s + 40.0));
+            (text, s, en)
+        })
+        .collect()
 }
 
 /// Make the word times monotone without overlaps.

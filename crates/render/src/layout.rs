@@ -71,7 +71,7 @@ fn bubble_box(p: &Project, cc: &CameraConfig, w: f32, h: f32, zoom: f64, mul: f3
 /// camera on the right, 5 camera left) under camera settings `cc`.
 pub fn layout_geom(id: u8, cc: &CameraConfig, p: &Project, w: f32, h: f32, r: R, zoom: f64, has_cam: bool) -> Geo {
     let s = h / 1080.0;
-    let rad = p.config.styles.corner_radius as f32 * s;
+    let rad = crate::devices::screen_radius(&p.config.styles.device, p.config.styles.corner_radius as f32 * s, r[3]);
     let bcol = crate::wallpapers::parse_color(if cc.border_color.is_empty() { "#ffffff" } else { &cc.border_color });
     let look = (if cc.shadow { 1.0 } else { 0.0 }, if cc.border { 1.0 } else { 0.0 }, if cc.mirror { -1.0 } else { 1.0 });
     let mk = |sr: R, sa: f32, cr: R, ca: f32, rad: f32| Geo { sr, sa, cr, ca, rad, shadow: look.0, border: look.1, mir: look.2, bcol };

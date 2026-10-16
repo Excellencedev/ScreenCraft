@@ -213,6 +213,8 @@ pub fn build_scene_with(p: &Project, track: &RenderTrack, i: usize, out: (u32, u
 
     let t_out_ms = i as f64 * 1000.0 / track.fps.max(1.0);
     let cfg = &p.config.cursor;
+    // a device's screen has corners of its own
+    let corner = crate::devices::screen_radius(&st.device, st.corner_radius as f32 * s, content[3]);
 
     // Points (recording units) to output px, through the camera.
     let rec_h_pts = (crop.height * p.media.bounds.height).max(1.0);
@@ -257,10 +259,10 @@ pub fn build_scene_with(p: &Project, track: &RenderTrack, i: usize, out: (u32, u
         let r = g_cur.sr;
         (
             [r[0] - dv.side as f32 * r[3], r[1] - dv.top as f32 * r[3], r[2] + 2.0 * dv.side as f32 * r[3], r[3] * (1.0 + (dv.top + dv.bottom) as f32)],
-            st.corner_radius as f32 * s + dv.side as f32 * r[3],
+            corner + dv.side as f32 * r[3],
         )
     } else {
-        (g_cur.sr, st.corner_radius as f32 * s)
+        (g_cur.sr, corner)
     };
 
     // camera box
@@ -290,12 +292,12 @@ pub fn build_scene_with(p: &Project, track: &RenderTrack, i: usize, out: (u32, u
         content_r: content,
         view: [(cx - vw / 2.0) as f32, (cy - vh / 2.0) as f32, vw as f32, vh as f32],
         zoom: zoom as f32,
-        screen_radius: st.corner_radius as f32 * s,
+        screen_radius: corner,
         t_src: track.t_src.get(i).copied().unwrap_or(0.0),
         t_out_ms,
         screen_alpha: geo.sa,
     };
-    let layers = overlay::build(p, &geom, &track.combos, out, g_cur.sr);
+    let layers = overlay::build(p, &geom, &track.combos, out, g_cur.sr, corner);
 
     Scene {
         out,
@@ -313,7 +315,7 @@ pub fn build_scene_with(p: &Project, track: &RenderTrack, i: usize, out: (u32, u
         bg_motion,
         bg_blur_px: if bg.kind == "color" { 0.0 } else { bg.blur as f32 * s },
         bg_image,
-        radius_px: st.corner_radius as f32 * s,
+        radius_px: corner,
         shadow_blur_px: sh.blur as f32 * 2.0 * s,
         shadow_intensity: sh.intensity as f32,
         shadow_offset,

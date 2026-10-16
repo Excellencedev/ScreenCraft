@@ -553,11 +553,11 @@ fn subtitles(p: &Project, cx: &Ctx, px: &mut Option<Pixmap>) {
 // ---- entry point ----------------------------------------------------------------------------
 
 /// Paint every CPU layer for one frame.
-pub fn build(p: &Project, g: &Geom, combos: &[ComboMark], out: (u32, u32), device_rect: R) -> Layers {
+pub fn build(p: &Project, g: &Geom, combos: &[ComboMark], out: (u32, u32), device_rect: R, screen_radius: f32) -> Layers {
     let s = g.h / 1080.0;
     let cx = Ctx { g, s, font: Font::at_weight(400.0), font_bold: Font::at_weight(600.0) };
     let mut layers = Layers::default();
-    layers.under = device_layer(&p.config.styles.device, device_rect, out, p.config.styles.corner_radius as f32 * s, s);
+    layers.under = device_layer(&p.config.styles.device, device_rect, out, screen_radius, s);
     if g.screen_alpha > 0.01 {
         layers.content = annotations(p, &cx, "content", &mut layers.bounds, &mut layers.effects);
     }
