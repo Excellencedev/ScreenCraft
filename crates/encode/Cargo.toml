@@ -11,8 +11,10 @@ default = []
 vp9 = ["dep:env-libvpx-sys"]
 
 [dependencies]
-openh264 = "0.9"
 rav1e = { version = "0.8", default-features = false, features = ["threading"] }
 audiopus = "0.3.0-rc.0"
 thiserror = "2"
 env-libvpx-sys = { version = "5.1", features = ["generate"], optional = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.61", features = ["Win32_Media_MediaFoundation", "Win32_Foundation", "Win32_System_Com", "Win32_System_Variant", "Win32_UI_Shell_PropertiesSystem"] }

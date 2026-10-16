@@ -81,10 +81,12 @@ fn exports_mp4_and_webm_with_edits_applied() {
     let bytes = std::fs::read(&webm).unwrap();
     assert_eq!(&bytes[..4], &[0x1A, 0x45, 0xDF, 0xA3]);
 
-    // Same project, same options -> identical bytes (software encoder, same GPU).
-    let again = dir.join("again.mp4");
-    export_project(&package, &project, &opts(Container::Mp4, VideoCodec::H264), &again, |_| true).unwrap();
-    assert_eq!(std::fs::read(&mp4).unwrap(), std::fs::read(&again).unwrap());
+    // Same project, same options -> identical bytes (software AV1 encoder, same GPU). H.264 goes
+    // through the OS encoder, which makes no byte-for-byte promise.
+    let (a, b) = (dir.join("a.mp4"), dir.join("b.mp4"));
+    export_project(&package, &project, &opts(Container::Mp4, VideoCodec::Av1), &a, |_| true).unwrap();
+    export_project(&package, &project, &opts(Container::Mp4, VideoCodec::Av1), &b, |_| true).unwrap();
+    assert_eq!(std::fs::read(&a).unwrap(), std::fs::read(&b).unwrap());
 
     // Cancelling removes the partial file.
     let cancelled = dir.join("cancel.mp4");

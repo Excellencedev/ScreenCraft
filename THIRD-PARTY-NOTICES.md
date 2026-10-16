@@ -12,12 +12,7 @@ This file is the authoritative list. The same text is published at
 
 ## Codecs and media libraries
 
-- **OpenH264** (software H.264 encoder and decoder): **BSD-2-Clause**, Copyright (c) 2013 Cisco Systems.
-  Upstream <https://github.com/cisco/openh264>, built from source by the `openh264` crate.
-  *Patent note:* Cisco's patent licence for H.264 covers only the binaries Cisco itself distributes.
-  Because ScreenCraft compiles OpenH264 from source, whoever redistributes a build is responsible for
-  any H.264 licensing the use of that build requires (see COMPLIANCE.md). On macOS the hardware
-  encoder in VideoToolbox is used by default instead.
+- **H.264**: ScreenCraft bundles no H.264 codec. Encoding and decoding use the operating system's licensed implementation (VideoToolbox on macOS, Media Foundation on Windows).
 - **rav1e** (AV1 encoder): **BSD-2-Clause** with the Alliance for Open Media patent licence,
   Copyright (c) The rav1e contributors. <https://github.com/xiph/rav1e>
 - **libopus** (audio encoder / decoder, via `audiopus`): **BSD-3-Clause**, Copyright (c) Xiph.Org

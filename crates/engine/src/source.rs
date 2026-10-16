@@ -1,6 +1,6 @@
 //! Decoding recordings back into frames and PCM for the editor and exporter.
 
-use screencraft_encode::h264::{avcc_to_annexb, H264Decoder};
+use screencraft_encode::h264::H264Decoder;
 use screencraft_encode::mp4read::{parse_avcc, Mp4File, SampleRef, Track, TrackKind};
 use screencraft_encode::opus::OpusDecoder;
 use screencraft_encode::I420;
@@ -83,7 +83,7 @@ impl VideoSource {
         Ok(Self {
             file,
             track,
-            decoder: H264Decoder::new().map_err(|e| e.to_string())?,
+            decoder: H264Decoder::new(&params, length_size).map_err(|e| e.to_string())?,
             length_size,
             params,
             last_decoded: None,
@@ -141,7 +141,7 @@ impl VideoSource {
             Some(l) if l < idx && idx - l <= 90 && self.no_key_between(l + 1, idx) => l + 1,
             _ => {
                 let k = self.keyframe_at_or_before(idx);
-                self.decoder = H264Decoder::new().map_err(|e| e.to_string())?;
+                self.decoder = H264Decoder::new(&self.params, self.length_size).map_err(|e| e.to_string())?;
                 k
             }
         };
@@ -149,8 +149,7 @@ impl VideoSource {
         for i in start..=idx {
             let s = self.samples()[i].clone();
             let raw = self.file.read_sample(&s).map_err(|e| e.to_string())?;
-            let annexb = avcc_to_annexb(&raw, self.length_size, if s.key { Some(&self.params) } else { None });
-            let pic = self.decoder.decode(&annexb).map_err(|e| e.to_string())?;
+            let pic = self.decoder.decode(&raw).map_err(|e| e.to_string())?;
             self.last_decoded = Some(i);
             if let Some(p) = pic {
                 let arc = Arc::new(p);

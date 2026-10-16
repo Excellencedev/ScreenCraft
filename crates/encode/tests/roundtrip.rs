@@ -1,4 +1,4 @@
-use screencraft_encode::h264::{avcc_to_annexb, H264Decoder};
+use screencraft_encode::h264::H264Decoder;
 use screencraft_encode::mp4read::{parse_avcc, Mp4File, TrackKind};
 use screencraft_encode::*;
 
@@ -74,12 +74,11 @@ fn h264_mp4_roundtrip_decodes() {
     assert_eq!(a.kind, TrackKind::Audio);
 
     let (ls, params) = parse_avcc(&v.config).unwrap();
-    let mut dec = H264Decoder::new().unwrap();
+    let mut dec = H264Decoder::new(&params, ls).unwrap();
     let mut got = 0;
     for (i, s) in v.samples.iter().enumerate() {
         let raw = mp4.read_sample(s).unwrap();
-        let annexb = avcc_to_annexb(&raw, ls, if s.key { Some(&params) } else { None });
-        if let Some(pic) = dec.decode(&annexb).unwrap() {
+        if let Some(pic) = dec.decode(&raw).unwrap() {
             let src = frame(i as u32);
             let err: u64 = pic.y.iter().zip(&src.y).map(|(a, b)| (*a as i64 - *b as i64).unsigned_abs()).sum();
             assert!(err / (W * H) as u64 <= 6, "frame {i}: mean luma error {}", err / (W * H) as u64);
@@ -106,7 +105,7 @@ fn av1_in_both_containers() {
 
 #[test]
 fn output_is_deterministic_across_thread_counts() {
-    for codec in [VideoCodec::H264, VideoCodec::Av1] {
+    for codec in [VideoCodec::Av1] {
         let a = run(codec, Container::Mp4, 1, true, 10);
         let b = run(codec, Container::Mp4, 4, true, 10);
         let c = run(codec, Container::Mp4, 4, true, 10);
@@ -116,8 +115,8 @@ fn output_is_deterministic_across_thread_counts() {
 
 #[test]
 fn threaded_exporter_matches_inline() {
-    let inline = run(VideoCodec::H264, Container::Mp4, 1, false, 8);
-    let mut video = VideoConfig::new(VideoCodec::H264, W, H, 30);
+    let inline = run(VideoCodec::Av1, Container::Mp4, 1, false, 8);
+    let mut video = VideoConfig::new(VideoCodec::Av1, W, H, 30);
     video.threads = 1;
     video.hardware = HwPreference::Software;
     video.effort = Effort::Fast;
@@ -180,7 +179,7 @@ fn run_sized(codec: VideoCodec, container: Container, threads: usize, w: u32, h:
 #[test]
 fn wide_frames_are_deterministic_across_thread_counts() {
     let cases: Vec<(VideoCodec, Container)> = vec![
-        (VideoCodec::H264, Container::Mp4),
+        (VideoCodec::Av1, Container::Mp4),
         (VideoCodec::Av1, Container::WebM),
         #[cfg(feature = "vp9")]
         (VideoCodec::Vp9, Container::WebM),
