@@ -344,6 +344,20 @@ impl App {
     fn place_bar(&mut self, ctx: &egui::Context) {
         let screen_w = self.rec.displays().iter().find(|d| d.is_main).map(|d| d.width as f32).unwrap_or(1440.0);
         let camera = self.prefs.camera;
+        // While an editor is open the bar steps aside (a 1px window parked off screen keeps the
+        // app's event loop running); it comes back when the last editor closes.
+        if !self.editors.is_empty() && self.rec.phase == Phase::Idle {
+            let key = (Vec2::splat(1.0), Phase::Idle, true);
+            if self.applied != Some(key) {
+                ctx.send_viewport_cmd(ViewportCommand::InnerSize(Vec2::splat(1.0)));
+                ctx.send_viewport_cmd(ViewportCommand::OuterPosition(Pos2::new(-20000.0, -20000.0)));
+                self.applied = Some(key);
+            }
+            return;
+        }
+        if matches!(self.applied, Some((v, _, true)) if v == Vec2::splat(1.0)) {
+            self.applied = None;
+        }
         let want = self.rec.window_size(screen_w, camera);
         let key = (want, self.rec.phase, self.rec.menu.is_some());
         if self.applied == Some(key) {
