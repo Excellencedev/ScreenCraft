@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds ScreenCraft and packs it into dist/ScreenCraft-<version>.dmg with a drag-to-
+# Builds ScreenCraft and packs it into dist/screencraft_<version>.dmg with a drag-to-
 # Applications layout. Usage: ./scripts/dmg.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -8,7 +8,8 @@ cd "$(dirname "$0")/.."
 
 VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
 VOL="ScreenCraft"
-OUT="dist/ScreenCraft-${VERSION}.dmg"
+# same naming as the Windows installer: 0.4.0 -> screencraft_0_4_0.dmg
+OUT="dist/screencraft_${VERSION//./_}.dmg"
 RW="dist/.ScreenCraft-rw.dmg"
 STAGE="$(mktemp -d)/$VOL"
 mkdir -p "$STAGE"
@@ -57,6 +58,7 @@ rm -f "$RW"
 swift -e 'import AppKit
 let a = CommandLine.arguments
 if let i = NSImage(contentsOfFile: a[1]) { NSWorkspace.shared.setIcon(i, forFile: a[2], options: []) }' dist/ScreenCraft.app/Contents/Resources/ScreenCraft.icns "$OUT" 2>/dev/null || true
-# the repo keeps the current installer at its root under a fixed name
-cp "$OUT" ScreenCraft.dmg
-echo "Built $OUT ($(du -h "$OUT" | cut -f1)) and copied it to ./ScreenCraft.dmg"
+# the repo keeps the current installer at its root under the same versioned name
+rm -f ./ScreenCraft.dmg ./screencraft_*.dmg
+cp "$OUT" "./$(basename "$OUT")"
+echo "Built $OUT ($(du -h "$OUT" | cut -f1)) and copied it to ./$(basename "$OUT")"

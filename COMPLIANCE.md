@@ -20,6 +20,7 @@ responsibly, what has been done, and what remains for the maintainer or for anyo
 | --- | --- | --- |
 | Third-party notices | [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), also on the website | MIT/BSD/ISC/Apache require the license and copyright notice to accompany binary distributions. This file is that notice. **Ship it (or a link to it) with every build.** |
 | rav1e, libopus (and libvpx when built with `vp9`) | BSD-2/3-Clause | Credited in the notices file. **H.264:** ScreenCraft ships no H.264 codec of its own. It calls the operating system's licensed encoder/decoder (VideoToolbox on macOS, Media Foundation on Windows), so codec licensing is covered by the OS vendor. Linux has no OS H.264 and offers AV1 / VP9 only. AV1 (rav1e) and VP9 / Opus come with royalty-free patent grants. |
+| whisper.cpp and the OpenAI Whisper models | MIT | whisper.cpp is built from source (`whisper-rs`). Models are downloaded by the user on request, not bundled. Credit is in the notices file and the About window. |
 | Crates under MPL-2.0 (if any appear in the lock file) | MPL-2.0 | File-level copyleft. Used unmodified; source is public on crates.io. If you modify those crates' files you must publish your modifications to them. |
 | Dual-licensed crates (`MIT OR Apache-2.0`, `... OR LGPL`) | | We elect MIT/Apache-2.0. No LGPL code is linked. |
 | Regenerating the list | `python3 scripts/gen-notices.py` (reads `cargo metadata`) | Re-run when dependencies change. `cargo deny check licenses` is a good CI gate. |
@@ -62,14 +63,14 @@ the rights to anything they record or add (music, logos, third-party footage).
 
 | Platform | What is required for distribution | Status |
 | --- | --- | --- |
-| macOS | Usage-description strings for Screen Recording and Microphone (written into `Info.plist` by `scripts/bundle.sh`). Developer ID signing + notarization to avoid Gatekeeper warnings. | Strings present. Ad-hoc signed only; **notarization needs a paid Apple Developer account** (not done). |
+| macOS | Usage-description strings for Screen Recording and Microphone (written into `Info.plist` by `scripts/bundle.sh`). Developer ID signing + notarization to avoid Gatekeeper warnings. | Strings present (screen, microphone and camera). Ad-hoc signed only; **notarization needs a paid Apple Developer account** (not done). |
 | Windows | Authenticode code signing to avoid SmartScreen warnings. | Unsigned. No runtime prerequisites (the UI is native). A code-signing certificate (or Azure Trusted Signing) is a future step. |
 | Linux | Needs `xdg-desktop-portal` with a ScreenCast backend and PipeWire at runtime. | Documented in the README. No package is published yet. |
 | Both | Distribute the MIT license and third-party notices with the binary. | The repository root carries both; link them from any release page. |
 
 ## 7. Export controls and encryption
 
-The app itself makes no network connections (there is no update check, telemetry or model download). Publicly available open-source
+The app makes only two kinds of network connection: the notify-only update check (one small JSON file, the app version in the request, can be switched off) and the caption model download you start yourself (from Hugging Face). There is no telemetry. Publicly available open-source
 software with mass-market encryption is generally not restricted, but US EAR §742.15(b) asks for an
 email notification to BIS/NSA for publicly available encryption source code in some cases. If you publish
 builds from the US, check this once; it is a one-off notification, not an ongoing duty.

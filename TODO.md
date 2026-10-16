@@ -1,6 +1,6 @@
-# native-egui: status and open items
+# 0.4.0: status and open items
 
-This branch rebuilds ScreenCraft as a native egui/wgpu app that matches the 0.3 (Tauri) UI:
+This rebuilds ScreenCraft as a native egui/wgpu app that matches the 0.3 (Tauri) UI:
 the same colours, layout, panels, timeline, recorder bar, dialogs and features, with no web view.
 Do not merge into `main` until the owner says so.
 

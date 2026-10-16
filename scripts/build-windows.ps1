@@ -4,12 +4,14 @@
 #   - Rust with the MSVC toolchain  (https://rustup.rs, and the "Desktop development
 #     with C++" workload from the Visual Studio Build Tools)
 #   - NSIS                          (winget install NSIS.NSIS)
-#   - CMake                         (winget install Kitware.CMake) - builds libopus
+#   - CMake                         (winget install Kitware.CMake) - builds libopus and whisper.cpp
+#   - LLVM (libclang)               (winget install LLVM.LLVM) - lets the whisper.cpp bindings generate
 #
 # Usage (from the repository root, in PowerShell):
 #   powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1
-#   powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1 -Out ScreenCraft-Setup.exe
-param([string]$Out = "ScreenCraft-Setup.exe")
+#   powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1 -Out custom-name.exe
+# The installer is named after the version (0.4.0 -> screencraft_0_4_0.exe), like the macOS .dmg.
+param([string]$Out = "")
 
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
@@ -51,6 +53,7 @@ if (-not $makensis) {
 }
 if (-not $makensis) { throw "makensis not found - install NSIS first (winget install NSIS.NSIS)" }
 
+if (-not $Out) { $Out = "screencraft_$($version -replace '\.', '_').exe" }
 $exe = (Resolve-Path "target\release\screencraft.exe").Path
 $ico = (Resolve-Path "assets\icons\icon.ico").Path
 $outPath = Join-Path (Get-Location) $Out

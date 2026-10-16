@@ -1,14 +1,11 @@
 # Changelog
 
-## native-egui (unreleased)
-- Native egui/wgpu rebuild matching the 0.3 UI; OS-licensed H.264 only (no OpenH264).
-
-
 ## Unreleased
 
 ## 0.4.0: native rewrite
 
-ScreenCraft is now a single native Rust application (egui + wgpu). The Tauri / web UI is gone.
+ScreenCraft is now a single native Rust application (egui + wgpu), with the same look, layout and
+features as 0.3. The Tauri / web UI is gone.
 
 - **Capture engines.** ScreenCaptureKit on macOS, DXGI Desktop Duplication on Windows and the
   xdg-desktop-portal ScreenCast + PipeWire stream on Linux (Wayland and X11), behind one `Capturer`
@@ -16,19 +13,31 @@ ScreenCraft is now a single native Rust application (egui + wgpu). The Tauri / w
 - **Audio.** Microphone through cpal everywhere, system audio from ScreenCaptureKit (macOS), WASAPI
   loopback (Windows) and PulseAudio / PipeWire monitor sources (Linux). Every stream is stamped on one
   monotonic clock and aligned to the first video frame (gaps filled, overlap trimmed, drift nudged).
-- **Encoding.** New sans-I/O encode stack: H.264 (VideoToolbox hardware on macOS, OpenH264 software),
-  AV1 (rav1e) and VP9 (libvpx, optional feature), Opus audio, MP4 and WebM muxers that describe file
+- **Encoding.** New sans-I/O encode stack: H.264 through the operating system's own licensed codec
+  (VideoToolbox on macOS, Media Foundation on Windows; no H.264 code is bundled), AV1 (rav1e) and
+  VP9 (libvpx, optional feature), Opus audio, MP4 and WebM muxers that describe file
   writes instead of performing them. Exports are byte-identical for the same input regardless of thread
   count; a threaded wrapper overlaps rendering and encoding.
-- **Editor.** wgpu compositor shared by the preview and the exporter (wallpapers, gradients, padding,
-  rounded corners, shadow, camera zoom / pan, cursor, click ripples, cursor highlight); non-destructive
-  trim, split, speed and cut; zoom regions you can move and resize, follow-cursor or fixed point,
-  generated automatically from clicks and typing; undo / redo and autosave.
-- **Platform.** Follows the system light / dark theme and handles high-DPI displays.
-- **Not carried over from the web UI:** the camera bubble, captions (whisper.cpp), annotations, key
-  display, device frames, transitions, music tracks, sound effects, GIF export, the compressor and
-  the in-app update check. Existing `.screencraft` packages open; those settings are kept in
-  `project.json` but not rendered.
+- **Editor, matching 0.3.** The 0.3 colours, layout, nine inspector panels, six-track timeline,
+  export dialog, presets, raw-file menu and About / updates window, drawn natively. The wgpu
+  compositor is shared by the preview and the exporter: wallpapers (with motion), gradients, images,
+  blur, padding, corners, shadow, **device frames**, camera zoom / pan, cursor, click effects,
+  highlight, the **camera bubble and layouts**, **annotations** (including blur, pixelate and
+  spotlight), shortcut display, **captions** (on-device whisper.cpp, SRT), watermark, and dissolve /
+  fade / flash / blur / slide / zoom **transitions**.
+- **Audio.** Levels, **music** with fades and ducking under speech, click and typing **sound
+  effects**, microphone levelling.
+- **Recorder.** The floating bar with Display / Window / Area (drag out the area), camera, microphone
+  and system-audio inputs with meters, quality menu, Projects menu, countdown, HUD, discard, and the
+  permissions window. The camera is recorded alongside the screen.
+- **Export.** MP4 (H.264 or AV1), WebM, **GIF**, motion blur and a **compress after export** pass; the
+  standalone **compressor** window; the notify-only **update check**.
+- **Projects.** One window per project, unsaved-edit prompt, zooms generated the first time a
+  recording opens. 0.3 `.screencraft` packages (including their fragmented-MP4 camera files and
+  separate microphone files) open as they are.
+- **Platform.** The app is dark only, like 0.3, and handles high-DPI displays.
+- **Installers.** Named after the version on both platforms: `screencraft_0_4_0.dmg` and
+  `screencraft_0_4_0.exe`.
 
 ## 0.3.4
 
